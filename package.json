@@ -1,0 +1,22 @@
+{
+  "name": "homesplit",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "ultracite check",
+    "lint:fix": "ultracite fix",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*": "pnpm lint"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "latest",
+    "@commitlint/cli": "latest",
+    "@commitlint/config-conventional": "latest",
+    "husky": "latest",
+    "lint-staged": "latest",
+    "ultracite": "latest"
+  },
+  "packageManager": "pnpm@12.4.1"
+}
