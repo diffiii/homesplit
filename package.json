@@ -3,9 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "pnpm -r build",
+    "build:backend": "pnpm --filter backend build",
+    "dev": "pnpm -r dev",
+    "dev:backend": "pnpm --filter backend dev",
     "lint": "ultracite check",
     "lint:fix": "ultracite fix",
-    "prepare": "husky"
+    "prepare": "husky",
+    "typecheck": "pnpm -r typecheck"
   },
   "lint-staged": {
     "*": "pnpm lint"
