@@ -1,0 +1,56 @@
+{
+  "name": "@homesplit/contracts",
+  "private": true,
+  "description": "Shared API contracts (Zod schemas and types)",
+  "type": "commonjs",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./features/catalog": {
+      "types": "./dist/features/catalog.d.ts",
+      "default": "./dist/features/catalog.js"
+    },
+    "./features/users": {
+      "types": "./dist/features/users/index.d.ts",
+      "default": "./dist/features/users/index.js"
+    },
+    "./features/households": {
+      "types": "./dist/features/households/index.d.ts",
+      "default": "./dist/features/households/index.js"
+    },
+    "./features/expenses": {
+      "types": "./dist/features/expenses/index.d.ts",
+      "default": "./dist/features/expenses/index.js"
+    },
+    "./features/chores": {
+      "types": "./dist/features/chores/index.d.ts",
+      "default": "./dist/features/chores/index.js"
+    },
+    "./features/shopping": {
+      "types": "./dist/features/shopping/index.d.ts",
+      "default": "./dist/features/shopping/index.js"
+    },
+    "./features/friends": {
+      "types": "./dist/features/friends/index.d.ts",
+      "default": "./dist/features/friends/index.js"
+    },
+    "./features/notifications": {
+      "types": "./dist/features/notifications/index.d.ts",
+      "default": "./dist/features/notifications/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}

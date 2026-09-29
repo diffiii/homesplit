@@ -1,0 +1,2 @@
+/** Friends schemas */
+export {};

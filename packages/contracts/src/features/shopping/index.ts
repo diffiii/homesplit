@@ -1,0 +1,2 @@
+/** Shopping schemas */
+export {};
