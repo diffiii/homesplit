@@ -7,5 +7,8 @@ export * from "./common/id";
 export * from "./common/money";
 export * from "./common/pagination";
 export * from "./features/catalog";
+export * from "./features/chores";
+export * from "./features/expenses";
 export * from "./features/households";
+export * from "./features/shopping";
 export * from "./features/users";
