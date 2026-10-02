@@ -188,14 +188,14 @@ importers:
   packages/backend:
     dependencies:
       '@nestjs/common':
-        specifier: ^12.1.0
-        version: 12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
+        specifier: ^12.1.1
+        version: 12.1.1(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core':
         specifier: ^12.1.0
-        version: 12.1.0(@nestjs/common@12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@12.1.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+        version: 12.1.0(@nestjs/common@12.1.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@12.1.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/platform-express':
         specifier: ^12.1.1
-        version: 12.1.1(@nestjs/common@12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)
+        version: 12.1.1(@nestjs/common@12.1.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -599,8 +599,8 @@ packages:
       webpack-node-externals:
         optional: true
 
-  '@nestjs/common@12.1.0':
-    resolution: {integrity: sha512-YGNboXyCmLWwIyrrVLst2dsH+DjsIje4S3P2i06HRwV0Sdcp+qZ7UV3PvIvCD4mI/VGH/f4p0Oq2sMVkVB0GOA==}
+  '@nestjs/common@12.1.1':
+    resolution: {integrity: sha512-foR+9SDz53vd4WXvN5UEXbcU0i/i9mf/zXqbAWlEDQlxAooS4kZoY5X/Zr2DsUJZaLPOk3kFQdu6EhbWrhAoDQ==}
     peerDependencies:
       class-transformer: '>=0.4.1'
       class-validator: '>=0.13.2'
@@ -2055,7 +2055,7 @@ snapshots:
       - '@types/node'
       - prettier
 
-  '@nestjs/common@12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2)':
+  '@nestjs/common@12.1.1(reflect-metadata@0.2.2)(rxjs@7.8.2)':
     dependencies:
       '@standard-schema/spec': 1.1.0
       file-type: 22.1.1
@@ -2068,9 +2068,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@nestjs/core@12.1.0(@nestjs/common@12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@12.1.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)':
+  '@nestjs/core@12.1.0(@nestjs/common@12.1.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@12.1.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)':
     dependencies:
-      '@nestjs/common': 12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/common': 12.1.1(reflect-metadata@0.2.2)(rxjs@7.8.2)
       fast-safe-stringify: 2.1.1
       iterare: 1.2.1
       path-to-regexp: 8.4.2
@@ -2079,12 +2079,12 @@ snapshots:
       tslib: 2.8.1
       uid: 2.0.2
     optionalDependencies:
-      '@nestjs/platform-express': 12.1.1(@nestjs/common@12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)
+      '@nestjs/platform-express': 12.1.1(@nestjs/common@12.1.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)
 
-  '@nestjs/platform-express@12.1.1(@nestjs/common@12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)':
+  '@nestjs/platform-express@12.1.1(@nestjs/common@12.1.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.1.0)':
     dependencies:
-      '@nestjs/common': 12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@nestjs/core': 12.1.0(@nestjs/common@12.1.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@12.1.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/common': 12.1.1(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core': 12.1.0(@nestjs/common@12.1.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@12.1.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       cors: 2.8.6
       express: 5.2.1
       multer: 2.4.0
@@ -2250,7 +2250,7 @@ snapshots:
   cli-truncate@6.1.1:
     dependencies:
       slice-ansi: 9.0.1
-      string-width: 8.2.2
+      string-width: 8.3.0
 
   cli-width@4.1.0: {}
 
@@ -2619,7 +2619,7 @@ snapshots:
       ansi-escapes: 7.3.0
       cli-cursor: 5.0.0
       slice-ansi: 9.0.1
-      string-width: 8.2.2
+      string-width: 8.3.0
       strip-ansi: 7.2.0
       wrap-ansi: 10.0.2
 
@@ -3041,7 +3041,7 @@ snapshots:
   wrap-ansi@10.0.2:
     dependencies:
       ansi-styles: 6.2.3
-      string-width: 8.2.2
+      string-width: 8.3.0
 
   wrap-ansi@9.0.2:
     dependencies:
@@ -3062,7 +3062,7 @@ snapshots:
       cliui: 9.0.1
       escalade: 3.2.0
       get-caller-file: 2.0.5
-      string-width: 8.2.2
+      string-width: 8.3.0
       y18n: 5.0.8
       yargs-parser: 22.0.0
 
