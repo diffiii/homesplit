@@ -5,6 +5,11 @@ import { Id } from "../../common/id";
 import { Money } from "../../common/money";
 import { Pagination, paginatedResponse } from "../../common/pagination";
 import { UserSummary } from "../users";
+import { ExpenseCategory } from "./categories";
+
+// biome-ignore lint/performance/noBarrelFile: package entry point
+export * from "./categories";
+export * from "./settlements";
 
 /** How an expense total is divided among participants. */
 export const SplitMethod = z.enum([
@@ -36,6 +41,7 @@ export const Expense = z.object({
   splitMethod: SplitMethod,
   payer: UserSummary, // if we want to be able to put more than one payer, we should consider payers ExpenseSplit or sth like that
   author: UserSummary,
+  category: ExpenseCategory.nullable(),
   expenseDate: IsoDate,
   splits: z.array(ExpenseSplit),
   createdAt: IsoDateTime,
@@ -56,6 +62,7 @@ const ExpenseWritableFields = z.object({
   total: Money,
   splitMethod: SplitMethod,
   payerId: Id,
+  categoryId: Id.nullable().optional(),
   expenseDate: IsoDate,
   splits: z.array(ExpenseSplitInput).min(1),
 });
