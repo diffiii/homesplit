@@ -3,21 +3,40 @@ import { z } from "zod";
 import { IsoDateTime } from "../../common/datetime";
 import { Id } from "../../common/id";
 import { Pagination, paginatedResponse } from "../../common/pagination";
+import { queryBoolean } from "../../common/query";
 import { UserSummary } from "../users";
 
-/** Shopping list item within a household. */
-export const ShoppingItem = z.object({
+const ShoppingItemBase = z.object({
   id: Id,
   householdId: Id,
   name: z.string().min(1),
   quantity: z.int().min(1),
   unit: z.string().min(1).nullable(), // TODO: maybe we can use some kind of enum here?
-  isPurchased: z.boolean(),
   addedBy: UserSummary,
-  purchasedBy: UserSummary.nullable(),
   addedAt: IsoDateTime,
-  purchasedAt: IsoDateTime.nullable(),
 });
+
+/** Shopping item that has not been purchased yet. */
+export const UnpurchasedShoppingItem = ShoppingItemBase.extend({
+  isPurchased: z.literal(false),
+  purchasedBy: z.null(),
+  purchasedAt: z.null(),
+});
+export type UnpurchasedShoppingItem = z.infer<typeof UnpurchasedShoppingItem>;
+
+/** Purchased shopping item with its purchase metadata. */
+export const PurchasedShoppingItem = ShoppingItemBase.extend({
+  isPurchased: z.literal(true),
+  purchasedBy: UserSummary,
+  purchasedAt: IsoDateTime,
+});
+export type PurchasedShoppingItem = z.infer<typeof PurchasedShoppingItem>;
+
+/** Shopping list item within a household; `isPurchased` narrows the purchase metadata. */
+export const ShoppingItem = z.discriminatedUnion("isPurchased", [
+  UnpurchasedShoppingItem,
+  PurchasedShoppingItem,
+]);
 export type ShoppingItem = z.infer<typeof ShoppingItem>;
 
 const ShoppingItemWritableFields = z.object({
@@ -34,9 +53,9 @@ export const CreateShoppingItemRequest = ShoppingItemWritableFields.extend({
 /** Partial update of writable fields only (not purchase state). */
 export const UpdateShoppingItemRequest = ShoppingItemWritableFields.partial();
 
-/** List shopping items; by default excludes purchased. */
+/** List shopping items; by default excludes purchased. Decodes raw URL query strings. */
 export const ListShoppingItemsQuery = Pagination.extend({
-  includePurchased: z.boolean().default(false),
+  includePurchased: queryBoolean().default(false),
 });
 export type ListShoppingItemsQuery = z.infer<typeof ListShoppingItemsQuery>;
 
@@ -54,10 +73,10 @@ export const ShoppingItemIdParams = z.object({
 export type ShoppingItemIdParams = z.infer<typeof ShoppingItemIdParams>;
 
 /** Response for purchasing a shopping item. */
-export type PurchaseShoppingItemResponse = ShoppingItem;
+export type PurchaseShoppingItemResponse = PurchasedShoppingItem;
 
 /** Response for unpurchasing a shopping item. */
-export type UnpurchaseShoppingItemResponse = ShoppingItem;
+export type UnpurchaseShoppingItemResponse = UnpurchasedShoppingItem;
 
 /** Path params for clearing all purchased items in a household. */
 export const ClearPurchasedShoppingItemsParams = z.object({

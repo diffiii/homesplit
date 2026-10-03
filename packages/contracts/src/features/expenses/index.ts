@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { IsoDate, IsoDateTime } from "../../common/datetime";
 import { Id } from "../../common/id";
-import { Money } from "../../common/money";
+import { Cents, PositiveCents, PositiveMoney } from "../../common/money";
 import { Pagination, paginatedResponse } from "../../common/pagination";
 import { UserSummary } from "../users";
 import { ExpenseCategory } from "./categories";
@@ -21,57 +21,210 @@ export const SplitMethod = z.enum([
 ]);
 export type SplitMethod = z.infer<typeof SplitMethod>;
 
-/** One participant's share of an expense. */
-export const ExpenseSplit = z.object({
-  id: Id,
+/** 100% expressed in basis points. */
+export const FULL_PERCENTAGE_BASIS_POINTS = 10_000;
+
+const AllocationParticipant = z.strictObject({ userId: Id });
+
+/**
+ * Allocation strategy for an expense. Amounts are calculated by the backend;
+ * users who don't take part are left out of `participants`.
+ */
+export const ExpenseAllocationInput = z.discriminatedUnion("method", [
+  z.strictObject({
+    method: z.literal(SplitMethod.enum.equal),
+    participants: z.array(AllocationParticipant).min(1),
+  }),
+  z.strictObject({
+    method: z.literal(SplitMethod.enum.percentage),
+    participants: z
+      .array(
+        AllocationParticipant.extend({
+          basisPoints: z.int().positive().max(FULL_PERCENTAGE_BASIS_POINTS),
+        })
+      )
+      .min(1),
+  }),
+  z.strictObject({
+    method: z.literal(SplitMethod.enum.shares),
+    participants: z
+      .array(AllocationParticipant.extend({ shares: z.int().positive() }))
+      .min(1),
+  }),
+  z.strictObject({
+    method: z.literal(SplitMethod.enum.exact),
+    participants: z
+      .array(AllocationParticipant.extend({ amountCents: Cents.nonnegative() }))
+      .min(1),
+  }),
+  z.strictObject({
+    method: z.literal(SplitMethod.enum.adjustment),
+    // Remainder after adjustments is split equally, then each adjustment is added.
+    participants: z
+      .array(AllocationParticipant.extend({ adjustmentCents: Cents }))
+      .min(1),
+  }),
+]);
+export type ExpenseAllocationInput = z.infer<typeof ExpenseAllocationInput>;
+
+/** Amount a user actually paid towards an expense. */
+export const ExpensePayerInput = z.strictObject({
+  userId: Id,
+  amountCents: PositiveCents,
+});
+export type ExpensePayerInput = z.infer<typeof ExpensePayerInput>;
+
+const ExpenseFinancialFields = z.strictObject({
+  total: PositiveMoney,
+  payers: z.array(ExpensePayerInput).min(1),
+  allocation: ExpenseAllocationInput,
+});
+type ExpenseFinancialFields = z.infer<typeof ExpenseFinancialFields>;
+
+const sum = (values: number[]) => values.reduce((acc, v) => acc + v, 0);
+
+function addDuplicateUserIssues(
+  entries: { userId: Id }[],
+  path: (string | number)[],
+  ctx: z.RefinementCtx
+) {
+  const seen = new Set<Id>();
+  entries.forEach((entry, index) => {
+    if (seen.has(entry.userId)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Duplicate user",
+        path: [...path, index, "userId"],
+      });
+    }
+    seen.add(entry.userId);
+  });
+}
+
+function validateFinancialSpec(
+  spec: ExpenseFinancialFields,
+  ctx: z.RefinementCtx
+) {
+  const total = spec.total.amountCents;
+  const { allocation } = spec;
+
+  addDuplicateUserIssues(spec.payers, ["payers"], ctx);
+  addDuplicateUserIssues(
+    allocation.participants,
+    ["allocation", "participants"],
+    ctx
+  );
+
+  if (sum(spec.payers.map((p) => p.amountCents)) !== total) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Payer amounts must sum to the total",
+      path: ["payers"],
+    });
+  }
+
+  const participantsPath = ["allocation", "participants"];
+  switch (allocation.method) {
+    case "percentage":
+      if (
+        sum(allocation.participants.map((p) => p.basisPoints)) !==
+        FULL_PERCENTAGE_BASIS_POINTS
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Percentages must sum to 100%",
+          path: participantsPath,
+        });
+      }
+      break;
+    case "exact":
+      if (sum(allocation.participants.map((p) => p.amountCents)) !== total) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Split amounts must sum to the total",
+          path: participantsPath,
+        });
+      }
+      break;
+    case "adjustment": {
+      const { participants } = allocation;
+      const adjustmentsSum = sum(participants.map((p) => p.adjustmentCents));
+      const baseShare = (total - adjustmentsSum) / participants.length;
+      participants.forEach((p, index) => {
+        if (baseShare + p.adjustmentCents < 0) {
+          ctx.addIssue({
+            code: "custom",
+            message: "Adjustment results in a negative share",
+            path: [...participantsPath, index, "adjustmentCents"],
+          });
+        }
+      });
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+/** Total, payers and allocation; always replaced and validated together. */
+export const ExpenseFinancialSpec = ExpenseFinancialFields.superRefine(
+  validateFinancialSpec
+);
+export type ExpenseFinancialSpec = z.infer<typeof ExpenseFinancialSpec>;
+
+const ExpenseDescriptiveFields = z.strictObject({
+  name: z.string().min(1),
+  description: z.string().min(1).nullable().optional(),
+  categoryId: Id.nullable().optional(),
+  expenseDate: IsoDate,
+});
+
+/** Payer's contribution to an expense. */
+export const ExpensePayer = z.object({
   user: UserSummary,
-  amount: Money,
-  // isSettled: z.boolean(),            // I think we can remove this field, because algorithm will be way more complex if we want to keep it
-  // settledAt: IsoDateTime.nullable(), // Same as above
+  amountCents: PositiveCents,
+});
+export type ExpensePayer = z.infer<typeof ExpensePayer>;
+
+/** One participant's calculated share of an expense (currency from `total`). */
+export const ExpenseSplit = z.object({
+  user: UserSummary,
+  amountCents: Cents,
 });
 export type ExpenseSplit = z.infer<typeof ExpenseSplit>;
 
-/** Household expense with payer, author, and splits. */
+/** Household expense with payers, author, allocation strategy, and splits. */
 export const Expense = z.object({
   id: Id,
   householdId: Id,
   name: z.string().min(1),
   description: z.string().min(1).nullable(),
-  total: Money,
-  splitMethod: SplitMethod,
-  payer: UserSummary, // if we want to be able to put more than one payer, we should consider payers ExpenseSplit or sth like that
+  total: PositiveMoney,
+  payers: z.array(ExpensePayer),
   author: UserSummary,
   category: ExpenseCategory.nullable(),
   expenseDate: IsoDate,
+  allocation: ExpenseAllocationInput,
   splits: z.array(ExpenseSplit),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });
 export type Expense = z.infer<typeof Expense>;
 
-/** Split line when creating or updating an expense (currency from `total`). */
-export const ExpenseSplitInput = z.object({
-  userId: Id,
-  amountCents: z.int(),
-});
-export type ExpenseSplitInput = z.infer<typeof ExpenseSplitInput>;
-
-const ExpenseWritableFields = z.object({
-  name: z.string().min(1),
-  description: z.string().min(1).nullable().optional(),
-  total: Money,
-  splitMethod: SplitMethod,
-  payerId: Id,
-  categoryId: Id.nullable().optional(),
-  expenseDate: IsoDate,
-  splits: z.array(ExpenseSplitInput).min(1),
-});
-
 /** Create an expense; author is the authenticated user. */
-export const CreateExpenseRequest = ExpenseWritableFields;
+export const CreateExpenseRequest = ExpenseDescriptiveFields.extend(
+  ExpenseFinancialFields.shape
+).superRefine(validateFinancialSpec);
+export type CreateExpenseRequest = z.infer<typeof CreateExpenseRequest>;
 
-/** Partial update of writable fields only (not settlement state). */
-export const UpdateExpenseRequest = ExpenseWritableFields.partial();
+/**
+ * Update an expense. Descriptive fields can be patched independently;
+ * the financial spec is replaced as a whole.
+ */
+export const UpdateExpenseRequest = ExpenseDescriptiveFields.partial().extend({
+  financial: ExpenseFinancialSpec.optional(),
+});
+export type UpdateExpenseRequest = z.infer<typeof UpdateExpenseRequest>;
 
 /** List expenses with offset pagination. */
 export const ListExpensesQuery = Pagination;

@@ -3,10 +3,10 @@ import { z } from "zod";
 import { IsoDate, IsoDateTime } from "../../common/datetime";
 import { Id } from "../../common/id";
 import { Pagination, paginatedResponse } from "../../common/pagination";
+import { queryBoolean } from "../../common/query";
 import { UserSummary } from "../users";
 
-/** Household chore / task. */
-export const Chore = z.object({
+const ChoreBase = z.object({
   id: Id,
   householdId: Id,
   name: z.string().min(1),
@@ -14,12 +14,31 @@ export const Chore = z.object({
   assignedTo: UserSummary.nullable(),
   dueDate: IsoDate.nullable(), // we could consider adding a due time as well (IsoDateTime)
   addedBy: UserSummary,
-  isCompleted: z.boolean(),
-  completedAt: IsoDateTime.nullable(),
-  completedBy: UserSummary.nullable(),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });
+
+/** Chore that has not been completed yet. */
+export const OpenChore = ChoreBase.extend({
+  isCompleted: z.literal(false),
+  completedAt: z.null(),
+  completedBy: z.null(),
+});
+export type OpenChore = z.infer<typeof OpenChore>;
+
+/** Completed chore with its completion metadata. */
+export const CompletedChore = ChoreBase.extend({
+  isCompleted: z.literal(true),
+  completedAt: IsoDateTime,
+  completedBy: UserSummary,
+});
+export type CompletedChore = z.infer<typeof CompletedChore>;
+
+/** Household chore / task; `isCompleted` narrows the completion metadata. */
+export const Chore = z.discriminatedUnion("isCompleted", [
+  OpenChore,
+  CompletedChore,
+]);
 export type Chore = z.infer<typeof Chore>;
 
 const ChoreWritableFields = z.object({
@@ -35,9 +54,9 @@ export const CreateChoreRequest = ChoreWritableFields;
 /** Partial update of writable fields only (not completion state). */
 export const UpdateChoreRequest = ChoreWritableFields.partial();
 
-/** List chores; by default excludes completed. */
+/** List chores; by default excludes completed. Decodes raw URL query strings. */
 export const ListChoresQuery = Pagination.extend({
-  includeCompleted: z.boolean().default(false),
+  includeCompleted: queryBoolean().default(false),
 });
 export type ListChoresQuery = z.infer<typeof ListChoresQuery>;
 
@@ -55,7 +74,7 @@ export const ChoreIdParams = z.object({
 export type ChoreIdParams = z.infer<typeof ChoreIdParams>;
 
 /** Response for completing a chore. */
-export type CompleteChoreResponse = Chore;
+export type CompleteChoreResponse = CompletedChore;
 
 /** Response for reopening a completed chore. */
-export type ReopenChoreResponse = Chore;
+export type ReopenChoreResponse = OpenChore;

@@ -1,14 +1,20 @@
 import { z } from "zod";
 
-/** Build offset pagination query schema; override defaults per endpoint. */
+import { queryInt } from "./query";
+
+/**
+ * Build offset pagination query schema; override defaults per endpoint.
+ * Wire decoder: input is raw URL query strings, output is decoded numbers.
+ */
 export const pagination = (opts?: { defaultSize?: number; max?: number }) =>
   z.object({
-    page: z.int().min(1).default(1),
-    pageSize: z
-      .int()
-      .min(1)
-      .max(opts?.max ?? 100)
-      .default(opts?.defaultSize ?? 20),
+    page: queryInt(z.int().min(1)).default(1),
+    pageSize: queryInt(
+      z
+        .int()
+        .min(1)
+        .max(opts?.max ?? 100)
+    ).default(opts?.defaultSize ?? 20),
   });
 
 /** Default offset pagination query parameters for list endpoints. */
