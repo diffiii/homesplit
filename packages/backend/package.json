@@ -3,15 +3,21 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
+    "auth:generate": "auth generate --config src/auth.ts --output src/db/schema.ts --yes",
     "build": "nest build",
-    "dev": "nest start --watch",
-    "start": "nest start",
+    "dev": "nest start --watch --exec \"node --env-file-if-exists=.env\"",
+    "start": "nest start --exec \"node --env-file-if-exists=.env\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "^1.7.7",
     "@nestjs/common": "^12.1.1",
     "@nestjs/core": "^12.1.0",
     "@nestjs/platform-express": "^12.1.1",
+    "@thallesp/nestjs-better-auth": "^2.8.0",
+    "better-auth": "^1.7.7",
+    "drizzle-orm": "^0.45.3",
+    "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
   },
@@ -19,6 +25,9 @@
     "@nestjs/cli": "^12.0.8",
     "@nestjs/schematics": "^12.0.6",
     "@types/node": "^24.13.6",
+    "@types/pg": "^8.23.1",
+    "auth": "^1.7.7",
+    "drizzle-kit": "^0.31.11",
     "typescript": "^6.0.3"
   }
 }
