@@ -95,7 +95,7 @@ All implemented foreign keys use `ON DELETE CASCADE`. `verification` has no fore
 
 ## Proposed household data
 
-`USERS` is a contract projection of the implemented `user` table, with `imageUrl` mapped to `image`; it is not an additional user table. `HOUSEHOLDS` represents the contract's household scope. Whether that scope maps directly to `organization`, and where its feature flags live, remain unspecified.
+`USERS` is a contract projection of the implemented `user` table, with `imageUrl` mapped to `image`; it is not an additional user table. `HOUSEHOLDS` represents the contract's household scope. Whether that scope maps directly to `organization`, and where its feature flags live, remain unspecified. The expense child tables propose composite primary keys on `(expense_id, user_id)`; the contracts expose no payer, allocation-participant, or split IDs.
 
 ```mermaid
 erDiagram
@@ -125,10 +125,9 @@ erDiagram
         uuid household_id FK
         text name
         text description "nullable"
-        bigint total_amount_cents
+        bigint total_amount_cents "Strictly positive"
         text currency "ISO 4217"
-        text split_method "equal, percentage, shares, exact, adjustment"
-        uuid payer_id FK
+        text allocation_method "equal, percentage, shares, exact, adjustment"
         uuid author_id FK
         uuid category_id FK "nullable"
         date expense_date
@@ -136,11 +135,25 @@ erDiagram
         timestamptz updated_at
     }
 
+    EXPENSE_PAYERS {
+        uuid expense_id PK,FK "Inferred from nested payers"
+        uuid user_id PK,FK
+        bigint amount_cents "Strictly positive; currency from expense"
+    }
+
+    EXPENSE_ALLOCATION_PARTICIPANTS {
+        uuid expense_id PK,FK "Inferred from nested allocation"
+        uuid user_id PK,FK
+        integer basis_points "nullable; percentage only, 1 to 10000"
+        bigint shares "nullable; shares only, strictly positive"
+        bigint exact_amount_cents "nullable; exact only, nonnegative"
+        bigint adjustment_cents "nullable; adjustment only, signed"
+    }
+
     EXPENSE_SPLITS {
-        uuid id PK
-        uuid expense_id FK "Inferred from nested splits"
-        uuid user_id FK
-        bigint amount_cents "Currency inherited from expense"
+        uuid expense_id PK,FK "Inferred from nested splits"
+        uuid user_id PK,FK
+        bigint amount_cents "Calculated; signed contract type; currency from expense"
     }
 
     SETTLEMENTS {
@@ -149,7 +162,7 @@ erDiagram
         uuid payer_id FK
         uuid payee_id FK
         uuid created_by_id FK
-        bigint amount_cents
+        bigint amount_cents "Strictly positive"
         text currency "ISO 4217"
         text note "nullable"
         timestamptz created_at
@@ -164,8 +177,8 @@ erDiagram
         date due_date "nullable"
         uuid added_by_id FK
         boolean is_completed
-        timestamptz completed_at "nullable"
-        uuid completed_by_id FK "nullable"
+        timestamptz completed_at "null when open; required when completed"
+        uuid completed_by_id FK "null when open; required when completed"
         timestamptz created_at
         timestamptz updated_at
     }
@@ -178,9 +191,9 @@ erDiagram
         text unit "nullable"
         boolean is_purchased
         uuid added_by_id FK
-        uuid purchased_by_id FK "nullable"
+        uuid purchased_by_id FK "null when unpurchased; required when purchased"
         timestamptz added_at
-        timestamptz purchased_at "nullable"
+        timestamptz purchased_at "null when unpurchased; required when purchased"
     }
 
     HOUSEHOLDS ||..o{ EXPENSE_CATEGORIES : contains
@@ -190,9 +203,12 @@ erDiagram
     HOUSEHOLDS ||..o{ SHOPPING_ITEMS : contains
 
     EXPENSE_CATEGORIES |o..o{ EXPENSES : categorizes
+    EXPENSES ||..o{ EXPENSE_PAYERS : funded_by
+    EXPENSES ||..o{ EXPENSE_ALLOCATION_PARTICIPANTS : allocated_to
     EXPENSES ||..o{ EXPENSE_SPLITS : has
+    USERS ||..o{ EXPENSE_PAYERS : contributes
+    USERS ||..o{ EXPENSE_ALLOCATION_PARTICIPANTS : allocated
     USERS ||..o{ EXPENSE_SPLITS : participates
-    USERS ||..o{ EXPENSES : pays
     USERS ||..o{ EXPENSES : authors
 
     USERS ||..o{ SETTLEMENTS : pays
@@ -243,10 +259,15 @@ erDiagram
 ## Mapping notes
 
 - Nested `UserSummary` / `FriendUser` values map to user foreign keys; nested expense categories map to `category_id`. The three `HouseholdFeatures` flags are shown as proposed household boolean columns, all defaulting to enabled as documented in the contract.
-- `Money` is stored as a signed integer amount in minor units plus a currency code. Split input inherits currency from the expense total, so split currency is derived when returning the API response. Expense creation requires at least one split; the response schema does not enforce a minimum array length.
-- `Balance` and `SettlementSuggestion` are computed responses, not tables. Settlements record payments between users within a household and have no direct expense or split reference. Splits have no settlement state.
+- `PositiveMoney` stores strictly positive expense totals and settlement payments in minor units plus a currency code. Payer contributions are also strictly positive; payer, allocation, and calculated split amounts inherit the expense currency. `Cents` / `Money` remain signed primitives for values such as balances and adjustments; the calculated split response also uses signed `Cents`.
+- Expenses support multiple payers. Creation and financial replacement require at least one payer and one allocation participant, with unique users within each list; payer contributions must sum to the total. Payers and allocation participants are separate sets, so a payer need not participate in the allocation. The expense response does not require nonempty payer or calculated split arrays, and does not apply the financial spec's cross-field refinements.
+- Allocation input is retained separately from calculated splits so the strategy can be returned and recalculated. `allocation.method` maps to `allocation_method`; participant `basisPoints`, `shares`, `amountCents`, and `adjustmentCents` map to the corresponding strategy-specific columns above. Equal allocation uses none of those columns. Percentage basis points must sum to 10,000, exact amounts must sum to the total, and adjustments are signed amounts added after splitting the remaining total equally; validation rejects an adjustment that yields a negative share before rounding. The proposed storage uses only the column for the selected method; rounding and persistence of calculated splits remain implementation decisions.
+- Descriptive expense fields can be patched independently. Financial updates replace and validate `total`, `payers`, and `allocation` together through `financial`; persisting that replacement and recalculating splits should be atomic. Clients no longer submit calculated splits.
+- `MemberBalance` / `CurrencyBalances` and `SettlementSuggestion` / `CurrencySettlementSuggestions` are computed responses, not tables. Balances and suggestions are grouped by currency, and currencies are never netted. A positive member balance means the user is owed money; a negative balance means they owe money. Settlements record strictly positive payments between distinct users within a household and have no direct expense or split reference. Splits have no settlement state.
+- Chore completion and shopping purchase metadata follow their state flags: open chores and unpurchased items require null actor/timestamp fields; completed chores and purchased items require both fields. The conditional columns in the diagram express those contract invariants; database checks are not implemented yet.
 - Accepting a friend request removes the request and creates a friendship. There is no request status field in the current contracts.
 - Organization membership and invitations already exist as `member` and `invitation`. Their mapping to the household API is not defined yet. The proposed household entity only models its inferred ID and existing feature flags. Notification contracts are empty.
-- In the proposed diagrams, UUIDs, calendar dates, and UTC timestamps come from the shared contract primitives, and SQL type choices are illustrative. Application indexes, participant-pair uniqueness rules, deletion policies, and cross-household consistency checks remain unspecified. The implemented `user.email` column is already unique.
+- Pagination and chore/shopping boolean filters now decode raw URL query strings. They are request handling concerns and introduce no persistence columns.
+- In the proposed diagrams, UUIDs, calendar dates, and UTC timestamps come from the shared contract primitives, and SQL type choices and composite keys are illustrative. Application indexes, friendship participant-pair uniqueness rules, deletion policies, and cross-household consistency checks remain unspecified. The implemented `user.email` column is already unique.
 
-Sources: [users](../packages/contracts/src/features/users/index.ts), [households](../packages/contracts/src/features/households/index.ts), [feature catalog](../packages/contracts/src/features/catalog.ts), [expenses](../packages/contracts/src/features/expenses/index.ts), [categories](../packages/contracts/src/features/expenses/categories.ts), [settlements](../packages/contracts/src/features/expenses/settlements.ts), [chores](../packages/contracts/src/features/chores/index.ts), [shopping](../packages/contracts/src/features/shopping/index.ts), and [friends](../packages/contracts/src/features/friends/index.ts).
+Sources: [users](../packages/contracts/src/features/users/index.ts), [households](../packages/contracts/src/features/households/index.ts), [feature catalog](../packages/contracts/src/features/catalog.ts), [expenses](../packages/contracts/src/features/expenses/index.ts), [categories](../packages/contracts/src/features/expenses/categories.ts), [settlements](../packages/contracts/src/features/expenses/settlements.ts), [chores](../packages/contracts/src/features/chores/index.ts), [shopping](../packages/contracts/src/features/shopping/index.ts), [friends](../packages/contracts/src/features/friends/index.ts), [money primitives](../packages/contracts/src/common/money.ts), [pagination](../packages/contracts/src/common/pagination.ts), and [query decoders](../packages/contracts/src/common/query.ts).
