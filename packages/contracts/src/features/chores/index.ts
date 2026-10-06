@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { IsoDate, IsoDateTime } from "../../common/datetime";
+import { IsoDateTime } from "../../common/datetime";
 import { Id } from "../../common/id";
 import { Pagination, paginatedResponse } from "../../common/pagination";
 import { queryBoolean } from "../../common/query";
@@ -12,7 +12,8 @@ const ChoreBase = z.object({
   name: z.string().min(1),
   description: z.string().min(1).nullable(),
   assignedTo: UserSummary.nullable(),
-  dueDate: IsoDate.nullable(), // we could consider adding a due time as well (IsoDateTime)
+  /** Optional deadline as an ISO 8601 UTC datetime. */
+  dueDate: IsoDateTime.nullable(),
   addedBy: UserSummary,
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
@@ -45,7 +46,8 @@ const ChoreWritableFields = z.object({
   name: z.string().min(1),
   description: z.string().min(1).nullable().optional(),
   assignedToId: Id.nullable().optional(),
-  dueDate: IsoDate.nullable().optional(),
+  /** Optional deadline as an ISO 8601 UTC datetime; null clears it. */
+  dueDate: IsoDateTime.nullable().optional(),
 });
 
 /** Create a chore; completion state is set by Complete/Reopen actions. */
