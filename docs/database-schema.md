@@ -174,7 +174,7 @@ erDiagram
         text name
         text description "nullable"
         uuid assigned_to_id FK "nullable"
-        timestamptz due_date "nullable; UTC deadline"
+        timestamptz due_at "nullable; UTC deadline"
         uuid added_by_id FK
         boolean is_completed
         timestamptz completed_at "null when open; required when completed"
@@ -256,6 +256,77 @@ erDiagram
     USERS ||..o{ FRIENDSHIPS : participant_b
 ```
 
+## Proposed attachments and receipts
+
+These tables support backlog tasks [4.3](backlog/tasks/4-expenses/4.3-attachments/4.3.0-epic.md) and [7](backlog/tasks/7-ai-receipts/7.0-epic.md) and have no contracts yet. `HOUSEHOLDS`, `USERS`, `EXPENSES`, and `SHOPPING_ITEMS` are the entities from the household diagram.
+
+```mermaid
+erDiagram
+    ATTACHMENTS {
+        uuid id PK
+        uuid household_id FK
+        text storage_key UK "Server-generated"
+        text mime_type
+        bigint size_bytes
+        uuid uploaded_by_id FK
+        timestamptz created_at
+    }
+
+    EXPENSE_ATTACHMENTS {
+        uuid expense_id PK,FK
+        uuid attachment_id PK,FK
+    }
+
+    RECEIPTS {
+        uuid id PK
+        uuid household_id FK
+        uuid attachment_id FK
+        text status "processing, ready, failed, confirmed"
+        text merchant "nullable"
+        date purchased_on "nullable"
+        text currency "nullable until extracted; ISO 4217"
+        bigint total_cents "nullable until extracted"
+        bigint discount_cents "Receipt-level; default 0"
+        uuid expense_id FK "nullable; set on confirm"
+        uuid created_by_id FK
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    RECEIPT_ITEMS {
+        uuid id PK
+        uuid receipt_id FK
+        integer position
+        text name
+        numeric quantity "Decimal for weighed products"
+        bigint unit_price_cents
+        bigint discount_cents "Line discount; default 0"
+        bigint total_cents "After line discount"
+    }
+
+    RECEIPT_ITEM_ASSIGNMENTS {
+        uuid receipt_item_id PK,FK
+        uuid user_id PK,FK
+        numeric shares "Strictly positive; units or equal shares"
+    }
+
+    HOUSEHOLDS ||..o{ ATTACHMENTS : stores
+    HOUSEHOLDS ||..o{ RECEIPTS : contains
+    USERS ||..o{ ATTACHMENTS : uploads
+    USERS ||..o{ RECEIPTS : creates
+    EXPENSES ||..o{ EXPENSE_ATTACHMENTS : has
+    ATTACHMENTS ||..o{ EXPENSE_ATTACHMENTS : linked_by
+    ATTACHMENTS ||..o{ RECEIPTS : scanned_from
+    EXPENSES |o..o| RECEIPTS : created_from
+    RECEIPTS ||..o{ RECEIPT_ITEMS : contains
+    RECEIPT_ITEMS ||..o{ RECEIPT_ITEM_ASSIGNMENTS : assigned_by
+    USERS ||..o{ RECEIPT_ITEM_ASSIGNMENTS : assigned
+```
+
+- Confirming a receipt creates an ordinary expense with the `exact` allocation method. Item assignments are kept on the receipt as the history of who had what, and the expense's splits remain the only source for balances.
+- Item costs are split by shares, receipt-level discounts are spread over items in proportion to their cost, and per-person totals are rounded once with the allocation engine's remainder rule.
+- Shopping matches from task 7.5 are request-time suggestions, not stored relations. Confirming them reuses the shopping purchase columns.
+
 ## Mapping notes
 
 - Nested `UserSummary` / `FriendUser` values map to user foreign keys; nested expense categories map to `category_id`. The three `HouseholdFeatures` flags are shown as proposed household boolean columns, all defaulting to enabled as documented in the contract.
@@ -264,7 +335,7 @@ erDiagram
 - Allocation input is retained separately from calculated splits so the strategy can be returned and recalculated. `allocation.method` maps to `allocation_method`; participant `basisPoints`, `shares`, `amountCents`, and `adjustmentCents` map to the corresponding strategy-specific columns above. Equal allocation uses none of those columns. Percentage basis points must sum to 10,000, exact amounts must sum to the total, and adjustments are signed amounts added after splitting the remaining total equally; validation rejects an adjustment that yields a negative share before rounding. The proposed storage uses only the column for the selected method; rounding and persistence of calculated splits remain implementation decisions.
 - Descriptive expense fields can be patched independently. Financial updates replace and validate `total`, `payers`, and `allocation` together through `financial`; persisting that replacement and recalculating splits should be atomic. Clients no longer submit calculated splits.
 - `MemberBalance` / `CurrencyBalances` and `SettlementSuggestion` / `CurrencySettlementSuggestions` are computed responses, not tables. Balances and suggestions are grouped by currency, and currencies are never netted. A positive member balance means the user is owed money; a negative balance means they owe money. Settlements record strictly positive payments between distinct users within a household and have no direct expense or split reference. Splits have no settlement state.
-- Chore `dueDate` is a nullable ISO 8601 UTC datetime (for example, `2026-10-06T16:00:00Z`), mapped to `timestamptz due_date`. Creation and updates may omit the deadline; an explicit null clears it. Clients convert local deadline input to UTC and display it in the user's local time zone. Date-only values are not accepted; expense `expenseDate` remains a calendar date.
+- Chore `dueAt` is a nullable ISO 8601 UTC datetime (for example, `2026-10-06T16:00:00Z`), mapped to `timestamptz due_at`. Creation and updates may omit the deadline; an explicit null clears it. Clients convert local deadline input to UTC and display it in the user's local time zone. Date-only values are not accepted; expense `expenseDate` remains a calendar date.
 - Chore completion and shopping purchase metadata follow their state flags: open chores and unpurchased items require null actor/timestamp fields; completed chores and purchased items require both fields. The conditional columns in the diagram express those contract invariants; database checks are not implemented yet.
 - Accepting a friend request removes the request and creates a friendship. There is no request status field in the current contracts.
 - Organization membership and invitations already exist as `member` and `invitation`. Their mapping to the household API is not defined yet. The proposed household entity only models its inferred ID and existing feature flags. Notification contracts are empty.
