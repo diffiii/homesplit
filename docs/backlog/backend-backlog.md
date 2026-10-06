@@ -9,7 +9,7 @@ The work is grouped into seven epics. Each epic is a folder in [`tasks/`](tasks)
 These are proposed directions. Task [1.1](tasks/1-foundation/1.1-decisions-household-permissions-api.md) records the final decisions, and currency limits are recorded in [4.1.2](tasks/4-expenses/4.1-ledger/4.1.2-allocation-engine.md).
 
 - **Household = organization.** The Better Auth organization ID is `householdId`. Membership and invitations are reused; module flags go in a separate organization-keyed table.
-- **Access.** Every household route checks membership of the requested household. Members can perform everyday operations; owners and admins change settings.
+- **Access.** Every household route checks access to the requested household under the 1.1 membership and lifecycle rules. Members can perform everyday operations; owners and admins change settings.
 - **Disabled module = read-only.** Data is kept, reads are allowed, and new mutations are rejected.
 - **Financial history is preserved.** A member who leaves stays attributed on past expenses and payments, with no cascading deletes from auth tables.
 - **Money.** Integer minor units, exact arithmetic, and deterministic remainder allocation. The backend calculates splits and stores them with the expense in one transaction.
@@ -33,7 +33,7 @@ Example: A pays 6,000 and B pays 3,000 for an expense split equally between A, B
 
 ## Dependencies
 
-Tasks 1.1, 1.2, and 4.1.2 can start immediately and in parallel. Once 2.2 is done, chores, shopping, friends, and expenses can proceed independently. The longest chain is 4.1.1, then 4.1.3, 4.1.4, 4.2.2, and 4.2.3. Epic 7 builds on expenses, attachments, and shopping; 7.1 and 7.2 can start as soon as 2.2 and 4.1.1 are done.
+Tasks 1.1, 1.2, and 4.1.2 can start immediately and in parallel. Users and friends can start after 1.2 and 1.3. Once 2.2 is done, chores, shopping, and expenses can proceed independently. The longest chain is 1.1, 1.3, 2.1, 2.2, 4.1.1, 4.1.3, 4.1.4, 4.3.2, 7.4, and 7.5. The core chain ends at 4.2.3, after 4.1.4, 4.2.2, and 4.2.3. Epic 7 builds on expenses, attachments, and shopping; 7.1 can start once 2.2 is done, and 7.2 once 7.1 and 4.1.1 are done.
 
 ```mermaid
 flowchart LR
