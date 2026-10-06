@@ -1,10 +1,10 @@
-# B13 — Record settlement payments and expose payment history
+# B13: Record settlement payments and expose payment history
 
 | | |
 | --- | --- |
 | **Parent** | [Backend backlog proposal](../backend-backlog.md) · [delivery order](../backend-backlog.md#delivery-order) |
-| **Depends on** | [B06 — Implement the household adapter and feature settings](b06-household-adapter-feature-settings.md)<br>[B10 — Implement deterministic expense allocation for all five methods](b10-expense-allocation.md) |
-| **Blocks** | [B14 — Compute member balances separately for each currency](b14-member-balances.md) |
+| **Depends on** | [B06: Implement the household adapter and feature settings](b06-household-adapter-feature-settings.md)<br>[B10: Implement deterministic expense allocation for all five methods](b10-expense-allocation.md) |
+| **Blocks** | [B14: Compute member balances separately for each currency](b14-member-balances.md) |
 | **Decision owner for** | Permissions, Financial history, Payments and retries ([design decisions](../backend-backlog.md#proposed-design-decisions)) |
 | **Suggested PRs** | If the retry/correction policy requires new contracts, review those contract changes separately before their implementation |
 | **Sources** | [PR #11](https://github.com/diffiii/homesplit/pull/11) (contracts), [PR #13](https://github.com/diffiii/homesplit/pull/13) (database mapping), [issue #2](https://github.com/diffiii/homesplit/issues/2) (completed schema/contracts work) |

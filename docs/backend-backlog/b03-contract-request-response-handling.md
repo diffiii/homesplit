@@ -1,11 +1,11 @@
-# B03 — Integrate shared contracts with Nest request and response handling
+# B03: Integrate shared contracts with Nest request and response handling
 
 | | |
 | --- | --- |
 | **Parent** | [Backend backlog proposal](../backend-backlog.md) · [delivery order](../backend-backlog.md#delivery-order) |
-| **Depends on** | [B02 — Specify shared API conventions and error handling](b02-shared-api-conventions.md) |
-| **Blocks** | [B05 — Enforce household membership and resource isolation](b05-household-membership-isolation.md)<br>[B07 — Implement authenticated profile updates and user projections](b07-profile-updates-user-projections.md) |
-| **Decision owner for** | — |
+| **Depends on** | [B02: Specify shared API conventions and error handling](b02-shared-api-conventions.md) |
+| **Blocks** | [B05: Enforce household membership and resource isolation](b05-household-membership-isolation.md)<br>[B07: Implement authenticated profile updates and user projections](b07-profile-updates-user-projections.md) |
+| **Decision owner for** | None |
 | **Suggested PRs** | One PR |
 | **Sources** | [PR #11](https://github.com/diffiii/homesplit/pull/11) (contracts), [PR #13](https://github.com/diffiii/homesplit/pull/13) (database mapping), [issue #2](https://github.com/diffiii/homesplit/issues/2) (completed schema/contracts work) |
 

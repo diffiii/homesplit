@@ -1,10 +1,10 @@
-# B10 — Implement deterministic expense allocation for all five methods
+# B10: Implement deterministic expense allocation for all five methods
 
 | | |
 | --- | --- |
 | **Parent** | [Backend backlog proposal](../backend-backlog.md) · [delivery order](../backend-backlog.md#delivery-order) |
-| **Depends on** | — |
-| **Blocks** | [B11 — Add expense aggregate persistence and migrations](b11-expense-aggregate-persistence.md)<br>[B13 — Record settlement payments and expose payment history](b13-settlement-payments.md) |
+| **Depends on** | None |
+| **Blocks** | [B11: Add expense aggregate persistence and migrations](b11-expense-aggregate-persistence.md)<br>[B13: Record settlement payments and expose payment history](b13-settlement-payments.md) |
 | **Decision owner for** | Money, Allocation storage ([design decisions](../backend-backlog.md#proposed-design-decisions)) |
 | **Suggested PRs** | One PR |
 | **Sources** | [PR #11](https://github.com/diffiii/homesplit/pull/11) (contracts), [PR #13](https://github.com/diffiii/homesplit/pull/13) (database mapping), [issue #2](https://github.com/diffiii/homesplit/issues/2) (completed schema/contracts work) |

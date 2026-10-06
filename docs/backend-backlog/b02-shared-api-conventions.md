@@ -1,10 +1,10 @@
-# B02 — Specify shared API conventions and error handling
+# B02: Specify shared API conventions and error handling
 
 | | |
 | --- | --- |
 | **Parent** | [Backend backlog proposal](../backend-backlog.md) · [delivery order](../backend-backlog.md#delivery-order) |
-| **Depends on** | [B01 — Decide household identity, permissions, and data lifecycle](b01-household-identity-permissions-lifecycle.md) |
-| **Blocks** | [B03 — Integrate shared contracts with Nest request and response handling](b03-contract-request-response-handling.md) |
+| **Depends on** | [B01: Decide household identity, permissions, and data lifecycle](b01-household-identity-permissions-lifecycle.md) |
+| **Blocks** | [B03: Integrate shared contracts with Nest request and response handling](b03-contract-request-response-handling.md) |
 | **Decision owner for** | Lists and transitions ([design decisions](../backend-backlog.md#proposed-design-decisions)) |
 | **Suggested PRs** | One PR |
 | **Sources** | [PR #11](https://github.com/diffiii/homesplit/pull/11) (contracts), [PR #13](https://github.com/diffiii/homesplit/pull/13) (database mapping), [issue #2](https://github.com/diffiii/homesplit/issues/2) (completed schema/contracts work) |

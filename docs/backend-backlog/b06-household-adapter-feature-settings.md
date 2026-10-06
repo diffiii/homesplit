@@ -1,10 +1,10 @@
-# B06 — Implement the household adapter and feature settings
+# B06: Implement the household adapter and feature settings
 
 | | |
 | --- | --- |
 | **Parent** | [Backend backlog proposal](../backend-backlog.md) · [delivery order](../backend-backlog.md#delivery-order) |
-| **Depends on** | [B05 — Enforce household membership and resource isolation](b05-household-membership-isolation.md) |
-| **Blocks** | [B09 — Implement household expense categories](b09-expense-categories.md)<br>[B13 — Record settlement payments and expose payment history](b13-settlement-payments.md)<br>[B16 — Implement chores and complete/reopen workflows](b16-chores.md)<br>[B17 — Implement shopping and purchase/clear workflows](b17-shopping.md) |
+| **Depends on** | [B05: Enforce household membership and resource isolation](b05-household-membership-isolation.md) |
+| **Blocks** | [B09: Implement household expense categories](b09-expense-categories.md)<br>[B13: Record settlement payments and expose payment history](b13-settlement-payments.md)<br>[B16: Implement chores and complete/reopen workflows](b16-chores.md)<br>[B17: Implement shopping and purchase/clear workflows](b17-shopping.md) |
 | **Decision owner for** | Household identity, Disabling a module ([design decisions](../backend-backlog.md#proposed-design-decisions)) |
 | **Suggested PRs** | One PR |
 | **Sources** | [PR #11](https://github.com/diffiii/homesplit/pull/11) (contracts), [PR #13](https://github.com/diffiii/homesplit/pull/13) (database mapping), [issue #2](https://github.com/diffiii/homesplit/issues/2) (completed schema/contracts work) |

@@ -1,10 +1,10 @@
-# B17 — Implement shopping and purchase/clear workflows
+# B17: Implement shopping and purchase/clear workflows
 
 | | |
 | --- | --- |
 | **Parent** | [Backend backlog proposal](../backend-backlog.md) · [delivery order](../backend-backlog.md#delivery-order) |
-| **Depends on** | [B06 — Implement the household adapter and feature settings](b06-household-adapter-feature-settings.md) |
-| **Blocks** | [B18 — Verify backend workflows across features and households](b18-cross-feature-verification.md) |
+| **Depends on** | [B06: Implement the household adapter and feature settings](b06-household-adapter-feature-settings.md) |
+| **Blocks** | [B18: Verify backend workflows across features and households](b18-cross-feature-verification.md) |
 | **Decision owner for** | Lists and transitions ([design decisions](../backend-backlog.md#proposed-design-decisions)) |
 | **Suggested PRs** | Storage and ordinary CRUD; then purchase/unpurchase/clear. Concurrency and retry cases may follow in a separate PR under this issue |
 | **Sources** | [PR #11](https://github.com/diffiii/homesplit/pull/11) (contracts), [PR #13](https://github.com/diffiii/homesplit/pull/13) (database mapping), [issue #2](https://github.com/diffiii/homesplit/issues/2) (completed schema/contracts work) |

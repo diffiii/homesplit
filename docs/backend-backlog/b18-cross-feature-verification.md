@@ -1,11 +1,11 @@
-# B18 — Verify backend workflows across features and households
+# B18: Verify backend workflows across features and households
 
 | | |
 | --- | --- |
 | **Parent** | [Backend backlog proposal](../backend-backlog.md) · [delivery order](../backend-backlog.md#delivery-order) |
-| **Depends on** | [B08 — Implement friend requests and accepted friendships](b08-friendships.md)<br>[B15 — Generate deterministic settlement suggestions](b15-settlement-suggestions.md)<br>[B16 — Implement chores and complete/reopen workflows](b16-chores.md)<br>[B17 — Implement shopping and purchase/clear workflows](b17-shopping.md) |
-| **Blocks** | — |
-| **Decision owner for** | — |
+| **Depends on** | [B08: Implement friend requests and accepted friendships](b08-friendships.md)<br>[B15: Generate deterministic settlement suggestions](b15-settlement-suggestions.md)<br>[B16: Implement chores and complete/reopen workflows](b16-chores.md)<br>[B17: Implement shopping and purchase/clear workflows](b17-shopping.md) |
+| **Blocks** | None |
+| **Decision owner for** | None |
 | **Suggested PRs** | Financial end-to-end scenario; then non-financial and second-household isolation scenarios; then the documentation status update |
 | **Sources** | [PR #11](https://github.com/diffiii/homesplit/pull/11) (contracts), [PR #13](https://github.com/diffiii/homesplit/pull/13) (database mapping), [issue #2](https://github.com/diffiii/homesplit/issues/2) (completed schema/contracts work) |
 

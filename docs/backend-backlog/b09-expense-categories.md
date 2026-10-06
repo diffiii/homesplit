@@ -1,11 +1,11 @@
-# B09 — Implement household expense categories
+# B09: Implement household expense categories
 
 | | |
 | --- | --- |
 | **Parent** | [Backend backlog proposal](../backend-backlog.md) · [delivery order](../backend-backlog.md#delivery-order) |
-| **Depends on** | [B06 — Implement the household adapter and feature settings](b06-household-adapter-feature-settings.md) |
-| **Blocks** | [B11 — Add expense aggregate persistence and migrations](b11-expense-aggregate-persistence.md) |
-| **Decision owner for** | — |
+| **Depends on** | [B06: Implement the household adapter and feature settings](b06-household-adapter-feature-settings.md) |
+| **Blocks** | [B11: Add expense aggregate persistence and migrations](b11-expense-aggregate-persistence.md) |
+| **Decision owner for** | None |
 | **Suggested PRs** | One PR |
 | **Sources** | [PR #11](https://github.com/diffiii/homesplit/pull/11) (contracts), [PR #13](https://github.com/diffiii/homesplit/pull/13) (database mapping), [issue #2](https://github.com/diffiii/homesplit/issues/2) (completed schema/contracts work) |
 

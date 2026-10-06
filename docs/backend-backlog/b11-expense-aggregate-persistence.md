@@ -1,10 +1,10 @@
-# B11 — Add expense aggregate persistence and migrations
+# B11: Add expense aggregate persistence and migrations
 
 | | |
 | --- | --- |
 | **Parent** | [Backend backlog proposal](../backend-backlog.md) · [delivery order](../backend-backlog.md#delivery-order) |
-| **Depends on** | [B09 — Implement household expense categories](b09-expense-categories.md)<br>[B10 — Implement deterministic expense allocation for all five methods](b10-expense-allocation.md) |
-| **Blocks** | [B12 — Implement expense CRUD and atomic financial replacement](b12-expense-crud.md) |
+| **Depends on** | [B09: Implement household expense categories](b09-expense-categories.md)<br>[B10: Implement deterministic expense allocation for all five methods](b10-expense-allocation.md) |
+| **Blocks** | [B12: Implement expense CRUD and atomic financial replacement](b12-expense-crud.md) |
 | **Decision owner for** | Financial history, Allocation storage ([design decisions](../backend-backlog.md#proposed-design-decisions)) |
 | **Suggested PRs** | One PR |
 | **Sources** | [PR #11](https://github.com/diffiii/homesplit/pull/11) (contracts), [PR #13](https://github.com/diffiii/homesplit/pull/13) (database mapping), [issue #2](https://github.com/diffiii/homesplit/issues/2) (completed schema/contracts work) |

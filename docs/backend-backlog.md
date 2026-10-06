@@ -36,16 +36,16 @@ Each feature issue defines and documents its own routes, status codes, and permi
 
 | ID | Proposed GitHub issue title | Depends on |
 | --- | --- | --- |
-| [B01](backend-backlog/b01-household-identity-permissions-lifecycle.md) | Decide household identity, permissions, and data lifecycle | — |
+| [B01](backend-backlog/b01-household-identity-permissions-lifecycle.md) | Decide household identity, permissions, and data lifecycle | None |
 | [B02](backend-backlog/b02-shared-api-conventions.md) | Specify shared API conventions and error handling | [B01](backend-backlog/b01-household-identity-permissions-lifecycle.md) |
 | [B03](backend-backlog/b03-contract-request-response-handling.md) | Integrate shared contracts with Nest request and response handling | [B02](backend-backlog/b02-shared-api-conventions.md) |
-| [B04](backend-backlog/b04-postgres-integration-tests.md) | Add a PostgreSQL integration-test and migration workflow | — |
+| [B04](backend-backlog/b04-postgres-integration-tests.md) | Add a PostgreSQL integration-test and migration workflow | None |
 | [B05](backend-backlog/b05-household-membership-isolation.md) | Enforce household membership and resource isolation | [B03](backend-backlog/b03-contract-request-response-handling.md), [B04](backend-backlog/b04-postgres-integration-tests.md) |
 | [B06](backend-backlog/b06-household-adapter-feature-settings.md) | Implement the household adapter and feature settings | [B05](backend-backlog/b05-household-membership-isolation.md) |
 | [B07](backend-backlog/b07-profile-updates-user-projections.md) | Implement authenticated profile updates and user projections | [B03](backend-backlog/b03-contract-request-response-handling.md), [B04](backend-backlog/b04-postgres-integration-tests.md) |
 | [B08](backend-backlog/b08-friendships.md) | Implement friend requests and accepted friendships | [B07](backend-backlog/b07-profile-updates-user-projections.md) |
 | [B09](backend-backlog/b09-expense-categories.md) | Implement household expense categories | [B06](backend-backlog/b06-household-adapter-feature-settings.md) |
-| [B10](backend-backlog/b10-expense-allocation.md) | Implement deterministic expense allocation for all five methods | — |
+| [B10](backend-backlog/b10-expense-allocation.md) | Implement deterministic expense allocation for all five methods | None |
 | [B11](backend-backlog/b11-expense-aggregate-persistence.md) | Add expense aggregate persistence and migrations | [B09](backend-backlog/b09-expense-categories.md), [B10](backend-backlog/b10-expense-allocation.md) |
 | [B12](backend-backlog/b12-expense-crud.md) | Implement expense CRUD and atomic financial replacement | [B11](backend-backlog/b11-expense-aggregate-persistence.md) |
 | [B13](backend-backlog/b13-settlement-payments.md) | Record settlement payments and expose payment history | [B06](backend-backlog/b06-household-adapter-feature-settings.md), [B10](backend-backlog/b10-expense-allocation.md) |

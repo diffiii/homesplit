@@ -1,11 +1,11 @@
-# B15 — Generate deterministic settlement suggestions
+# B15: Generate deterministic settlement suggestions
 
 | | |
 | --- | --- |
 | **Parent** | [Backend backlog proposal](../backend-backlog.md) · [delivery order](../backend-backlog.md#delivery-order) |
-| **Depends on** | [B14 — Compute member balances separately for each currency](b14-member-balances.md) |
-| **Blocks** | [B18 — Verify backend workflows across features and households](b18-cross-feature-verification.md) |
-| **Decision owner for** | — |
+| **Depends on** | [B14: Compute member balances separately for each currency](b14-member-balances.md) |
+| **Blocks** | [B18: Verify backend workflows across features and households](b18-cross-feature-verification.md) |
+| **Decision owner for** | None |
 | **Suggested PRs** | One PR |
 | **Sources** | [PR #11](https://github.com/diffiii/homesplit/pull/11) (contracts), [PR #13](https://github.com/diffiii/homesplit/pull/13) (database mapping), [issue #2](https://github.com/diffiii/homesplit/issues/2) (completed schema/contracts work) |
 

@@ -1,10 +1,10 @@
-# B08 — Implement friend requests and accepted friendships
+# B08: Implement friend requests and accepted friendships
 
 | | |
 | --- | --- |
 | **Parent** | [Backend backlog proposal](../backend-backlog.md) · [delivery order](../backend-backlog.md#delivery-order) |
-| **Depends on** | [B07 — Implement authenticated profile updates and user projections](b07-profile-updates-user-projections.md) |
-| **Blocks** | [B18 — Verify backend workflows across features and households](b18-cross-feature-verification.md) |
+| **Depends on** | [B07: Implement authenticated profile updates and user projections](b07-profile-updates-user-projections.md) |
+| **Blocks** | [B18: Verify backend workflows across features and households](b18-cross-feature-verification.md) |
 | **Decision owner for** | Permissions, Lists and transitions ([design decisions](../backend-backlog.md#proposed-design-decisions)) |
 | **Suggested PRs** | Request storage/send/lists; then acceptance/decline/removal. Concurrency and retry cases may follow in a separate PR under this issue |
 | **Sources** | [PR #11](https://github.com/diffiii/homesplit/pull/11) (contracts), [PR #13](https://github.com/diffiii/homesplit/pull/13) (database mapping), [issue #2](https://github.com/diffiii/homesplit/issues/2) (completed schema/contracts work) |

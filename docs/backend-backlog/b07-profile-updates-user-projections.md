@@ -1,11 +1,11 @@
-# B07 — Implement authenticated profile updates and user projections
+# B07: Implement authenticated profile updates and user projections
 
 | | |
 | --- | --- |
 | **Parent** | [Backend backlog proposal](../backend-backlog.md) · [delivery order](../backend-backlog.md#delivery-order) |
-| **Depends on** | [B03 — Integrate shared contracts with Nest request and response handling](b03-contract-request-response-handling.md)<br>[B04 — Add a PostgreSQL integration-test and migration workflow](b04-postgres-integration-tests.md) |
-| **Blocks** | [B08 — Implement friend requests and accepted friendships](b08-friendships.md) |
-| **Decision owner for** | — |
+| **Depends on** | [B03: Integrate shared contracts with Nest request and response handling](b03-contract-request-response-handling.md)<br>[B04: Add a PostgreSQL integration-test and migration workflow](b04-postgres-integration-tests.md) |
+| **Blocks** | [B08: Implement friend requests and accepted friendships](b08-friendships.md) |
+| **Decision owner for** | None |
 | **Suggested PRs** | One PR |
 | **Sources** | [PR #11](https://github.com/diffiii/homesplit/pull/11) (contracts), [PR #13](https://github.com/diffiii/homesplit/pull/13) (database mapping), [issue #2](https://github.com/diffiii/homesplit/issues/2) (completed schema/contracts work) |
 

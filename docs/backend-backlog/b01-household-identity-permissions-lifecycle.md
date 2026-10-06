@@ -1,10 +1,10 @@
-# B01 — Decide household identity, permissions, and data lifecycle
+# B01: Decide household identity, permissions, and data lifecycle
 
 | | |
 | --- | --- |
 | **Parent** | [Backend backlog proposal](../backend-backlog.md) · [delivery order](../backend-backlog.md#delivery-order) |
-| **Depends on** | — |
-| **Blocks** | [B02 — Specify shared API conventions and error handling](b02-shared-api-conventions.md) |
+| **Depends on** | None |
+| **Blocks** | [B02: Specify shared API conventions and error handling](b02-shared-api-conventions.md) |
 | **Decision owner for** | Household identity, Permissions, Disabling a module, Financial history ([design decisions](../backend-backlog.md#proposed-design-decisions)) |
 | **Suggested PRs** | One PR |
 | **Sources** | [PR #11](https://github.com/diffiii/homesplit/pull/11) (contracts), [PR #13](https://github.com/diffiii/homesplit/pull/13) (database mapping), [issue #2](https://github.com/diffiii/homesplit/issues/2) (completed schema/contracts work) |
