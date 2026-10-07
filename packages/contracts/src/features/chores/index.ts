@@ -13,7 +13,7 @@ const ChoreBase = z.object({
   description: z.string().min(1).nullable(),
   assignedTo: UserSummary.nullable(),
   /** Optional deadline as an ISO 8601 UTC datetime. */
-  dueDate: IsoDateTime.nullable(),
+  dueAt: IsoDateTime.nullable(),
   addedBy: UserSummary,
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
@@ -47,7 +47,7 @@ const ChoreWritableFields = z.object({
   description: z.string().min(1).nullable().optional(),
   assignedToId: Id.nullable().optional(),
   /** Optional deadline as an ISO 8601 UTC datetime; null clears it. */
-  dueDate: IsoDateTime.nullable().optional(),
+  dueAt: IsoDateTime.nullable().optional(),
 });
 
 /** Create a chore; completion state is set by Complete/Reopen actions. */
