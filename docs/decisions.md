@@ -1,0 +1,313 @@
+# Decision record: households, permissions, lifecycle, and API
+
+Backlog tasks (#20) call these "the #22 rules". Changes to this file go in their own PR, never bundled with other changes.
+
+Better Auth behavior described here was checked against `better-auth` 1.7.7; re-check it after upgrading.
+
+## Identity
+
+- A household is a Better Auth organization. `householdId` is `organization.id`, and the household name is `organization.name`. HomeSplit doesn't use `slug`, `logo`, or `metadata`. Better Auth requires a unique `slug` when an organization is created, so clients send a random UUID, and no HomeSplit route accepts a slug. Better Auth's `create` and `update` accept the other two as well, and `update` accepts a new `slug`, so hooks keep them unset: `organizationHooks.beforeCreateOrganization` rejects `logo` and `metadata`, and `beforeUpdateOrganization` rejects every field but `name`, both with 400 `UNSUPPORTED_FIELD`.
+- Module flags live in `household_features`, one row per organization. Its primary key `organization_id` references `organization.id`, and it has one boolean per [feature ID](../packages/contracts/src/features/catalog.ts): `expenses_enabled`, `chores_enabled`, and `shopping_enabled`, not null and default `true`. A later module adds its own column and default; `ai` (#53) defaults to `false`. The flags aren't columns on `organization`. Columns added by hand would vanish from the Drizzle schema whenever `pnpm auth:generate` rewrites it. Better Auth `additionalFields` would let `/organization/create` and `/organization/update` set flags past `PATCH /features`, and would put every new module into the auth config.
+- Access is always checked against the `:householdId` in the URL. HomeSplit never reads `session.activeOrganizationId`, so household routes don't use the Nest integration's `@OrgRoles`, `@RequireActiveOrg`, or `@MemberHasPermission` decorators, which depend on it.
+- Roles are Better Auth's defaults, `owner`, `admin`, and `member`, with their default permissions. Custom roles, teams, and dynamic access control stay disabled. Better Auth stores multiple roles as a comma-separated string, and checks use the strongest one.
+
+## Membership history
+
+Better Auth deletes the `member` row when someone leaves or is removed. Past membership is kept in `household_membership_history`:
+
+| Column | Definition |
+| --- | --- |
+| `organization_id` | FK to `organization.id`, `ON DELETE CASCADE` |
+| `user_id` | FK to `user.id`, `ON DELETE RESTRICT` |
+| `first_joined_at` | `timestamptz`, not null |
+
+The primary key is (`organization_id`, `user_id`). Creating a household, accepting an invitation, and rejoining insert the pair if it's missing. Leaving and removal write nothing, so the row outlives the `member` row. Rows disappear only together with their household.
+
+History never grants a role or any access; both come only from `member`. There's no `left_at` column, because whether someone has left is derived from `member`. Add one only when a contract needs it.
+
+These terms are used throughout:
+
+- **Current member:** has a `member` row for the household.
+- **Departed member:** has a history row but no `member` row.
+- **Household party:** a current or departed member, meaning anyone with a history row.
+
+### Keeping derived tables in sync
+
+| Table | Maintained by | Backfilled by |
+| --- | --- | --- |
+| `household_features` | An `AFTER INSERT ON organization` trigger inserts the default row. | #27 migration |
+| `household_membership_history` | An `AFTER INSERT ON member` trigger inserts the pair with `ON CONFLICT DO NOTHING`. | #26 migration |
+
+Better Auth hooks can't do this reliably in 1.7.7:
+
+- Accepting an invitation calls only the invitation hooks, not `afterAddMember`.
+- `/organization/leave` calls no organization hook at all.
+- Hooks run after Better Auth's write and outside any transaction with it, so a failing hook leaves a member without history.
+
+A trigger runs in the same statement as every insert, whatever the path, including test fixtures. Triggers go in custom Drizzle migrations (`drizzle-kit generate --custom`) and are the only change HomeSplit makes to Better Auth's tables. `pnpm auth:generate` rewrites `src/db/schema.ts` in full, so application tables live in separate schema files listed in `drizzle.config.ts`.
+
+## Roles and permissions
+
+`all` means any current member (`member`, `admin`, or `owner`), and `admin+` means `admin` or `owner`. Non-members, departed members included, have no rights at all. A dash means the contracts have no such operation.
+
+| Feature | Read | Create | Update | Delete | Actions |
+| --- | --- | --- | --- | --- | --- |
+| Household (Better Auth) | all | any signed-in user | admin+ (rename) | `owner`¹ | invite, cancel invitation, change roles², remove members²: admin+; leave: all³ |
+| Module flags | all | – (automatic) | admin+⁶ | – | – |
+| Expense categories | all | admin+ | admin+ | admin+⁵ | – |
+| Expenses | all | all | author or admin+ | author or admin+ | – |
+| Payments (settlements) | all | party or admin+⁴ | – | pending only: party or admin+⁴ | confirm: payee or admin+⁴ |
+| Balances and suggestions | all | – | – | – | – |
+| Chores | all | all | all | all | complete, reopen: all |
+| Shopping items | all | all | all | all | purchase, unpurchase, clear purchased: all |
+| Profile | self (Better Auth `get-session`) | – | self | – | – |
+| Friends | self | self | – | either friend | accept, decline: recipient |
+
+1. Only while every balance in the household is zero; see [Deleting households](#deleting-households).
+2. Better Auth's rules apply: only an `owner` can invite, promote, demote, or remove an owner, and the last owner can't be demoted or removed. HomeSplit adds that nobody removes themselves; they leave instead.
+3. Only with every balance settled; see [Departed members](#departed-members). Better Auth doesn't let the last `owner` leave.
+4. A party is the payer or the payee. A payment recorded by its payer waits for confirmation, and nobody confirms their own payment; see [Recording payments](#recording-payments).
+5. Only while no expense uses the category; see [Deleting households](#deleting-households).
+6. `expenses` can't be turned off while any balance in the household isn't zero; see [Disabled modules](#disabled-modules).
+
+The matrix follows three rules:
+
+- Money and shared configuration are protected, while everyday lists are open to every member. Any member may record an expense paid by other members.
+- The acting user always comes from the session. Server-set fields (the author, `createdBy`, `confirmedBy`, `addedBy`, `completedBy`, `purchasedBy`, and their timestamps) are never read from requests; the contract schemas strip or reject them.
+- Role checks read the caller's `member` row for the household in the URL.
+
+## Lifecycle
+
+### Departed members
+
+- **Access:** none, whatever their balance. Every `/api/households/:householdId/...` route answers 404, as for any non-member, and Better Auth's endpoints answer with their own errors.
+- **History:** everything they authored, paid, took part in, were assigned, completed, or bought stays attributed to them through their usual `UserSummary`. Nothing is reassigned or rewritten when someone leaves, so an open chore stays assigned to them until a member reassigns it.
+- **Balances:** #41 lists a departed member in a currency whenever their balance in it isn't zero, so current members see who still owes or is owed and can remind them.
+- **Payments:** they can't record or confirm payments. A current member who is the other party, or an admin+, records the payment for them, and an admin+ confirms a pending payment whose payee has left.
+- **Leaving:** blocked with 409 `UNSETTLED_BALANCE` while any of the member's balances in the household isn't zero, so members settle up before they leave. `/organization/leave` calls no organization hook, so the check goes in a global `hooks.before` matched on that path; verify in 1.7.7 that it can read balances and reject the request, and otherwise replace the endpoint with a HomeSplit route.
+- **Removal:** an admin+ can remove another member whatever their balance. The balance stays, and the debt stays settleable. Nobody can remove themselves, because that would skip the leaving check: `/organization/remove-member` aimed at the caller's own membership answers 403 `CANNOT_REMOVE_SELF`. Better Auth 1.7.7 allows self-removal and doesn't pass the caller to `beforeRemoveMember`, so this check also goes in the global `hooks.before`, matched on `/organization/remove-member`.
+- **Rejoining:** accepting a new invitation makes them a current member again with the invited role, and their history continues under the same user ID.
+
+### Deleting accounts
+
+Better Auth's `/delete-user` stays disabled (`user.deleteUser.enabled` defaults to `false`), because it hard-deletes the `user` row and the auth tables cascade.
+
+Account deletion keeps the `user` row and its ID but overwrites the personal data in it, built by whichever task adds `DELETE /api/me` (none is in the backlog yet). In one transaction, it:
+
+1. Hands ownership on in every household where the user is the only `owner` and other members remain: the `admin` with the earliest `first_joined_at` becomes `owner`, or the `member` with the earliest one if there's no admin.
+2. Deletes every household where the user is the last current member, with all its data and whatever its balances, because nobody can open it again: departed members have no access. It deletes the `organization` row directly, so the settled-up check in `beforeDeleteOrganization` doesn't apply.
+3. Deletes the user's remaining `member` rows, sessions, accounts, pending invitations they sent, friend requests, and friendships.
+4. Sets `name` to `Deleted user`, `email` to `deleted-<userId>@deleted.invalid`, and `image` to `null`.
+5. _To be decided:_ what happens to invitations addressed to the user's email, Better Auth's `verification` rows, and free-text fields that may name the user.
+
+Account deletion is never blocked, not even by an outstanding balance. The account and its personal data go, but in households that still have members, the user's ledger entries stay, because those members may still have claims against them; GDPR allows keeping data needed for legal claims (Art. 17(3)(e)). This is pseudonymization, not anonymization: ledger rows, chores, shopping items, and membership history keep pointing at the same user ID, and the other members still know who it was. The balance stays settleable by the other party or an admin+.
+
+As a backstop, every foreign key from household data to `user` is `ON DELETE RESTRICT`, so hard-deleting anyone with household history fails instead of erasing it.
+
+### Deleting households
+
+An `owner` can delete a household through Better Auth's `/organization/delete` only while it's settled up: every household party's balance, departed members' included, is zero. Otherwise `organizationHooks.beforeDeleteOrganization` rejects the request with 409 `HOUSEHOLD_HAS_UNSETTLED_BALANCES`. A household with no expenses and no settlements is trivially settled. #26 adds the hook, and #40 adds the balance check once balances exist.
+
+Deleting a settled household deletes its expenses and settlements with it, since nobody is owed anything. An unsettled household stays: members settle up before leaving, an admin+ can remove members who don't and [write off](#writing-off-debts) what they still owe, and Better Auth never lets the last `owner` leave or be removed, so it keeps an owner while it has members. The only way a household loses its last member is account deletion, which then deletes the household too (see [Deleting accounts](#deleting-accounts)). Archiving is deferred.
+
+Foreign keys in application tables delete as follows:
+
+- **To `organization`:** `CASCADE` from every household table. The settled-up check in `beforeDeleteOrganization` is what protects the ledger.
+- **To `user`:** `RESTRICT` from every household table, including membership history, and `CASCADE` only from friend requests and friendships.
+- **Expense child rows** (payers, allocation participants, and splits) cascade from their expense.
+- **Expenses to categories:** `RESTRICT`. Deleting a category that any expense uses answers 409 `CATEGORY_IN_USE`; the service checks first, and the key catches races. Deleting a household still works, because PostgreSQL checks the key only after the cascade has removed both the expenses and the categories.
+
+Better Auth's generated tables keep their own `CASCADE` keys. A task that stores files outside PostgreSQL (#44) also cleans up objects whose rows are gone.
+
+### Disabled modules
+
+- `expenses` covers categories, expenses, payments, balances, suggestions, and attachment links. `chores` and `shopping` cover their own routes.
+- While a module is off, its `GET` routes keep working, and every other method answers 403 `MODULE_DISABLED`. Nothing is deleted or hidden, and turning the module back on restores everything.
+- Better Auth's membership actions are never blocked. Changing flags isn't either, except that `expenses` stays on while any balance in the household isn't zero, so members can always settle up: turning it off then answers 409 `HOUSEHOLD_HAS_UNSETTLED_BALANCES`. #40 adds this check together with the one for deleting households.
+
+## Referenced users
+
+| A request references | The user must be |
+| --- | --- |
+| A newly added expense payer or participant, or a chore assignee | A current member |
+| A payer or participant already on the stored expense, in a financial replacement | A household party |
+| A payment's payer or payee | A household party |
+| A stored reference sent back unchanged in a `PATCH` | Anyone; it isn't re-checked |
+
+Checking for a household party takes one lookup in `household_membership_history`. That lookup also covers ledger participation without aggregating balances: everyone in the ledger was a current member when they were added, so they have a history row.
+
+Unknown users, users from another household, and ineligible users all get the same 400 `INVALID_REFERENCE`.
+
+### Historical expense edits
+
+These rules apply to #38:
+
+- A financial replacement may keep anyone who is already a payer or allocation participant on the stored expense, in either role, even after they've left. Anyone else must be a current member.
+- Removing a departed user from an expense is allowed, because it's an explicit edit by someone allowed to edit. The server never drops anyone by itself.
+- Descriptive-only patches neither change nor re-validate payers and participants.
+
+For example, A pays 90.00, split equally among A, B, and C. C pays A 30.00 and leaves. A corrects the total to 120.00 and sends payer A (120.00) and participants A, B, and C. C passes because C is already on the expense. Each split becomes 40.00, so C owes 10.00 again after leaving. That's intended: C stays in the balances until someone records the payment, and the members remind C outside the app, since C can no longer see the household.
+
+### Recording payments
+
+- The payer and payee are distinct household parties.
+- The recorder (`createdBy`, from the session) is a current member who is the payer or the payee, or an admin+ recording between any two parties. A departed member's payment is recorded by the other party or by an admin+.
+- A payment recorded by its payer is `pending` until the payee, or an admin+ other than the payer, confirms it with `POST /settlements/:settlementId/confirm`. A payment recorded by the payee, or by an admin+ who isn't the payer, is `confirmed` at once. Nobody confirms their own payment, so an admin+ paying a departed member needs another admin+ to confirm.
+- Only confirmed payments count toward balances, suggestions, and every settled-up check. While a payment is pending, `DELETE /settlements/:settlementId` removes it: the payer withdraws it, or the payee or an admin+ rejects it. A confirmed payment can't be deleted, and `DELETE` answers 409 `SETTLEMENT_CONFIRMED`.
+- The expenses module must be enabled. Eligibility doesn't depend on balances; #40 decides balance limits, duplicate handling, and corrections of confirmed payments.
+- The contracts don't have this yet. #40 adds a `status` (`pending` or `confirmed`) with `confirmedBy` and `confirmedAt` to `Settlement`, the two routes, and their params.
+
+### Writing off debts
+
+There's no write-off operation. When a departed member's debt can't be collected, an admin+ settles it with ordinary payments from the debtor, which are confirmed at once because the admin isn't the payer, and writes `Write-off` in each `note`. There are two ways to do it:
+
+- **Forgive it:** payments from the debtor to the creditors, up to what each is owed, so the creditors take the loss.
+- **Split it:** one payment from the debtor to each current member, an equal share each, so everyone takes the same loss.
+
+For example, departed D owes 30.00, A is owed 30.00, and A, B, and C are still members. Forgiving it records D→A 30.00, which leaves everyone at zero. Splitting it records D→A, D→B, and D→C for 10.00 each, which leaves A at +20.00 and B and C at −10.00.
+
+A departed member who is owed money is written off the same way, with payments to them instead. Write-offs look like other payments in the history, and only the note tells them apart.
+
+## API conventions
+
+### Routes
+
+- Application routes live under `/api`, the Nest global prefix from #24. Better Auth owns `/api/auth/*`, and no application route starts with it.
+- Household routes have the shape `/api/households/:householdId/<collection>[/:<name>Id][/<action>]`. User routes start with `/api/me`, act on the session user, and never contain a user ID.
+- Collections are plural kebab-case nouns, and path params use the contract names. Actions are `POST` requests to a verb segment with an empty body.
+
+Household paths in this table are relative to `/api/households/:householdId`. Tasks may add routes with the same shapes.
+
+| Area | Routes |
+| --- | --- |
+| Module flags | `/features`: `GET`, `PATCH` |
+| Categories | `/expense-categories`: `GET`, `POST` · `/expense-categories/:categoryId`: `PATCH`, `DELETE` |
+| Expenses | `/expenses`: `GET`, `POST` · `/expenses/:expenseId`: `GET`, `PATCH`, `DELETE` |
+| Payments | `/settlements`: `GET`, `POST` · `/settlements/:settlementId`: `DELETE` · `/settlements/:settlementId/confirm`: `POST` |
+| Balances | `/balances`: `GET` · `/settlement-suggestions`: `GET` |
+| Chores | `/chores`: `GET`, `POST` · `/chores/:choreId`: `GET`, `PATCH`, `DELETE` · `/chores/:choreId/complete` and `/reopen`: `POST` |
+| Shopping | `/shopping-items`: `GET`, `POST` · `/shopping-items/:itemId`: `GET`, `PATCH`, `DELETE` · `/shopping-items/:itemId/purchase` and `/unpurchase`: `POST` · `/shopping-items/clear-purchased`: `POST` |
+| Profile | `/api/me`: `PATCH` |
+| Friends | `/api/me/friends`: `GET` · `/api/me/friends/:friendshipId`: `DELETE` · `/api/me/friend-requests`: `POST` · `/api/me/friend-requests/incoming` and `/sent`: `GET` · `/api/me/friend-requests/:requestId/accept` and `/decline`: `POST` |
+
+### Better Auth endpoints
+
+- Households are created, listed, renamed, and deleted, and members and invitations are managed, through Better Auth's `/api/auth/organization/*` endpoints: `create`, `list`, `update`, `delete`, `get-full-organization`, `list-members`, `update-member-role`, `remove-member`, `leave`, `invite-member`, `get-invitation`, `accept-invitation`, `reject-invitation`, `cancel-invitation`, `list-invitations`, and `list-user-invitations`. HomeSplit doesn't wrap or proxy them.
+- HomeSplit sends no invitation emails (`sendInvitationEmail` isn't configured). An invitee finds their pending invitations through `list-user-invitations`, which matches the session user's email, and accepts or rejects one by its ID.
+- The other organization endpoints that 1.7.7 registers with this config (`set-active`, `check-slug`, `get-organization`, `get-active-member`, `get-active-member-role`, and `has-permission`) go into Better Auth's `disabledPaths`.
+- Every member sees the other members' emails, because `list-members` and `get-full-organization` return them. That's accepted: invitations go by email, so housemates already share them, and hiding them would mean wrapping both endpoints.
+- Clients pass `organizationId` explicitly wherever an endpoint accepts it. Without it, Better Auth falls back to the session's active organization, which `create` and `accept-invitation` still set.
+- These endpoints keep Better Auth's status codes and error codes, not the ones in [Errors](#errors). In 1.7.7, for example, a caller who isn't a member gets 400 or 403 rather than 404, and `remove-member` without the right answers 401 `YOU_ARE_NOT_ALLOWED_TO_DELETE_THIS_MEMBER`, so a 401 from `/api/auth/*` doesn't always mean the session is gone. Their error bodies are usually `{ code, message }`, which parses as an `ApiError` without `details`.
+- #30 adds `/update-user` to Better Auth's `disabledPaths`, so profile changes go only through `PATCH /api/me` and its `imageUrl` validation.
+
+### Responses
+
+- `GET` returns 200, and a creating `POST` returns 201 with the created resource. `PATCH` returns 200 with the full resource, which for `PATCH /api/me` is the user's `UserSummary`, and `DELETE` returns 204 with no body.
+- An action returns 200 with the resulting resource. `clear-purchased` returns `{ deletedCount }`, accepting a friend request returns the new `Friendship`, and declining returns 204.
+- In a `PATCH`, an omitted field stays unchanged, `null` clears a nullable field, and `financial` replaces the whole financial spec.
+- Chore, shopping-item, and payment actions are idempotent. Repeating one whose target state already holds returns 200 with the resource unchanged, keeping the original actor and time, and repeating `clear-purchased` returns `{ deletedCount: 0 }`. Friend-request actions aren't: accepting or declining deletes the request, so a repeat answers 404.
+
+### Errors
+
+Every error from an application route is an [`ApiError`](../packages/contracts/src/common/api-error.ts) (`{ code, message, details? }`). Clients branch on the status and `code`; `message` is English text for developers. Errors from `/api/auth/*` come from Better Auth and don't follow this section; see [Better Auth endpoints](#better-auth-endpoints).
+
+| Status | `code` | When |
+| --- | --- | --- |
+| 400 | `VALIDATION_ERROR` | Path params, query, or body fail the contract schema. `details.issues` lists `{ path, message }` objects. |
+| 400 | `EMPTY_PATCH` | A `PATCH` body has no fields after parsing. |
+| 400 | `INVALID_REFERENCE` | An ID in the body doesn't exist in this household or isn't eligible. `details.issues` has the same shape. |
+| 401 | `UNAUTHENTICATED` | There's no valid session. |
+| 403 | `FORBIDDEN` | A current member lacks the role or the resource-level right. |
+| 403 | `MODULE_DISABLED` | A write hits a disabled module. `details.module` names it. |
+| 404 | `NOT_FOUND` | The household doesn't exist or the caller isn't a current member, a path resource isn't in this household, or the route doesn't exist. These cases look identical. |
+| 409 | A feature code, or `CONFLICT` | A uniqueness or state conflict, including database unique and foreign-key violations, which never surface as 500. |
+| 429 | `RATE_LIMITED` | The caller hit a per-user limit. |
+| 500 | `INTERNAL_ERROR` | Anything unexpected. The body exposes no internals. |
+
+Each area's route doc lists its own codes, such as `CATEGORY_IN_USE` or `USER_NOT_FOUND`. `UNSUPPORTED_FIELD`, `UNSETTLED_BALANCE`, `CANNOT_REMOVE_SELF`, and `HOUSEHOLD_HAS_UNSETTLED_BALANCES` are HomeSplit codes too, but HomeSplit's hooks return them from Better Auth endpoints, so they arrive from `/api/auth/*` with Better Auth's body.
+
+Requests are checked in this order, so each failure has one predictable answer. Steps 1 to 3 run in guards, step 4 in pipes, and the rest in services.
+
+1. Session: 401.
+2. `householdId` format: 400. Current membership: 404.
+3. Module enabled, for writes: 403 `MODULE_DISABLED`. Route-level role: 403 `FORBIDDEN`.
+4. Remaining params, query, and body: 400 `VALIDATION_ERROR` or `EMPTY_PATCH`.
+5. Path resource in this household: 404.
+6. Resource-level right, such as being the expense author: 403.
+7. Referenced IDs: 400 `INVALID_REFERENCE`.
+8. Conflicts: 409.
+
+### Lists
+
+- Paginated lists take `page` (default 1) and `pageSize` (default 20, maximum 100) and return `{ items, page, pageSize, totalItems }` with the values applied. A page past the end returns 200 with empty `items` and the real `totalItems`. Items and total come from one read-only `REPEATABLE READ` transaction, so both queries see the same snapshot; under PostgreSQL's default `READ COMMITTED`, each query would see its own.
+- Unpaginated lists return `{ items }`.
+- Every order ends with `id`, so rows with equal sort keys never swap places between requests.
+
+| List | Order |
+| --- | --- |
+| Expenses | `expenseDate` desc, `createdAt` desc, `id` desc |
+| Settlements | `createdAt` desc, `id` desc |
+| Chores | Open before completed, deadline asc with no deadline last, `createdAt` asc, `id` asc |
+| Shopping items | Unpurchased before purchased, `addedAt` asc, `id` asc |
+| Categories | Name asc (case-insensitive), `id` asc |
+| Friends | Friend's name asc (case-insensitive), `id` asc |
+| Friend requests | `createdAt` desc, `id` desc |
+| Balances and suggestions | Currency code asc; within a currency, #41 and #42 define the order, ending with the user ID |
+
+Offset pages can shift when rows are added or removed between requests. That's accepted, because the contracts have no cursors.
+
+## Friend-request privacy
+
+This decision applies to #31. An unknown email gets 400 `USER_NOT_FOUND`, because it's a body value, not a path resource. Success returns 201 with a `FriendRequest` that holds a real `FriendUser`, so the response contract stays unchanged.
+
+Why:
+
+- A fake success would need a made-up `FriendUser` with an ID, which the contract rules out.
+- A uniform 202 with no body needs a contract change and still leaks: a real request appears in the sender's sent list, and an unknown email doesn't.
+- The leak exists already. With the current config, `POST /api/auth/sign-up/email` answers 422 `USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL` for a registered address, to anyone, without signing in.
+
+As a result, any signed-in user can check whether an email has an account, which is accepted for now. #31 trims and lowercases the email (Better Auth stores emails lowercased) in the `CreateFriendRequest` schema, before the email check, as `z.string().trim().toLowerCase().pipe(z.email())`, because pipes validate before the service runs and `z.email()` rejects surrounding spaces. #31 also limits `POST /api/me/friend-requests` per user, answering 429 `RATE_LIMITED` over a limit that #31 chooses.
+
+Revisit this if sign-up stops revealing accounts. Better Auth returns a generic sign-up response when `requireEmailVerification` is on or `autoSignIn` is off. At that point, propose a uniform response and its contract change before implementing it.
+
+## Route doc template
+
+Each epic documents its routes in `docs/api/<area>.md` (`households`, `users-friends`, `expenses`, `chores`, or `shopping`), and a task adds its routes there in the same PR. Rules from this file aren't repeated.
+
+````markdown
+# <Area> API
+
+Module flag: `<flag or none>` · Tasks: #<n> · Contracts: [<file>](../../packages/contracts/src/features/<area>/index.ts)
+
+## Routes
+
+| Method | Path | Request | Response | Success | Allowed |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/api/households/:householdId/<things>` | `List<Thing>Query` | `<Thing>ListResponse` | 200 | all |
+
+## Rules
+
+- Server-set fields:
+- References and eligibility:
+- Ordering:
+- Repeated and concurrent requests:
+
+## Errors
+
+Shared errors from [the decision record](../decisions.md#errors) apply. Feature codes:
+
+| Status | Code | When |
+| --- | --- | --- |
+| 409 | `<CODE>` | <condition> |
+
+## Storage
+
+Tables, constraints, foreign-key delete behavior, and indexes added by this area's migrations.
+````
+
+## Deferred
+
+- An account-deletion endpoint, following [Deleting accounts](#deleting-accounts).
+- Archiving households.
+- A write-off action that does [Writing off debts](#writing-off-debts) in one step and keeps write-offs apart from real payments.
+- Custom roles and teams.
