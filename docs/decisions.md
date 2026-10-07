@@ -84,8 +84,8 @@ The matrix follows three rules:
 - **History:** everything they authored, paid, took part in, were assigned, completed, or bought stays attributed to them through their usual `UserSummary`. Nothing is reassigned or rewritten when someone leaves, so an open chore stays assigned to them until a member reassigns it.
 - **Balances:** #41 lists a departed member in a currency whenever their balance in it isn't zero, so current members see who still owes or is owed and can remind them.
 - **Payments:** they can't record or confirm payments. A current member who is the other party, or an admin+, records the payment for them, and an admin+ confirms a pending payment whose payee has left.
-- **Leaving:** blocked with 409 `UNSETTLED_BALANCE` while any of the member's balances in the household isn't zero, so members settle up before they leave. `/organization/leave` calls no organization hook, so the check goes in a global `hooks.before` matched on that path; verify in 1.7.7 that it can read balances and reject the request, and otherwise replace the endpoint with a HomeSplit route.
-- **Removal:** an admin+ can remove another member whatever their balance. The balance stays, and the debt stays settleable. Nobody can remove themselves, because that would skip the leaving check: `/organization/remove-member` aimed at the caller's own membership answers 403 `CANNOT_REMOVE_SELF`. Better Auth 1.7.7 allows self-removal and doesn't pass the caller to `beforeRemoveMember`, so this check also goes in the global `hooks.before`, matched on `/organization/remove-member`.
+- **Leaving:** blocked with 409 `UNSETTLED_BALANCE` while any of the member's balances in the household isn't zero, so members settle up before they leave. `/organization/leave` calls no organization hook, so the check goes in a global `hooks.before` matched on that path; verify in 1.7.7 that it can read balances and reject the request, and otherwise replace the endpoint with a HomeSplit route. That hook runs outside Better Auth's write, so an expense committed in between can leave the member departed with a balance. That's accepted, because it's the same state an admin+ removal creates and the debt stays settleable.
+- **Removal:** an admin+ can remove another member whatever their balance. The balance stays, and the debt stays settleable. Nobody can remove themselves, because that would skip the leaving check: `/organization/remove-member` aimed at the caller's own membership answers 403 `CANNOT_REMOVE_SELF`. Better Auth 1.7.7 allows self-removal and doesn't pass the caller to `beforeRemoveMember`, so this check also goes in the global `hooks.before`, matched on `/organization/remove-member`. The hook doesn't rely on clients sending a convenient request. It rejects a request without `organizationId` with 400 instead of falling back to the session's active organization. It treats `memberIdOrEmail` as the caller when it's an email equal to the caller's, compared case-insensitively, or a member ID whose member in that household is the caller. Either match answers 403 `CANNOT_REMOVE_SELF`.
 - **Rejoining:** accepting a new invitation makes them a current member again with the invited role, and their history continues under the same user ID.
 
 ### Deleting accounts
@@ -95,7 +95,7 @@ Better Auth's `/delete-user` stays disabled (`user.deleteUser.enabled` defaults 
 Account deletion keeps the `user` row and its ID but overwrites the personal data in it, built by whichever task adds `DELETE /api/me` (none is in the backlog yet). In one transaction, it:
 
 1. Hands ownership on in every household where the user is the only `owner` and other members remain: the `admin` with the earliest `first_joined_at` becomes `owner`, or the `member` with the earliest one if there's no admin.
-2. Deletes every household where the user is the last current member, with all its data and whatever its balances, because nobody can open it again: departed members have no access. It deletes the `organization` row directly, so the settled-up check in `beforeDeleteOrganization` doesn't apply.
+2. Deletes every household where the user is the last current member, with all its data and whatever its balances, because nobody can open it again: departed members have no access. It deletes the `organization` row directly, so the settled-up check in `DELETE /api/households/:householdId` doesn't apply.
 3. Deletes the user's remaining `member` rows, sessions, accounts, pending invitations they sent, friend requests, and friendships.
 4. Sets `name` to `Deleted user`, `email` to `deleted-<userId>@deleted.invalid`, and `image` to `null`.
 5. _To be decided:_ what happens to invitations addressed to the user's email, Better Auth's `verification` rows, and free-text fields that may name the user.
@@ -106,13 +106,20 @@ As a backstop, every foreign key from household data to `user` is `ON DELETE RES
 
 ### Deleting households
 
-An `owner` can delete a household through Better Auth's `/organization/delete` only while it's settled up: every household party's balance, departed members' included, is zero. Otherwise `organizationHooks.beforeDeleteOrganization` rejects the request with 409 `HOUSEHOLD_HAS_UNSETTLED_BALANCES`. A household with no expenses and no settlements is trivially settled. #26 adds the hook, and #40 adds the balance check once balances exist.
+An `owner` can delete a household through `DELETE /api/households/:householdId` only while it's settled up: every household party's balance, departed members' included, is zero. Otherwise it answers 409 `HOUSEHOLD_HAS_UNSETTLED_BALANCES`. A household with no expenses and no settlements is trivially settled. #26 adds the route, and #40 adds the balance check once balances exist.
+
+Better Auth's `/organization/delete` can't do this safely. In 1.7.7, `beforeDeleteOrganization` runs before the deletion transaction and outside it, so an expense committed between the check and the delete would be erased by the cascade. HomeSplit's route checks and deletes in one transaction, and a global `hooks.before` rejects `/organization/delete` with 404 so clients can't use it.
+
+Every settled-up check is serialized against ledger writes on the `organization` row:
+
+- A settled-up check runs in the same transaction as the change it guards, after `SELECT … FROM organization WHERE id = $1 FOR UPDATE`. Under `READ COMMITTED`, the balance query after the lock sees every ledger write committed before it.
+- Every transaction that writes the ledger (expenses, their child rows, and settlements) first takes `FOR SHARE` on the same row, so it waits for a check in progress and the check waits for it. A write that waited on a deletion then finds no household and answers 404.
 
 Deleting a settled household deletes its expenses and settlements with it, since nobody is owed anything. An unsettled household stays: members settle up before leaving, an admin+ can remove members who don't and [write off](#writing-off-debts) what they still owe, and Better Auth never lets the last `owner` leave or be removed, so it keeps an owner while it has members. The only way a household loses its last member is account deletion, which then deletes the household too (see [Deleting accounts](#deleting-accounts)). Archiving is deferred.
 
 Foreign keys in application tables delete as follows:
 
-- **To `organization`:** `CASCADE` from every household table. The settled-up check in `beforeDeleteOrganization` is what protects the ledger.
+- **To `organization`:** `CASCADE` from every household table. The settled-up check in `DELETE /api/households/:householdId`, serialized against ledger writes, is what protects the ledger.
 - **To `user`:** `RESTRICT` from every household table, including membership history, and `CASCADE` only from friend requests and friendships.
 - **Expense child rows** (payers, allocation participants, and splits) cascade from their expense.
 - **Expenses to categories:** `RESTRICT`. Deleting a category that any expense uses answers 409 `CATEGORY_IN_USE`; the service checks first, and the key catches races. Deleting a household still works, because PostgreSQL checks the key only after the cascade has removed both the expenses and the categories.
@@ -123,7 +130,7 @@ Better Auth's generated tables keep their own `CASCADE` keys. A task that stores
 
 - `expenses` covers categories, expenses, payments, balances, suggestions, and attachment links. `chores` and `shopping` cover their own routes.
 - While a module is off, its `GET` routes keep working, and every other method answers 403 `MODULE_DISABLED`. Nothing is deleted or hidden, and turning the module back on restores everything.
-- Better Auth's membership actions are never blocked. Changing flags isn't either, except that `expenses` stays on while any balance in the household isn't zero, so members can always settle up: turning it off then answers 409 `HOUSEHOLD_HAS_UNSETTLED_BALANCES`. #40 adds this check together with the one for deleting households.
+- Better Auth's membership actions are never blocked. Changing flags isn't either, except that `expenses` stays on while any balance in the household isn't zero, so members can always settle up: turning it off then answers 409 `HOUSEHOLD_HAS_UNSETTLED_BALANCES`. #40 adds this check together with the one for deleting households, serialized against ledger writes the same way (see [Deleting households](#deleting-households)).
 
 ## Referenced users
 
@@ -180,6 +187,7 @@ Household paths in this table are relative to `/api/households/:householdId`. Ta
 
 | Area | Routes |
 | --- | --- |
+| Household | `/api/households/:householdId`: `DELETE` |
 | Module flags | `/features`: `GET`, `PATCH` |
 | Categories | `/expense-categories`: `GET`, `POST` · `/expense-categories/:categoryId`: `PATCH`, `DELETE` |
 | Expenses | `/expenses`: `GET`, `POST` · `/expenses/:expenseId`: `GET`, `PATCH`, `DELETE` |
@@ -192,8 +200,9 @@ Household paths in this table are relative to `/api/households/:householdId`. Ta
 
 ### Better Auth endpoints
 
-- Households are created, listed, renamed, and deleted, and members and invitations are managed, through Better Auth's `/api/auth/organization/*` endpoints: `create`, `list`, `update`, `delete`, `get-full-organization`, `list-members`, `update-member-role`, `remove-member`, `leave`, `invite-member`, `get-invitation`, `accept-invitation`, `reject-invitation`, `cancel-invitation`, `list-invitations`, and `list-user-invitations`. HomeSplit doesn't wrap or proxy them.
-- HomeSplit sends no invitation emails (`sendInvitationEmail` isn't configured). An invitee finds their pending invitations through `list-user-invitations`, which matches the session user's email, and accepts or rejects one by its ID.
+- Households are created, listed, and renamed, and members and invitations are managed, through Better Auth's `/api/auth/organization/*` endpoints: `create`, `list`, `update`, `get-full-organization`, `list-members`, `update-member-role`, `remove-member`, `leave`, `invite-member`, `get-invitation`, `accept-invitation`, `reject-invitation`, `cancel-invitation`, and `list-invitations`. HomeSplit doesn't wrap or proxy them. Households are deleted through `DELETE /api/households/:householdId` instead, and `/organization/delete` answers 404 (see [Deleting households](#deleting-households)).
+- Invitees learn about invitations by email: #28 configures `sendInvitationEmail` with a link that carries the invitation ID. The invitee opens it with `get-invitation` and answers with `accept-invitation` or `reject-invitation`. All three check that the session user's email matches the invitation's, case-insensitively, so a forwarded link is useless to anyone else.
+- Email verification isn't set up, so every user has `emailVerified: false`. In 1.7.7, the three ID-based endpoints skip the verification check while invitation IDs are built-in UUIDs (`advanced.database.generateId: "uuid"`, no custom `generateId`) and `requireEmailVerificationOnInvitation` is unset; both must stay that way. `list-user-invitations` always requires a verified email, so it would answer every call with 403 `EMAIL_VERIFICATION_REQUIRED_FOR_INVITATION` and goes into `disabledPaths` until email verification exists.
 - The other organization endpoints that 1.7.7 registers with this config (`set-active`, `check-slug`, `get-organization`, `get-active-member`, `get-active-member-role`, and `has-permission`) go into Better Auth's `disabledPaths`.
 - Every member sees the other members' emails, because `list-members` and `get-full-organization` return them. That's accepted: invitations go by email, so housemates already share them, and hiding them would mean wrapping both endpoints.
 - Clients pass `organizationId` explicitly wherever an endpoint accepts it. Without it, Better Auth falls back to the session's active organization, which `create` and `accept-invitation` still set.
@@ -224,7 +233,7 @@ Every error from an application route is an [`ApiError`](../packages/contracts/s
 | 429 | `RATE_LIMITED` | The caller hit a per-user limit. |
 | 500 | `INTERNAL_ERROR` | Anything unexpected. The body exposes no internals. |
 
-Each area's route doc lists its own codes, such as `CATEGORY_IN_USE` or `USER_NOT_FOUND`. `UNSUPPORTED_FIELD`, `UNSETTLED_BALANCE`, `CANNOT_REMOVE_SELF`, and `HOUSEHOLD_HAS_UNSETTLED_BALANCES` are HomeSplit codes too, but HomeSplit's hooks return them from Better Auth endpoints, so they arrive from `/api/auth/*` with Better Auth's body.
+Each area's route doc lists its own codes, such as `CATEGORY_IN_USE` or `USER_NOT_FOUND`. `UNSUPPORTED_FIELD`, `UNSETTLED_BALANCE`, and `CANNOT_REMOVE_SELF` are HomeSplit codes too, but HomeSplit's hooks return them from Better Auth endpoints, so they arrive from `/api/auth/*` with Better Auth's body.
 
 Requests are checked in this order, so each failure has one predictable answer. Steps 1 to 3 run in guards, step 4 in pipes, and the rest in services.
 
