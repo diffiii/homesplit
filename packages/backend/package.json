@@ -5,8 +5,12 @@
   "scripts": {
     "auth:generate": "auth generate --config src/auth.ts --output src/db/schema.ts --yes",
     "build": "nest build",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
     "dev": "nest start --watch --exec \"node --env-file-if-exists=.env\"",
     "start": "nest start --exec \"node --env-file-if-exists=.env\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -25,10 +29,15 @@
   "devDependencies": {
     "@nestjs/cli": "^12.0.8",
     "@nestjs/schematics": "^12.0.6",
+    "@swc/core": "^1.16.13",
     "@types/node": "^24.13.6",
     "@types/pg": "^8.23.1",
+    "@types/supertest": "^7.2.1",
     "auth": "^1.7.7",
     "drizzle-kit": "^0.31.11",
-    "typescript": "^6.0.3"
+    "supertest": "^7.3.1",
+    "typescript": "^6.0.3",
+    "unplugin-swc": "^2.0.0",
+    "vitest": "^5.0.3"
   }
 }
