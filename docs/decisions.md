@@ -200,6 +200,15 @@ Household paths in this table are relative to `/api/households/:householdId`. Ta
 
 ### Better Auth endpoints
 
+<<<<<<< HEAD
+### Email Verification & Invitations (#29)
+
+- **`requireEmailVerification`**: Explicitly set to `true` under `emailAndPassword`. Unverified users cannot sign in until their email address is confirmed.
+- **`list-user-invitations`**: Before verification, Better Auth returns HTTP `403 Forbidden` (`EMAIL_VERIFICATION_REQUIRED_FOR_INVITATION`). After email verification (`emailVerified: true`), `list-user-invitations` returns matching user invitations.
+- **Mail Transports**: Uses Resend for production environments (`RESEND_API_KEY`, `MAIL_FROM`) and an in-memory capturing transport for development and test suites.
+
+=======
+>>>>>>> origin/main
 - Households are created, listed, and renamed, and members and invitations are managed, through Better Auth's `/api/auth/organization/*` endpoints: `create`, `list`, `update`, `get-full-organization`, `list-members`, `update-member-role`, `remove-member`, `leave`, `invite-member`, `get-invitation`, `accept-invitation`, `reject-invitation`, `cancel-invitation`, and `list-invitations`. HomeSplit doesn't wrap or proxy them. Households are deleted through `DELETE /api/households/:householdId` instead, and `/organization/delete` answers 404 (see [Deleting households](#deleting-households)).
 - Invitees learn about invitations by email: #28 configures `sendInvitationEmail` with a link that carries the invitation ID. The invitee opens it with `get-invitation` and answers with `accept-invitation` or `reject-invitation`. All three check that the session user's email matches the invitation's, case-insensitively, so a forwarded link is useless to anyone else.
 - Email verification isn't set up, so every user has `emailVerified: false`. In 1.7.7, the three ID-based endpoints skip the verification check while invitation IDs are built-in UUIDs (`advanced.database.generateId: "uuid"`, no custom `generateId`) and `requireEmailVerificationOnInvitation` is unset; both must stay that way. `list-user-invitations` always requires a verified email, so it would answer every call with 403 `EMAIL_VERIFICATION_REQUIRED_FOR_INVITATION` and goes into `disabledPaths` until email verification exists.
