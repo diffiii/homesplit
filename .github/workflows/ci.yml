@@ -47,6 +47,9 @@ jobs:
           require-lockfile: true
           runtime: node@lts
 
+      - name: Build workspace dependencies
+        run: pnpm --filter "${{ matrix.package }}^..." build
+
       - name: Run typecheck
         run: pnpm --filter ${{ matrix.package }} typecheck
 
@@ -69,8 +72,35 @@ jobs:
           require-lockfile: true
           runtime: node@lts
 
+      - name: Build workspace dependencies
+        run: pnpm --filter "${{ matrix.package }}^..." build
+
       - name: Run build
         run: pnpm --filter ${{ matrix.package }} build
+
+  test:
+    name: test (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [backend]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@v3
+        with:
+          cache: true
+          require-lockfile: true
+          runtime: node@lts
+
+      - name: Build workspace dependencies
+        run: pnpm --filter "${{ matrix.package }}^..." build
+
+      - name: Run tests
+        run: pnpm --filter ${{ matrix.package }} test
 
   commitlint:
     runs-on: ubuntu-latest

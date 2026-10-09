@@ -7,6 +7,8 @@
     "build": "nest build",
     "dev": "nest start --watch --exec \"node --env-file-if-exists=.env\"",
     "start": "nest start --exec \"node --env-file-if-exists=.env\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -29,6 +31,7 @@
     "@types/pg": "^8.23.1",
     "auth": "^1.7.7",
     "drizzle-kit": "^0.31.11",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.3"
   }
 }

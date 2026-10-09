@@ -18,5 +18,5 @@
     "strictPropertyInitialization": false,
     "types": ["node"]
   },
-  "include": ["src", "drizzle.config.ts"]
+  "include": ["src", "drizzle.config.ts", "vitest.config.mts"]
 }
