@@ -74,6 +74,9 @@ jobs:
 
   commitlint:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - name: Check out repository history
         uses: actions/checkout@v7
@@ -105,3 +108,13 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: pnpm exec commitlint --from "$BASE" --to "$HEAD" --verbose
+
+      - name: Validate pull request title with commitlint
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        # Fetch the current title: re-runs replay the original event payload, so its title may be stale.
+        run: |
+          TITLE=$(gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" --json title --jq .title)
+          echo "$TITLE (#$NUMBER)" | pnpm exec commitlint --verbose
