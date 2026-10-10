@@ -1,6 +1,13 @@
 import { z } from "zod";
 
+import { Id } from "../../common/id";
 import { FEATURE_IDS } from "../catalog";
+
+/** Path params for routes scoped to a household as a whole. */
+export const HouseholdIdParams = z.object({
+  householdId: Id,
+});
+export type HouseholdIdParams = z.infer<typeof HouseholdIdParams>;
 
 /** Per-household feature toggles; all three default to enabled at persistence time. */
 export const HouseholdFeatures = z.object(

@@ -8,6 +8,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./endpoints": {
+      "types": "./dist/endpoints/index.d.ts",
+      "default": "./dist/endpoints/index.js"
+    },
     "./features/catalog": {
       "types": "./dist/features/catalog.d.ts",
       "default": "./dist/features/catalog.js"

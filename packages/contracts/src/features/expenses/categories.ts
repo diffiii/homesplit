@@ -32,14 +32,6 @@ export const ExpenseCategoryIdParams = z.object({
 });
 export type ExpenseCategoryIdParams = z.infer<typeof ExpenseCategoryIdParams>;
 
-/** Path params for listing categories in a household. */
-export const ListExpenseCategoriesParams = z.object({
-  householdId: Id,
-});
-export type ListExpenseCategoriesParams = z.infer<
-  typeof ListExpenseCategoriesParams
->;
-
 /** Unpaginated category list (small set per household). */
 export const ExpenseCategoryListResponse = z.object({
   items: z.array(ExpenseCategory),
