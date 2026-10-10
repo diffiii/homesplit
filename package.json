@@ -14,7 +14,7 @@
     "lint": "ultracite check",
     "lint:fix": "ultracite fix",
     "prepare": "husky",
-    "test:backend": "pnpm --filter backend test",
+    "test:backend": "pnpm --filter \"backend^...\" build && pnpm --filter backend test",
     "typecheck": "pnpm -r typecheck"
   },
   "lint-staged": {

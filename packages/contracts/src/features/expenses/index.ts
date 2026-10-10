@@ -2,7 +2,15 @@ import { z } from "zod";
 
 import { IsoDate, IsoDateTime } from "../../common/datetime";
 import { Id } from "../../common/id";
-import { Cents, PositiveCents, PositiveMoney } from "../../common/money";
+import {
+  BoundedCents,
+  BoundedPositiveCents,
+  BoundedPositiveMoney,
+  Cents,
+  MAX_SHARES,
+  PositiveCents,
+  PositiveMoney,
+} from "../../common/money";
 import { Pagination, paginatedResponse } from "../../common/pagination";
 import { UserSummary } from "../users";
 import { ExpenseCategory } from "./categories";
@@ -48,20 +56,28 @@ export const ExpenseAllocationInput = z.discriminatedUnion("method", [
   z.strictObject({
     method: z.literal(SplitMethod.enum.shares),
     participants: z
-      .array(AllocationParticipant.extend({ shares: z.int().positive() }))
+      .array(
+        AllocationParticipant.extend({
+          shares: z.int().positive().max(MAX_SHARES),
+        })
+      )
       .min(1),
   }),
   z.strictObject({
     method: z.literal(SplitMethod.enum.exact),
     participants: z
-      .array(AllocationParticipant.extend({ amountCents: Cents.nonnegative() }))
+      .array(
+        AllocationParticipant.extend({
+          amountCents: BoundedCents.nonnegative(),
+        })
+      )
       .min(1),
   }),
   z.strictObject({
     method: z.literal(SplitMethod.enum.adjustment),
     // Remainder after adjustments is split equally, then each adjustment is added.
     participants: z
-      .array(AllocationParticipant.extend({ adjustmentCents: Cents }))
+      .array(AllocationParticipant.extend({ adjustmentCents: BoundedCents }))
       .min(1),
   }),
 ]);
@@ -70,12 +86,12 @@ export type ExpenseAllocationInput = z.infer<typeof ExpenseAllocationInput>;
 /** Amount a user actually paid towards an expense. */
 export const ExpensePayerInput = z.strictObject({
   userId: Id,
-  amountCents: PositiveCents,
+  amountCents: BoundedPositiveCents,
 });
 export type ExpensePayerInput = z.infer<typeof ExpensePayerInput>;
 
 const ExpenseFinancialFields = z.strictObject({
-  total: PositiveMoney,
+  total: BoundedPositiveMoney,
   payers: z.array(ExpensePayerInput).min(1),
   allocation: ExpenseAllocationInput,
 });

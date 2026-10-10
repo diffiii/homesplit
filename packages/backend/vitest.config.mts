@@ -15,7 +15,7 @@ export default defineConfig({
   // SWC emits the decorator metadata Nest's dependency injection needs.
   plugins: [swc.vite({ module: { type: "es6" } })],
   test: {
-    include: ["test/**/*.test.ts"],
+    include: ["src/**/*.spec.ts", "test/**/*.test.ts"],
     env: {
       DATABASE_URL: databaseUrl,
       BETTER_AUTH_SECRET: "test-secret-not-for-production-use-0123456789",

@@ -17,7 +17,7 @@ Tests run against the `postgres-test` service in `compose.yaml`, never against t
 - It's in the compose `test` profile, so `pnpm db:up` and `pnpm db:down` don't touch it.
 - Tests ignore `packages/backend/.env` and `DATABASE_URL`. To use another database, set `TEST_DATABASE_URL`. Its database name must end in `_test`, or the run stops before connecting.
 
-CI runs the same command in the `test-backend` job, with its own PostgreSQL service on port 5433.
+CI runs the suite in the `test (backend)` job, with its own PostgreSQL service on port 5433.
 
 ## How a run works
 
@@ -31,7 +31,7 @@ Each file that boots the app closes it in `afterAll`. That ends the database poo
 
 ## Writing tests
 
-Test files go in `packages/backend/test` and end in `.test.ts`. The helpers are in `test/helpers`:
+Integration tests go in `packages/backend/test` and end in `.test.ts`. Unit tests sit next to the code in `src` and end in `.spec.ts`; they run in the same suite, so they need the test database too. The helpers are in `test/helpers`:
 
 | Helper | Gives you |
 | --- | --- |
