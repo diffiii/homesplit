@@ -15,13 +15,13 @@ export default defineConfig({
   test: {
     projects: [
       {
+        plugins: [swc.vite({ module: { type: "es6" } })],
         test: {
           name: "unit",
           include: ["src/**/*.spec.ts"],
         },
       },
       {
-        // SWC emits the decorator metadata Nest's dependency injection needs.
         plugins: [swc.vite({ module: { type: "es6" } })],
         test: {
           name: "integration",

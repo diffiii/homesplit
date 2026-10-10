@@ -14,7 +14,7 @@ describe("auth and organization schema", () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    await app?.close();
   });
 
   it("stores signed-up users and returns their session", async () => {

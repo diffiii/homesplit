@@ -9,7 +9,6 @@ export async function createTestApp(): Promise<INestApplication> {
     bodyParser: false,
     logger: false,
   });
-  app.enableShutdownHooks();
   await app.init();
   return app;
 }
