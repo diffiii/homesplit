@@ -230,6 +230,8 @@ Every error from an application route is an [`ApiError`](../packages/contracts/s
 | 403 | `MODULE_DISABLED` | A write hits a disabled module. `details.module` names it. |
 | 404 | `NOT_FOUND` | The household doesn't exist or the caller isn't a current member, a path resource isn't in this household, or the route doesn't exist. These cases look identical. |
 | 409 | A feature code, or `CONFLICT` | A uniqueness or state conflict, including database unique and foreign-key violations, which never surface as 500. |
+| 413 | `PAYLOAD_TOO_LARGE` | The body is over the JSON parser's size limit (100 KB). |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | The body uses a charset or content encoding the parser can't decode. |
 | 429 | `RATE_LIMITED` | The caller hit a per-user limit. |
 | 500 | `INTERNAL_ERROR` | Anything unexpected. The body exposes no internals. |
 
