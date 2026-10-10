@@ -179,7 +179,7 @@ A departed member who is owed money is written off the same way, with payments t
 
 ### Routes
 
-- Application routes live under `/api`, the Nest global prefix from #24. Better Auth owns `/api/auth/*`, and no application route starts with it.
+- Application routes live under `/api/...` as full paths in the contracts endpoint map; the backend binds them through `@Route` without a Nest global prefix. Better Auth owns `/api/auth/*`, and no application route starts with `/api/auth`.
 - Household routes have the shape `/api/households/:householdId/<collection>[/:<name>Id][/<action>]`. User routes start with `/api/me`, act on the session user, and never contain a user ID.
 - Collections are plural kebab-case nouns, and path params use the contract names. Actions are `POST` requests to a verb segment with an empty body.
 

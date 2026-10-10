@@ -78,14 +78,6 @@ export type PurchaseShoppingItemResponse = PurchasedShoppingItem;
 /** Response for unpurchasing a shopping item. */
 export type UnpurchaseShoppingItemResponse = UnpurchasedShoppingItem;
 
-/** Path params for clearing all purchased items in a household. */
-export const ClearPurchasedShoppingItemsParams = z.object({
-  householdId: Id,
-});
-export type ClearPurchasedShoppingItemsParams = z.infer<
-  typeof ClearPurchasedShoppingItemsParams
->;
-
 /** Result of clearing purchased shopping items. */
 export const ClearPurchasedShoppingItemsResponse = z.object({
   deletedCount: z.int().nonnegative(),

@@ -56,12 +56,6 @@ export const CurrencyBalances = z.object({
 });
 export type CurrencyBalances = z.infer<typeof CurrencyBalances>;
 
-/** Path params for listing balances in a household. */
-export const ListBalancesParams = z.object({
-  householdId: Id,
-});
-export type ListBalancesParams = z.infer<typeof ListBalancesParams>;
-
 /** Unpaginated balances, one entry per currency. */
 export const BalanceListResponse = z.object({
   items: z.array(CurrencyBalances),
@@ -119,14 +113,6 @@ export const ProcessSettlementRequest = z
     )
   );
 export type ProcessSettlementRequest = z.infer<typeof ProcessSettlementRequest>;
-
-/** Path params for listing settlement suggestions in a household. */
-export const ListSettlementSuggestionsParams = z.object({
-  householdId: Id,
-});
-export type ListSettlementSuggestionsParams = z.infer<
-  typeof ListSettlementSuggestionsParams
->;
 
 /** List settlement history with offset pagination. */
 export const ListSettlementHistoryQuery = Pagination;
