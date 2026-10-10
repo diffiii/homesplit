@@ -31,7 +31,7 @@ Each file that boots the app closes it in `afterAll`. That ends the database poo
 
 ## Writing tests
 
-Integration tests go in `packages/backend/test` and end in `.test.ts`. Unit tests sit next to the code in `src` and end in `.spec.ts`; they run in the same suite, so they need the test database too. The helpers are in `test/helpers`:
+Integration tests go in `packages/backend/test` and end in `.test.ts`. Unit tests sit next to the code in `src` and end in `.spec.ts`. The two kinds are separate Vitest projects: only `integration` uses the database, and `pnpm --filter backend test:unit` runs the unit tests without it. The helpers are in `test/helpers`:
 
 | Helper | Gives you |
 | --- | --- |

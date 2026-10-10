@@ -10,6 +10,7 @@
     "dev": "nest start --watch --exec \"node --env-file-if-exists=.env\"",
     "start": "nest start --exec \"node --env-file-if-exists=.env\"",
     "test": "vitest run",
+    "test:unit": "vitest run --project unit",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },

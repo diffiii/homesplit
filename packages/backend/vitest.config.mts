@@ -12,17 +12,30 @@ if (!new URL(databaseUrl).pathname.endsWith("_test")) {
 }
 
 export default defineConfig({
-  // SWC emits the decorator metadata Nest's dependency injection needs.
-  plugins: [swc.vite({ module: { type: "es6" } })],
   test: {
-    include: ["src/**/*.spec.ts", "test/**/*.test.ts"],
-    env: {
-      DATABASE_URL: databaseUrl,
-      BETTER_AUTH_SECRET: "test-secret-not-for-production-use-0123456789",
-      BETTER_AUTH_URL: "http://localhost:8080",
-    },
-    globalSetup: ["test/global-setup.ts"],
-    setupFiles: ["test/setup.ts"],
-    fileParallelism: false,
+    projects: [
+      {
+        test: {
+          name: "unit",
+          include: ["src/**/*.spec.ts"],
+        },
+      },
+      {
+        // SWC emits the decorator metadata Nest's dependency injection needs.
+        plugins: [swc.vite({ module: { type: "es6" } })],
+        test: {
+          name: "integration",
+          include: ["test/**/*.test.ts"],
+          env: {
+            DATABASE_URL: databaseUrl,
+            BETTER_AUTH_SECRET: "test-secret-not-for-production-use-0123456789",
+            BETTER_AUTH_URL: "http://localhost:8080",
+          },
+          globalSetup: ["test/global-setup.ts"],
+          setupFiles: ["test/setup.ts"],
+          fileParallelism: false,
+        },
+      },
+    ],
   },
 });
