@@ -1,14 +1,21 @@
-import type { INestApplication } from "@nestjs/common";
+import type { INestApplication, Type } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import request, { type Test } from "supertest";
 import { AppModule } from "../../src/app.module";
+import { configureApp } from "../../src/app.setup";
 
-/** Boots the app the way `main.ts` does, without listening on a port. */
-export async function createTestApp(): Promise<INestApplication> {
-  const app = await NestFactory.create(AppModule, {
+/**
+ * Boots the app the way `main.ts` does, without listening on a port. Tests can
+ * pass a module that imports `AppModule` and adds test-only controllers.
+ */
+export async function createTestApp(
+  module: Type = AppModule
+): Promise<INestApplication> {
+  const app = await NestFactory.create(module, {
     bodyParser: false,
     logger: false,
   });
+  configureApp(app);
   await app.init();
   return app;
 }
