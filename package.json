@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "pnpm -r build",
-    "build:backend": "pnpm --filter backend build",
+    "build:backend": "pnpm --filter backend... build",
     "db:down": "docker compose down",
     "db:up": "docker compose up -d --wait",
     "dev": "pnpm -r dev",
