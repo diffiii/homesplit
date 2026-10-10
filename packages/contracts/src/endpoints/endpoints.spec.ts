@@ -94,4 +94,10 @@ describe("ResponseBody", () => {
       ResponseBody<typeof endpoints.deleteExpense>
     >().toEqualTypeOf<undefined>();
   });
+
+  it("distributes over a union of endpoints", () => {
+    expectTypeOf<
+      ResponseBody<typeof endpoints.getExpense | typeof endpoints.deleteExpense>
+    >().toEqualTypeOf<Expense | undefined>();
+  });
 });

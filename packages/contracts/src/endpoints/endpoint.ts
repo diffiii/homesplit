@@ -41,6 +41,8 @@ export type RequestBody<E extends Endpoint> = E extends {
   : never;
 
 /** Parsed success response; `undefined` for 204 routes. */
-export type ResponseBody<E extends Endpoint> = E["response"] extends z.ZodType
-  ? z.output<E["response"]>
+export type ResponseBody<E extends Endpoint> = E extends {
+  response: infer R extends z.ZodType;
+}
+  ? z.output<R>
   : undefined;
