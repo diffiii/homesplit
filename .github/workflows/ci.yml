@@ -84,7 +84,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [backend]
+        package: [backend, contracts]
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
