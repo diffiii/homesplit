@@ -1,12 +1,9 @@
-import {
-  type ExpenseAllocationInput,
-  MAX_AMOUNT_CENTS,
-  MAX_SHARES,
-} from "@homesplit/contracts";
 import { describe, expect, it } from "vitest";
 
+import { MAX_AMOUNT_CENTS, MAX_SHARES } from "../../../common/money";
 import { type AllocatedSplit, allocate } from "./allocate";
 import { AllocationError, type AllocationErrorCode } from "./allocation-error";
+import type { ExpenseAllocationInput } from "./input";
 
 const A = "00000000-0000-4000-8000-00000000000a";
 const B = "00000000-0000-4000-8000-00000000000b";
