@@ -40,6 +40,17 @@ describe("registered routes", () => {
     expect(registeredRoutes(app)).toContain("GET /");
   });
 
+  it("live under /api, except status", () => {
+    const outside = registeredRoutes(app)
+      .filter((route) => {
+        const path = route.slice(route.indexOf(" ") + 1);
+        return route !== "GET /" && !path.startsWith("/api/");
+      })
+      .sort();
+
+    expect(outside).toEqual([]);
+  });
+
   it("match an entry in the endpoint map", () => {
     const mapped = new Set(
       Object.values(endpoints).map(({ method, path }) => `${method} ${path}`)
