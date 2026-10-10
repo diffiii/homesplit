@@ -6,6 +6,8 @@
     "build": "pnpm -r build",
     "build:backend": "pnpm --filter backend... build",
     "db:down": "docker compose down",
+    "db:test:down": "docker compose --profile test rm --stop --force postgres-test",
+    "db:test:up": "docker compose --profile test up -d --wait postgres-test",
     "db:up": "docker compose up -d --wait",
     "dev": "pnpm -r dev",
     "dev:backend": "pnpm --filter backend dev",
