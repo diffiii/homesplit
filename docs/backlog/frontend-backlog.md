@@ -2,7 +2,7 @@
 
 This backlog plans the HomeSplit web app on top of the [API contracts](../../packages/contracts/src), the [decision record](../decisions.md), the [money rules](../money.md), and the backend backlog ([#20](https://github.com/diffiii/homesplit/issues/20)). No frontend exists yet. The contracts cover every core feature except settlement confirmation ([#40](https://github.com/diffiii/homesplit/issues/40)), attachments ([#44](https://github.com/diffiii/homesplit/issues/44)), and receipts ([#55](https://github.com/diffiii/homesplit/issues/55)).
 
-The work is grouped into nine epics. Each epic is a folder in [`frontend-tasks/`](frontend-tasks) with an `x.0-epic.md` overview and numbered tasks. Expenses has three sub-epics. AI and receipts (epic 8) and public pages (epic 9) are planned for after the core epics.
+The work is grouped into ten epics. Each epic is a folder in [`frontend-tasks/`](frontend-tasks) with an `x.0-epic.md` overview and numbered tasks. Expenses has three sub-epics. The dashboard (epic 8), AI and receipts (epic 9), and public pages (epic 10) are planned for after the core epics.
 
 Most tasks are frontend work. A few are small backend or contracts changes the frontend needs; they're labelled `backend` as well and follow the backend definition of done from [#20](https://github.com/diffiii/homesplit/issues/20).
 
@@ -22,23 +22,24 @@ Most tasks are frontend work. A few are small backend or contracts changes the f
 ## Epics
 
 1. [Foundation](frontend-tasks/1-foundation/1.0-epic.md): [1.1 Web app](frontend-tasks/1-foundation/1.1-web-app-scaffold.md), [1.2 Endpoint map](frontend-tasks/1-foundation/1.2-endpoint-map.md), [1.3 Shared allocation engine](frontend-tasks/1-foundation/1.3-shared-allocation-engine.md), [1.4 Backend origin and links](frontend-tasks/1-foundation/1.4-backend-origin-links.md), [1.5 API layer](frontend-tasks/1-foundation/1.5-api-layer.md), [1.6 Mocks](frontend-tasks/1-foundation/1.6-contract-mocks.md), [1.7 App shell and UI kit](frontend-tasks/1-foundation/1.7-app-shell-ui-kit.md), [1.8 Tests](frontend-tasks/1-foundation/1.8-test-workflow.md)
-2. [Auth and account](frontend-tasks/2-auth-account/2.0-epic.md): [2.1 Sign-up and sign-in](frontend-tasks/2-auth-account/2.1-sign-up-sign-in.md), [2.2 Email verification](frontend-tasks/2-auth-account/2.2-email-verification.md), [2.3 Password reset emails](frontend-tasks/2-auth-account/2.3-password-reset-emails.md), [2.4 Password reset pages](frontend-tasks/2-auth-account/2.4-password-reset-pages.md), [2.5 Avatar upload](frontend-tasks/2-auth-account/2.5-avatar-upload.md), [2.6 Profile and account](frontend-tasks/2-auth-account/2.6-profile-account.md)
-3. [Households](frontend-tasks/3-households/3.0-epic.md): [3.1 List and create](frontend-tasks/3-households/3.1-household-list-create.md), [3.2 Household shell](frontend-tasks/3-households/3.2-household-shell.md), [3.3 Members](frontend-tasks/3-households/3.3-members-roles.md), [3.4 Invitations](frontend-tasks/3-households/3.4-invitations.md), [3.5 Leave and delete](frontend-tasks/3-households/3.5-leave-delete.md), [3.6 Module settings](frontend-tasks/3-households/3.6-module-settings.md), [3.7 Dashboard](frontend-tasks/3-households/3.7-dashboard.md)
+2. [Auth and account](frontend-tasks/2-auth-account/2.0-epic.md): [2.1 Sign-up and sign-in](frontend-tasks/2-auth-account/2.1-sign-up-sign-in.md), [2.2 Email verification](frontend-tasks/2-auth-account/2.2-email-verification.md), [2.3 Password reset emails](frontend-tasks/2-auth-account/2.3-password-reset-emails.md), [2.4 Password reset pages](frontend-tasks/2-auth-account/2.4-password-reset-pages.md), [2.5 Profile and account](frontend-tasks/2-auth-account/2.5-profile-account.md)
+3. [Households](frontend-tasks/3-households/3.0-epic.md): [3.1 List and create](frontend-tasks/3-households/3.1-household-list-create.md), [3.2 Household shell](frontend-tasks/3-households/3.2-household-shell.md), [3.3 Members](frontend-tasks/3-households/3.3-members-roles.md), [3.4 Invitations](frontend-tasks/3-households/3.4-invitations.md), [3.5 Leave and delete](frontend-tasks/3-households/3.5-leave-delete.md), [3.6 Module settings](frontend-tasks/3-households/3.6-module-settings.md)
 4. [Friends](frontend-tasks/4-friends/4.0-epic.md): [4.1 Withdraw requests](frontend-tasks/4-friends/4.1-withdraw-friend-requests.md), [4.2 Friends page](frontend-tasks/4-friends/4.2-friends-page.md), [4.3 Invite friends](frontend-tasks/4-friends/4.3-invite-friends.md)
 5. [Expenses](frontend-tasks/5-expenses/5.0-epic.md)
    - [5.1 Ledger](frontend-tasks/5-expenses/5.1-ledger/5.1.0-epic.md): [5.1.1 Categories](frontend-tasks/5-expenses/5.1-ledger/5.1.1-categories.md), [5.1.2 List filters](frontend-tasks/5-expenses/5.1-ledger/5.1.2-expense-list-filters.md), [5.1.3 List and detail](frontend-tasks/5-expenses/5.1-ledger/5.1.3-expense-list-detail.md), [5.1.4 Simple form](frontend-tasks/5-expenses/5.1-ledger/5.1.4-expense-form-simple.md), [5.1.5 Advanced form](frontend-tasks/5-expenses/5.1-ledger/5.1.5-expense-form-advanced.md), [5.1.6 Edit and delete](frontend-tasks/5-expenses/5.1-ledger/5.1.6-expense-edit-delete.md)
    - [5.2 Settlements](frontend-tasks/5-expenses/5.2-settlements/5.2.0-epic.md): [5.2.1 Balances](frontend-tasks/5-expenses/5.2-settlements/5.2.1-balances.md), [5.2.2 Settle up](frontend-tasks/5-expenses/5.2-settlements/5.2.2-settle-up.md), [5.2.3 Payment history](frontend-tasks/5-expenses/5.2-settlements/5.2.3-payment-history.md)
-   - [5.3 Attachments](frontend-tasks/5-expenses/5.3-attachments/5.3.0-epic.md): [5.3.1 Uploads](frontend-tasks/5-expenses/5.3-attachments/5.3.1-file-upload.md), [5.3.2 Expense attachments](frontend-tasks/5-expenses/5.3-attachments/5.3.2-expense-attachments.md)
+   - [5.3 Attachments](frontend-tasks/5-expenses/5.3-attachments/5.3.0-epic.md): [5.3.1 Uploads](frontend-tasks/5-expenses/5.3-attachments/5.3.1-file-upload.md), [5.3.2 Expense attachments](frontend-tasks/5-expenses/5.3-attachments/5.3.2-expense-attachments.md), [5.3.3 Avatar upload](frontend-tasks/5-expenses/5.3-attachments/5.3.3-avatar-upload.md), [5.3.4 Avatars](frontend-tasks/5-expenses/5.3-attachments/5.3.4-avatar-ui.md)
 6. [Chores](frontend-tasks/6-chores/6.0-epic.md): [6.1 Assignee filter](frontend-tasks/6-chores/6.1-chore-assignee-filter.md), [6.2 Chore list](frontend-tasks/6-chores/6.2-chore-list-editing.md), [6.3 Complete and reopen](frontend-tasks/6-chores/6.3-complete-reopen.md)
 7. [Shopping](frontend-tasks/7-shopping/7.0-epic.md): [7.1 Shopping list](frontend-tasks/7-shopping/7.1-shopping-list-editing.md), [7.2 Purchase and clear](frontend-tasks/7-shopping/7.2-purchase-clear.md)
-8. [AI and receipts](frontend-tasks/8-ai-receipts/8.0-epic.md): [8.1 AI opt-in](frontend-tasks/8-ai-receipts/8.1-ai-opt-in.md), [8.2 Category suggestions](frontend-tasks/8-ai-receipts/8.2-category-suggestions.md), [8.3 Receipt drafts](frontend-tasks/8-ai-receipts/8.3-receipt-capture-drafts.md), [8.4 Receipt assignment](frontend-tasks/8-ai-receipts/8.4-receipt-assignment.md), [8.5 Shopping match](frontend-tasks/8-ai-receipts/8.5-shopping-match.md)
-9. [Public pages](frontend-tasks/9-public-pages/9.0-epic.md): [9.1 Landing page](frontend-tasks/9-public-pages/9.1-landing-page.md), [9.2 Legal pages](frontend-tasks/9-public-pages/9.2-legal-pages.md)
+8. [Dashboard](frontend-tasks/8-dashboard/8.0-epic.md): [8.1 Dashboard](frontend-tasks/8-dashboard/8.1-dashboard.md)
+9. [AI and receipts](frontend-tasks/9-ai-receipts/9.0-epic.md): [9.1 AI opt-in](frontend-tasks/9-ai-receipts/9.1-ai-opt-in.md), [9.2 Category suggestions](frontend-tasks/9-ai-receipts/9.2-category-suggestions.md), [9.3 Receipt drafts](frontend-tasks/9-ai-receipts/9.3-receipt-capture-drafts.md), [9.4 Receipt assignment](frontend-tasks/9-ai-receipts/9.4-receipt-assignment.md), [9.5 Shopping match](frontend-tasks/9-ai-receipts/9.5-shopping-match.md)
+10. [Public pages](frontend-tasks/10-public-pages/10.0-epic.md): [10.1 Landing page](frontend-tasks/10-public-pages/10.1-landing-page.md), [10.2 Legal pages](frontend-tasks/10-public-pages/10.2-legal-pages.md)
 
-Backend or contracts tasks: 1.2, 1.3, 1.4, 2.3, 2.5, 4.1, 5.1.2, and 6.1.
+Backend or contracts tasks: 1.2, 1.3, 1.4, 2.3, 4.1, 5.1.2, 5.3.3, and 6.1.
 
 ## Dependencies
 
-1.1, 1.2, 1.3, and 1.4 can start immediately and in parallel. Everything else needs 1.5 and 1.7; feature tasks can then run against the 1.6 mocks as soon as their contracts exist, and each one finishes once its backend task (listed under **Depends on**) is done. Only 5.2.3 (settlement status, [#40](https://github.com/diffiii/homesplit/issues/40)), epic 5.3 (attachment contracts, [#44](https://github.com/diffiii/homesplit/issues/44)), and epic 8 (receipt contracts) have to wait for new contracts.
+1.1, 1.2, 1.3, and 1.4 can start immediately and in parallel. Everything else needs 1.5 and 1.7; feature tasks can then run against the 1.6 mocks as soon as their contracts exist, and each one finishes once its backend task (listed under **Depends on**) is done. Only 5.2.3 (settlement status, [#40](https://github.com/diffiii/homesplit/issues/40)), sub-epic 5.3 (attachment contracts, [#44](https://github.com/diffiii/homesplit/issues/44)), and epic 9 (receipt contracts) have to wait for new contracts.
 
 ```mermaid
 flowchart LR
@@ -53,8 +54,7 @@ flowchart LR
   F1_4 --> F2_3
   F2_3[Reset emails] --> F2_4[Reset pages]
   F2_1 --> F2_4
-  F2_5[Avatar upload] --> F2_6[Profile]
-  F2_1 --> F2_6
+  F2_1 --> F2_5[Profile]
   F2_1 --> F3_1[Households] --> F3_2[Shell]
   F3_2 --> F3_3[Members] --> F3_4[Invitations]
   F1_4[Origin and links] --> F3_4
@@ -72,19 +72,22 @@ flowchart LR
   F3_2 --> F5_2_1[Balances] --> F5_2_2[Settle up] --> F5_2_3[History]
   F1_7 --> F5_3_1[Uploads] --> F5_3_2[Expense attachments]
   F5_1_6 --> F5_3_2
+  F5_3_3[Avatar upload] --> F5_3_4[Avatars]
+  F5_3_1 --> F5_3_4
+  F2_5 --> F5_3_4
   F6_1[Assignee filter] --> F6_2[Chores]
   F3_2 --> F6_2 --> F6_3[Complete]
   F3_2 --> F7_1[Shopping] --> F7_2[Purchase]
-  F5_2_1 --> F3_7[Dashboard]
-  F6_2 --> F3_7
-  F7_1 --> F3_7
-  F3_6 --> F8_1[AI opt-in] --> F8_2[Category suggestion]
-  F5_1_4 --> F8_2
-  F8_1 --> F8_3[Receipt drafts]
-  F5_3_1 --> F8_3 --> F8_4[Assignment]
-  F8_2 --> F8_4 --> F8_5[Shopping match]
-  F7_2 --> F8_5
-  F2_1 --> F9_1[Landing page] --> F9_2[Legal pages]
+  F5_2_1 --> F8_1[Dashboard]
+  F6_2 --> F8_1
+  F7_1 --> F8_1
+  F3_6 --> F9_1[AI opt-in] --> F9_2[Category suggestion]
+  F5_1_4 --> F9_2
+  F9_1 --> F9_3[Receipt drafts]
+  F5_3_1 --> F9_3 --> F9_4[Assignment]
+  F9_2 --> F9_4 --> F9_5[Shopping match]
+  F7_2 --> F9_5
+  F2_1 --> F10_1[Landing page] --> F10_2[Legal pages]
 ```
 
 ## Definition of done (every frontend task)
