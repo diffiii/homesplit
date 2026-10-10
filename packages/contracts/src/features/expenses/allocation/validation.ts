@@ -1,5 +1,5 @@
-import { type Id, MAX_AMOUNT_CENTS } from "@homesplit/contracts";
-
+import type { Id } from "../../../common/id";
+import { MAX_AMOUNT_CENTS } from "../../../common/money";
 import { AllocationError, type AllocationErrorCode } from "./allocation-error";
 
 export function assertValidTotal(totalCents: number) {

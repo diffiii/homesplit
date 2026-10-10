@@ -15,6 +15,7 @@
     "lint:fix": "ultracite fix",
     "prepare": "husky",
     "test:backend": "pnpm --filter \"backend^...\" build && pnpm --filter backend test",
+    "test:contracts": "pnpm --filter @homesplit/contracts test",
     "typecheck": "pnpm -r typecheck"
   },
   "lint-staged": {

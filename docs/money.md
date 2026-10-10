@@ -1,6 +1,6 @@
 # Money: currencies, limits, and rounding
 
-These rules apply to every task that stores, accepts, or calculates amounts, including expenses (#37, #38), settlements (#40 to #42), and receipts (#56). The constants live in [money primitives](../packages/contracts/src/common/money.ts), and the backend's money math lives in [`src/common/money`](../packages/backend/src/common/money).
+These rules apply to every task that stores, accepts, or calculates amounts, including expenses (#37, #38), settlements (#40 to #42), and receipts (#56). The constants live in [money primitives](../packages/contracts/src/common/money.ts), the shared money math in [`distribute.ts`](../packages/contracts/src/common/distribute.ts) and [`safe-integer.ts`](../packages/contracts/src/common/safe-integer.ts), and the allocation engine in [`allocation`](../packages/contracts/src/features/expenses/allocation).
 
 ## Minor units
 
@@ -33,7 +33,7 @@ Request schemas use the bounded primitives `BoundedCents`, `BoundedPositiveCents
 
 - **API:** amounts are JSON numbers. Every integer in a request or response is a safe JavaScript integer (`z.int()`, at most 2^53 − 1 in absolute value).
 - **Database:** amounts are `bigint` columns, and basis points and shares are `integer` columns.
-- **Reading:** node-postgres returns `bigint` and `numeric` values, including every `SUM(...)`, as strings. Each one goes through `toSafeInteger` from `src/common/money`, which throws when the value isn't a safe integer instead of losing precision. Don't use `Number(...)` or Drizzle's `mode: "number"` on these columns.
+- **Reading:** node-postgres returns `bigint` and `numeric` values, including every `SUM(...)`, as strings. Each one goes through `toSafeInteger` from `@homesplit/contracts`, which throws when the value isn't a safe integer instead of losing precision. Don't use `Number(...)` or Drizzle's `mode: "number"` on these columns.
 - **Arithmetic:** backend calculations that multiply amounts, such as splitting a total by weights, use `bigint` internally and convert back to `number` at the end.
 
 ## Rounding

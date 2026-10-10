@@ -84,7 +84,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [backend]
+        package: [backend, contracts]
     services:
       postgres-test:
         image: postgres:18-alpine

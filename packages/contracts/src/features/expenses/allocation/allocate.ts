@@ -1,17 +1,12 @@
+import { distributeProportionally, floorDiv } from "../../../common/distribute";
+import type { Id } from "../../../common/id";
+import { MAX_AMOUNT_CENTS, MAX_SHARES } from "../../../common/money";
+import { toSafeInteger } from "../../../common/safe-integer";
+import { AllocationError } from "./allocation-error";
 import {
   type ExpenseAllocationInput,
   FULL_PERCENTAGE_BASIS_POINTS,
-  type Id,
-  MAX_AMOUNT_CENTS,
-  MAX_SHARES,
-} from "@homesplit/contracts";
-
-import {
-  distributeProportionally,
-  floorDiv,
-  toSafeInteger,
-} from "../../../common/money";
-import { AllocationError } from "./allocation-error";
+} from "./input";
 import {
   assertUniqueParticipants,
   assertValidTotal,

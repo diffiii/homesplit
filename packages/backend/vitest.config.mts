@@ -13,6 +13,7 @@ if (!new URL(databaseUrl).pathname.endsWith("_test")) {
 
 export default defineConfig({
   test: {
+    passWithNoTests: true,
     projects: [
       {
         plugins: [swc.vite({ module: { type: "es6" } })],
