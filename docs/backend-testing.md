@@ -40,6 +40,11 @@ Integration tests go in `packages/backend/test` and end in `.test.ts`. Unit test
 | `createUser(app, name?)` | A signed-up user with a unique email and a `client` that sends their session cookie |
 | `createHousehold(user, name?)` | A household owned by that user |
 | `createTwoHouseholds(app)` | `alice` and `bob`, each owning a separate household |
+| `inviteAndAccept(inviter, household, invitee, role?)` | `invitee` joins through Better Auth's invite and accept endpoints |
+| `removeMember(remover, household, removed)` | `removed` is removed through `remove-member` |
+| `leaveHousehold(user, household)` | `user` leaves through `leave` |
+
+`HouseholdProbeModule` in `test/helpers/household-probe.ts` adds test-only routes under `/api/households/:householdId/probe` that exercise the household guard and access helpers; pass it to `createTestApp`.
 
 ```ts
 describe("expenses", () => {
@@ -71,14 +76,14 @@ Create fixtures inside each test or in `beforeEach`, not in `beforeAll`: tables 
 
 | Command | What it does |
 | --- | --- |
-| `pnpm auth:generate` | Rewrites `src/db/schema.ts` from the Better Auth config. Run it after changing `src/auth.ts` or upgrading Better Auth. |
+| `pnpm auth:generate` | Rewrites `src/db/schema/auth.ts` from the Better Auth config. Run it after changing `src/auth.ts` or upgrading Better Auth. |
 | `pnpm db:generate` | Compares the schema files with the latest snapshot and writes a new SQL migration to `src/db/migrations`. |
 | `pnpm db:generate --custom --name <name>` | Writes an empty migration for SQL that Drizzle can't generate, such as triggers. |
 | `pnpm db:migrate` | Applies pending migrations to the development database. |
 
 To change the schema:
 
-1. Edit a schema file. `src/db/schema.ts` is generated, so application tables go in their own files listed under `schema` in `drizzle.config.ts`.
+1. Edit a schema file in `src/db/schema/`. `auth.ts` there is generated, so application tables go in one file per area (`households.ts`, `expenses.ts`, …). Export a new file from `src/db/schema/index.ts`, which both `drizzle.config.ts` and `db` read.
 2. Run `pnpm db:generate` and review the generated SQL.
 3. Run `pnpm db:migrate` to update your development database.
 4. Run `pnpm test:backend`. The tests apply the migrations to an empty database, so a broken migration fails there.

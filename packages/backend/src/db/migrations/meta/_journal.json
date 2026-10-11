@@ -8,6 +8,20 @@
       "when": 1791038814087,
       "tag": "0000_petite_spyke",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791714024578,
+      "tag": "0001_membership_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791714024855,
+      "tag": "0002_membership_history_trigger",
+      "breakpoints": true
     }
   ]
 }

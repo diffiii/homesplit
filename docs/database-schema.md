@@ -1,6 +1,6 @@
 # Database schema
 
-The current branch contains an implemented authentication/organization schema and [API contracts](../packages/contracts/src/features) for application features. The first diagram reflects the [Drizzle schema](../packages/backend/src/db/schema.ts) and [initial migration](../packages/backend/src/db/migrations/0000_petite_spyke.sql). The remaining diagrams propose relational mappings for the contracts; those application tables are not implemented yet.
+The current branch contains an implemented authentication/organization schema and [API contracts](../packages/contracts/src/features) for application features. The first diagram reflects the [Drizzle schema](../packages/backend/src/db/schema) and the [migrations](../packages/backend/src/db/migrations). The remaining diagrams propose relational mappings for the contracts; those application tables are not implemented yet.
 
 `PK` = primary key, `FK` = foreign key, `UK` = unique key. Attribute comments mark nullable fields. Relationships show whether a referenced entity is required (`||`) or optional (`|o`); each referenced entity can have zero or many associated records (`o{`).
 
@@ -89,9 +89,18 @@ erDiagram
     user ||..o{ invitation : sends
     organization ||..o{ member : has
     organization ||..o{ invitation : has
+
+    household_membership_history {
+        uuid organization_id PK,FK
+        uuid user_id PK,FK
+        timestamptz first_joined_at
+    }
+
+    organization ||..o{ household_membership_history : remembers
+    user ||..o{ household_membership_history : was_member
 ```
 
-All implemented foreign keys use `ON DELETE CASCADE`. `verification` has no foreign keys; `session.active_organization_id` is nullable text with no enforced organization reference. Timestamp columns are PostgreSQL `timestamp` without time zone. Non-unique indexes cover `session.user_id`, `account.user_id`, `verification.identifier`, both member foreign keys, and invitation organization/email. Membership pairs are not constrained to be unique.
+`household_membership_history` keeps everyone who has ever been a member, after Better Auth deletes their `member` row; an `AFTER INSERT ON member` trigger fills it (see [Households API](api/households.md#storage)). Its `user_id` key is `ON DELETE RESTRICT`. Every other implemented foreign key uses `ON DELETE CASCADE`. `verification` has no foreign keys; `session.active_organization_id` is nullable text with no enforced organization reference. Timestamp columns are PostgreSQL `timestamp` without time zone. Non-unique indexes cover `session.user_id`, `account.user_id`, `verification.identifier`, both member foreign keys, and invitation organization/email. Membership pairs are not constrained to be unique.
 
 ## Proposed household data
 
