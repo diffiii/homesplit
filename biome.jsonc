@@ -9,6 +9,12 @@
       }
     }
   },
+  "javascript": {
+    "parser": {
+      // NestJS uses parameter decorators (@Param, @Body, @Query).
+      "unsafeParameterDecoratorsEnabled": true
+    }
+  },
   "files": {
     "includes": ["!**/src/db/migrations"]
   }
