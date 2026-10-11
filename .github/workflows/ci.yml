@@ -35,7 +35,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [backend, contracts]
+        package: [backend, contracts, web]
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -52,6 +52,9 @@ jobs:
 
       - name: Run typecheck
         run: pnpm --filter ${{ matrix.package }} typecheck
+        env:
+          # `next typegen` evaluates the web rewrites, which need an API origin.
+          API_URL: http://localhost:8080
 
   build:
     name: build (${{ matrix.package }})
@@ -60,7 +63,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [backend, contracts]
+        package: [backend, contracts, web]
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -77,6 +80,8 @@ jobs:
 
       - name: Run build
         run: pnpm --filter ${{ matrix.package }} build
+        env:
+          API_URL: http://localhost:8080
 
   test:
     name: test (${{ matrix.package }})
