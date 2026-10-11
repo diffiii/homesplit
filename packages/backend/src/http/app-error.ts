@@ -21,3 +21,9 @@ export const notFound = (): AppError =>
 
 export const forbidden = (): AppError =>
   new AppError(403, "FORBIDDEN", "Forbidden");
+
+export const moduleDisabled = (module: string): AppError =>
+  new AppError(403, "MODULE_DISABLED", "Module disabled", { module });
+
+export const emptyPatch = (): AppError =>
+  new AppError(400, "EMPTY_PATCH", "Patch body has no fields");

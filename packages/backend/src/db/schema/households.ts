@@ -1,4 +1,10 @@
-import { pgTable, primaryKey, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  pgTable,
+  primaryKey,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { organization, user } from "./auth";
 
 /**
@@ -20,3 +26,13 @@ export const householdMembershipHistory = pgTable(
   },
   (table) => [primaryKey({ columns: [table.organizationId, table.userId] })]
 );
+
+/** Per-household module toggles; one row per organization, seeded by trigger. */
+export const householdFeatures = pgTable("household_features", {
+  organizationId: uuid("organization_id")
+    .primaryKey()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  expensesEnabled: boolean("expenses_enabled").notNull().default(true),
+  choresEnabled: boolean("chores_enabled").notNull().default(true),
+  shoppingEnabled: boolean("shopping_enabled").notNull().default(true),
+});
