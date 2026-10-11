@@ -24,8 +24,10 @@ const CLIENT_ERRORS = new Map([
   [401, { code: "UNAUTHENTICATED", message: "Authentication required" }],
   [403, { code: "FORBIDDEN", message: "Forbidden" }],
   [404, { code: "NOT_FOUND", message: "Not found" }],
+  [409, { code: "CONFLICT", message: "Conflicts with existing data" }],
   [413, { code: "PAYLOAD_TOO_LARGE", message: "Request body is too large" }],
   [415, { code: "UNSUPPORTED_MEDIA_TYPE", message: "Unsupported encoding" }],
+  [429, { code: "RATE_LIMITED", message: "Too many requests" }],
 ]);
 
 @Catch()
@@ -56,9 +58,6 @@ export class ApiExceptionFilter implements ExceptionFilter {
           : undefined;
       return reply(status, clientError.code, clientError.message, details);
     }
-    if (isConstraintViolation(exception)) {
-      return reply(409, "CONFLICT", "Conflicts with existing data");
-    }
 
     this.logger.error(exception);
     return reply(500, "INTERNAL_ERROR", "Internal server error");
@@ -77,6 +76,9 @@ function reply(
 function statusOf(exception: unknown): number {
   if (exception instanceof HttpException) {
     return exception.getStatus();
+  }
+  if (isConstraintViolation(exception)) {
+    return 409;
   }
   const status = (exception as { status?: unknown } | null)?.status;
   return typeof status === "number" ? status : 500;

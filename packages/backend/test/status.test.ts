@@ -2,7 +2,7 @@ import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createClient, createTestApp } from "./helpers/app";
 
-describe("GET /api", () => {
+describe("GET /", () => {
   let app: INestApplication;
 
   beforeAll(async () => {
@@ -14,7 +14,7 @@ describe("GET /api", () => {
   });
 
   it("answers unauthenticated clients", async () => {
-    const response = await createClient(app).get("/api").expect(200);
+    const response = await createClient(app).get("/").expect(200);
 
     expect(response.body).toEqual({ status: "ok" });
   });

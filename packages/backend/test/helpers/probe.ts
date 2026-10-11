@@ -2,9 +2,12 @@ import { randomUUID } from "node:crypto";
 import { Id, Pagination, queryBoolean } from "@homesplit/contracts";
 import {
   Body,
+  ConflictException,
   Controller,
   ForbiddenException,
   Get,
+  HttpException,
+  HttpStatus,
   Module,
   Param,
   Post,
@@ -27,7 +30,7 @@ export const ProbeBody = z.object({
 });
 
 /** Test-only routes that exercise validation and errors. */
-@Controller("probe")
+@Controller("api/probe")
 @AllowAnonymous()
 class ProbeController {
   @Get()
@@ -50,6 +53,16 @@ class ProbeController {
     throw new ForbiddenException();
   }
 
+  @Get("conflict")
+  conflict(): never {
+    throw new ConflictException();
+  }
+
+  @Get("rate-limited")
+  rateLimited(): never {
+    throw new HttpException("Too many requests", HttpStatus.TOO_MANY_REQUESTS);
+  }
+
   @Post("duplicate-user")
   async duplicateUser(): Promise<void> {
     const email = `dup-${randomUUID()}@test.local`;
@@ -65,7 +78,7 @@ class ProbeController {
 }
 
 /** Route that keeps the global auth guard. */
-@Controller("probe-private")
+@Controller("api/probe-private")
 class ProbePrivateController {
   @Get()
   get() {

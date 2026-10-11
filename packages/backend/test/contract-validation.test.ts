@@ -152,10 +152,14 @@ describe("contract validation and errors", () => {
       await alice.client.get("/api/probe-private").expect(200);
     });
 
-    it("keeps the status of other client errors", async () => {
-      const response = await client.get("/api/probe/forbidden").expect(403);
+    it.each([
+      ["forbidden", 403, "FORBIDDEN"],
+      ["conflict", 409, "CONFLICT"],
+      ["rate-limited", 429, "RATE_LIMITED"],
+    ])("keeps the status of a %s error", async (route, status, code) => {
+      const response = await client.get(`/api/probe/${route}`).expect(status);
 
-      expectApiError(response, "FORBIDDEN");
+      expectApiError(response, code);
     });
 
     it("answers 404 for unknown routes", async () => {
