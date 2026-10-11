@@ -1,8 +1,8 @@
 import type { INestApplication } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { db } from "../src/db";
-import { member, organization, user } from "../src/db/schema";
+import { db } from "@/db";
+import { member, organization, user } from "@/db/schema";
 import { createClient, createTestApp } from "./helpers/app";
 import { createTwoHouseholds, createUser } from "./helpers/fixtures";
 

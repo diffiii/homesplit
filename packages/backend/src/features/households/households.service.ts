@@ -1,8 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { eq } from "drizzle-orm";
-import { db } from "../../db";
-import { organization } from "../../db/schema";
-import { notFound } from "../../http/app-error";
+import { db } from "@/db";
+import { organization } from "@/db/schema";
+import { notFound } from "@/http/app-error";
 
 @Injectable()
 export class HouseholdsService {

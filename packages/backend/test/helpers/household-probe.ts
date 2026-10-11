@@ -2,17 +2,17 @@ import { type Endpoint, Id } from "@homesplit/contracts";
 import { Body, Controller, Module, Param } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { AppModule } from "../../src/app.module";
-import { db } from "../../src/db";
-import { invitation } from "../../src/db/schema";
+import { AppModule } from "@/app.module";
+import { db } from "@/db";
+import { invitation } from "@/db/schema";
 import {
   CurrentHousehold,
   HouseholdRoute,
-} from "../../src/features/households/access/household.decorators";
-import type { HouseholdContext } from "../../src/features/households/access/household.guard";
-import { assertUsersEligible } from "../../src/features/households/access/household-access";
-import { notFound } from "../../src/http/app-error";
-import { ZodPipe } from "../../src/http/zod.pipe";
+} from "@/features/households/access/household.decorators";
+import type { HouseholdContext } from "@/features/households/access/household.guard";
+import { assertUsersEligible } from "@/features/households/access/household-access";
+import { notFound } from "@/http/app-error";
+import { ZodPipe } from "@/http/zod.pipe";
 
 export const probePath = (householdId: string, path = ""): string =>
   `/api/households/${householdId}/probe${path}`;

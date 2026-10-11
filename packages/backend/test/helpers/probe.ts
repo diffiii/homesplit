@@ -15,10 +15,10 @@ import {
 } from "@nestjs/common";
 import { AllowAnonymous } from "@thallesp/nestjs-better-auth";
 import { z } from "zod";
-import { AppModule } from "../../src/app.module";
-import { db } from "../../src/db";
-import { user } from "../../src/db/schema";
-import { ZodPipe } from "../../src/http/zod.pipe";
+import { AppModule } from "@/app.module";
+import { db } from "@/db";
+import { user } from "@/db/schema";
+import { ZodPipe } from "@/http/zod.pipe";
 
 export const ProbeQuery = Pagination.extend({
   archived: queryBoolean().optional(),

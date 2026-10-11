@@ -8,10 +8,10 @@ import {
 import { Reflector } from "@nestjs/core";
 import type { UserSession } from "@thallesp/nestjs-better-auth";
 import { and, eq } from "drizzle-orm";
-import { db } from "../../../db";
-import { member } from "../../../db/schema";
-import { forbidden, notFound } from "../../../http/app-error";
-import { ZodPipe } from "../../../http/zod.pipe";
+import { db } from "@/db";
+import { member } from "@/db/schema";
+import { forbidden, notFound } from "@/http/app-error";
+import { ZodPipe } from "@/http/zod.pipe";
 import { type HouseholdRole, hasRole, strongestRole } from "./roles";
 
 export const MIN_ROLE = Symbol("household:minRole");

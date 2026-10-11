@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { beforeEach } from "vitest";
-import { db } from "../src/db";
+import { db } from "@/db";
 
 beforeEach(async () => {
   const { rows } = await db.execute<{ tablename: string }>(
