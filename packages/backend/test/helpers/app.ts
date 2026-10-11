@@ -1,8 +1,8 @@
 import type { INestApplication, Type } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import request, { type Test } from "supertest";
-import { AppModule } from "../../src/app.module";
-import { configureApp } from "../../src/app.setup";
+import { AppModule } from "@/app.module";
+import { configureApp } from "@/app.setup";
 
 /**
  * Boots the app the way `main.ts` does, without listening on a port. Tests can

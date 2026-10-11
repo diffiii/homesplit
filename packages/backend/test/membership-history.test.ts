@@ -4,13 +4,13 @@ import { join } from "node:path";
 import type { INestApplication } from "@nestjs/common";
 import { and, eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { db } from "../src/db";
+import { db } from "@/db";
 import {
   householdMembershipHistory,
   member,
   organization,
   user,
-} from "../src/db/schema";
+} from "@/db/schema";
 import { createTestApp } from "./helpers/app";
 import {
   createHousehold,

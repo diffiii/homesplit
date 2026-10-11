@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { closeDb, db } from "../src/db";
-import { user } from "../src/db/schema";
+import { closeDb, db } from "@/db";
+import { user } from "@/db/schema";
 
 const insertUser = (email: string) =>
   db.insert(user).values({ email, name: "Isolation" });

@@ -4,15 +4,15 @@ import type { INestApplication } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
 import type { Response } from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { db } from "../src/db";
+import { db } from "@/db";
 import {
   householdMembershipHistory,
   invitation,
   member,
   organization,
   session,
-} from "../src/db/schema";
-import type { HouseholdRole } from "../src/features/households/access/roles";
+} from "@/db/schema";
+import type { HouseholdRole } from "@/features/households/access/roles";
 import { createTestApp } from "./helpers/app";
 import {
   createTwoHouseholds,

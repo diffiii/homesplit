@@ -6,7 +6,7 @@ import {
   SetMetadata,
   UseGuards,
 } from "@nestjs/common";
-import { Route } from "../../../route.decorator";
+import { Route } from "@/route.decorator";
 import {
   type HouseholdContext,
   HouseholdGuard,

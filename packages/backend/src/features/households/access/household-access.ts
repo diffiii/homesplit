@@ -1,7 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
-import type { Executor } from "../../../db";
-import { householdMembershipHistory, member } from "../../../db/schema";
-import { AppError } from "../../../http/app-error";
+import type { Executor } from "@/db";
+import { householdMembershipHistory, member } from "@/db/schema";
+import { AppError } from "@/http/app-error";
 
 /** A user ID from the request and where it appeared, for `details.issues`. */
 export interface UserReference {

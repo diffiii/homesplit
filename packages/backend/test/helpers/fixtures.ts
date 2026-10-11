@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { INestApplication } from "@nestjs/common";
-import type { HouseholdRole } from "../../src/features/households/access/roles";
+import type { HouseholdRole } from "@/features/households/access/roles";
 import { createClient, type TestClient } from "./app";
 
 export const TEST_PASSWORD = "correct-horse-battery-staple";
