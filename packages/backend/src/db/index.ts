@@ -13,6 +13,11 @@ const pool = new Pool({ connectionString: databaseUrl });
 
 export const db = drizzle(pool, { schema });
 
+/** `db` itself or an open transaction. */
+export type Executor =
+  | typeof db
+  | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 export async function closeDb(): Promise<void> {
   await pool.end();
 }

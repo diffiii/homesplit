@@ -15,3 +15,9 @@ export class AppError extends Error {
     this.details = details;
   }
 }
+
+export const notFound = (): AppError =>
+  new AppError(404, "NOT_FOUND", "Not found");
+
+export const forbidden = (): AppError =>
+  new AppError(403, "FORBIDDEN", "Forbidden");
