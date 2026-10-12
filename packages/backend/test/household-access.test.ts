@@ -278,4 +278,107 @@ describe("household access", () => {
       expect(await householdRow(alice.household.id)).toHaveLength(1);
     });
   });
+
+  describe("module flags", () => {
+    const featuresPath = (householdId: string) =>
+      `/api/households/${householdId}/features`;
+
+    async function disableChores(alice: TestUser, householdId: string) {
+      await alice.client
+        .patch(featuresPath(householdId))
+        .send({ chores: false })
+        .expect(200);
+    }
+
+    it("allows reads but blocks writes when a module is disabled", async () => {
+      const { alice } = await setup();
+      const base = probePath(alice.household.id, "/chores");
+
+      await disableChores(alice, alice.household.id);
+
+      await alice.client.get(base).expect(200);
+      const response = await alice.client.post(base).expect(403);
+      expectApiError(response, "MODULE_DISABLED");
+      expect(response.body.details).toEqual({ module: "chores" });
+    });
+
+    it("does not block routes for other modules", async () => {
+      const { alice } = await setup();
+
+      await alice.client
+        .patch(featuresPath(alice.household.id))
+        .send({ shopping: false })
+        .expect(200);
+
+      await alice.client
+        .post(probePath(alice.household.id, "/chores"))
+        .expect(201);
+    });
+
+    it("checks module before role on write routes", async () => {
+      const { alice, carol } = await setup("member");
+      await disableChores(alice, alice.household.id);
+
+      const response = await carol.client
+        .post(probePath(alice.household.id, "/chores/admin"))
+        .expect(403);
+      expectApiError(response, "MODULE_DISABLED");
+    });
+
+    it("checks membership before module", async () => {
+      const { alice, bob } = await setup();
+      await disableChores(alice, alice.household.id);
+
+      await bob.client
+        .post(probePath(alice.household.id, "/chores"))
+        .expect(404);
+    });
+
+    it("restores writes after re-enabling without changing membership data", async () => {
+      const { alice } = await setup();
+      const { id: householdId } = alice.household;
+
+      const membersBefore = await db
+        .select()
+        .from(member)
+        .where(eq(member.organizationId, householdId));
+      const historyBefore = await db
+        .select()
+        .from(householdMembershipHistory)
+        .where(eq(householdMembershipHistory.organizationId, householdId));
+      const invitationsBefore = await db
+        .select()
+        .from(invitation)
+        .where(eq(invitation.organizationId, householdId));
+
+      await disableChores(alice, householdId);
+      await alice.client.post(probePath(householdId, "/chores")).expect(403);
+
+      await alice.client
+        .patch(featuresPath(householdId))
+        .send({ chores: true })
+        .expect(200);
+
+      await alice.client.post(probePath(householdId, "/chores")).expect(201);
+
+      expect(
+        await db
+          .select()
+          .from(member)
+          .where(eq(member.organizationId, householdId))
+      ).toEqual(membersBefore);
+      expect(
+        await db
+          .select()
+          .from(householdMembershipHistory)
+          .where(eq(householdMembershipHistory.organizationId, householdId))
+      ).toEqual(historyBefore);
+      expect(
+        await db
+          .select()
+          .from(invitation)
+          .where(eq(invitation.organizationId, householdId))
+      ).toEqual(invitationsBefore);
+    });
+  });
 });

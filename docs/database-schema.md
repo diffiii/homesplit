@@ -96,15 +96,23 @@ erDiagram
         timestamptz first_joined_at
     }
 
+    household_features {
+        uuid organization_id PK,FK
+        boolean expenses_enabled "Default true"
+        boolean chores_enabled "Default true"
+        boolean shopping_enabled "Default true"
+    }
+
+    organization ||..o| household_features : toggles
     organization ||..o{ household_membership_history : remembers
     user ||..o{ household_membership_history : was_member
 ```
 
-`household_membership_history` keeps everyone who has ever been a member, after Better Auth deletes their `member` row; an `AFTER INSERT ON member` trigger fills it (see [Households API](api/households.md#storage)). Its `user_id` key is `ON DELETE RESTRICT`. Every other implemented foreign key uses `ON DELETE CASCADE`. `verification` has no foreign keys; `session.active_organization_id` is nullable text with no enforced organization reference. Timestamp columns are PostgreSQL `timestamp` without time zone. Non-unique indexes cover `session.user_id`, `account.user_id`, `verification.identifier`, both member foreign keys, and invitation organization/email. Membership pairs are not constrained to be unique.
+`household_membership_history` keeps everyone who has ever been a member, after Better Auth deletes their `member` row; an `AFTER INSERT ON member` trigger fills it (see [Households API](api/households.md#storage)). Its `user_id` key is `ON DELETE RESTRICT`. `household_features` holds one row per organization with module toggles; an `AFTER INSERT ON organization` trigger seeds defaults (same doc). Every other implemented foreign key uses `ON DELETE CASCADE`. `verification` has no foreign keys; `session.active_organization_id` is nullable text with no enforced organization reference. Timestamp columns are PostgreSQL `timestamp` without time zone. Non-unique indexes cover `session.user_id`, `account.user_id`, `verification.identifier`, both member foreign keys, and invitation organization/email. Membership pairs are not constrained to be unique.
 
 ## Proposed household data
 
-`USERS` is a contract projection of the implemented `user` table, with `imageUrl` mapped to `image`; it is not an additional user table. `HOUSEHOLDS` represents the contract's household scope. Whether that scope maps directly to `organization`, and where its feature flags live, remain unspecified. The expense child tables propose composite primary keys on `(expense_id, user_id)`; the contracts expose no payer, allocation-participant, or split IDs.
+`USERS` is a contract projection of the implemented `user` table, with `imageUrl` mapped to `image`; it is not an additional user table. `HOUSEHOLDS` represents the contract's household scope as `organization.id` (`householdId`); module flags live in the implemented `household_features` table, not on `organization`. The expense child tables propose composite primary keys on `(expense_id, user_id)`; the contracts expose no payer, allocation-participant, or split IDs.
 
 ```mermaid
 erDiagram
@@ -116,10 +124,7 @@ erDiagram
     }
 
     HOUSEHOLDS {
-        uuid id PK "Inferred from householdId"
-        boolean expenses_enabled "Default true at persistence time"
-        boolean chores_enabled "Default true at persistence time"
-        boolean shopping_enabled "Default true at persistence time"
+        uuid id PK "Maps to organization.id"
     }
 
     EXPENSE_CATEGORIES {

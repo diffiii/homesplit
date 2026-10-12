@@ -1,4 +1,4 @@
-import type { Endpoint } from "@homesplit/contracts";
+import type { Endpoint, FeatureId } from "@homesplit/contracts";
 import {
   applyDecorators,
   createParamDecorator,
@@ -12,17 +12,24 @@ import {
   HouseholdGuard,
   type HouseholdRequest,
   MIN_ROLE,
+  REQUIRED_MODULE,
 } from "./household.guard";
 import type { HouseholdRole } from "./roles";
 
 /** `@Route` for a `/api/households/:householdId/...` endpoint, behind `HouseholdGuard`. */
 export const HouseholdRoute = (
   endpoint: Endpoint,
-  { minRole = "member" }: { minRole?: HouseholdRole } = {}
+  {
+    minRole = "member",
+    module,
+  }: { minRole?: HouseholdRole; module?: FeatureId } = {}
 ) =>
   applyDecorators(
     Route(endpoint),
     SetMetadata(MIN_ROLE, minRole),
+    ...(endpoint.method !== "GET" && module !== undefined
+      ? [SetMetadata(REQUIRED_MODULE, module)]
+      : []),
     UseGuards(HouseholdGuard)
   );
 

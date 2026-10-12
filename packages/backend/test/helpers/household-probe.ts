@@ -70,6 +70,24 @@ class HouseholdProbeController {
     return row;
   }
 
+  @HouseholdRoute(probe("GET", "/chores"))
+  listChores(@CurrentHousehold() household: HouseholdContext) {
+    return { ok: true, householdId: household.householdId };
+  }
+
+  @HouseholdRoute(probe("POST", "/chores", 201), { module: "chores" })
+  createChore(@CurrentHousehold() household: HouseholdContext) {
+    return { created: true, actorId: household.userId };
+  }
+
+  @HouseholdRoute(probe("POST", "/chores/admin", 201), {
+    minRole: "admin",
+    module: "chores",
+  })
+  adminChore(@CurrentHousehold() _household: HouseholdContext) {
+    return { created: true };
+  }
+
   @HouseholdRoute(probe("POST", "/items", 201))
   async createItem(
     @CurrentHousehold() household: HouseholdContext,

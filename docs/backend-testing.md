@@ -44,7 +44,7 @@ Integration tests go in `packages/backend/test` and end in `.test.ts`. Unit test
 | `removeMember(remover, household, removed)` | `removed` is removed through `remove-member` |
 | `leaveHousehold(user, household)` | `user` leaves through `leave` |
 
-`HouseholdProbeModule` in `test/helpers/household-probe.ts` adds test-only routes under `/api/households/:householdId/probe` that exercise the household guard and access helpers; pass it to `createTestApp`.
+`HouseholdProbeModule` in `test/helpers/household-probe.ts` adds test-only routes under `/api/households/:householdId/probe` that exercise the household guard and access helpers, including probe routes under `/probe/chores` with `{ module: "chores" }` for the module-disabled check; pass it to `createTestApp`.
 
 ```ts
 describe("expenses", () => {
