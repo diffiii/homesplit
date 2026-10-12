@@ -7,7 +7,11 @@ import { HouseholdsModule } from "./features/households/households.module";
 
 @Module({
   controllers: [AppController],
-  imports: [AuthModule.forRoot({ auth }), HouseholdsModule],
+  imports: [
+    // Browsers call the API through the frontend origin, never cross-origin.
+    AuthModule.forRoot({ auth, disableTrustedOriginsCors: true }),
+    HouseholdsModule,
+  ],
 })
 export class AppModule implements BeforeApplicationShutdown {
   async beforeApplicationShutdown(): Promise<void> {

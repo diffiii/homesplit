@@ -37,7 +37,8 @@ export default defineConfig({
           env: {
             DATABASE_URL: databaseUrl,
             BETTER_AUTH_SECRET: "test-secret-not-for-production-use-0123456789",
-            BETTER_AUTH_URL: "http://localhost:8080",
+            FRONTEND_URL: "https://homesplit.test",
+            FRONTEND_PREVIEW_ORIGINS: "https://homesplit-web-*.vercel.app",
           },
           globalSetup: ["test/global-setup.ts"],
           setupFiles: ["test/setup.ts"],

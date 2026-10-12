@@ -30,14 +30,14 @@ export interface TestClient {
 /**
  * HTTP client for the app. Without a cookie it acts as an unauthenticated
  * visitor. Better Auth checks the Origin header on cookie requests, so every
- * request sends the configured app origin.
+ * request sends the frontend origin.
  */
 export function createClient(
   app: INestApplication,
   cookie?: string
 ): TestClient {
   const server = app.getHttpServer();
-  const origin = process.env.BETTER_AUTH_URL ?? "";
+  const origin = process.env.FRONTEND_URL ?? "";
   const prepare = (test: Test): Test => {
     test.set("Origin", origin);
     return cookie ? test.set("Cookie", cookie) : test;

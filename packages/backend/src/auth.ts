@@ -6,10 +6,33 @@ import { db } from "./db";
 // biome-ignore lint/performance/noNamespaceImport: drizzle schema bag for better-auth adapter
 import * as schema from "./db/schema/auth";
 
+const frontendUrl = process.env.FRONTEND_URL;
+
+if (!frontendUrl) {
+  throw new Error("FRONTEND_URL is not set");
+}
+
+const previewOrigins = (process.env.FRONTEND_PREVIEW_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 export const auth = betterAuth({
+  // The browser reaches the API only through the frontend's `/api/*` rewrite,
+  // so the frontend origin is Better Auth's public URL. Cookies carry no
+  // `Domain`, use `SameSite=Lax`, and are `Secure` when this URL is https.
+  baseURL: frontendUrl,
+  trustedOrigins: [new URL(frontendUrl).origin, ...previewOrigins],
   advanced: {
     database: {
       generateId: "uuid",
+    },
+    // Better Auth skips the origin check under test unless this is explicit.
+    disableOriginCheck: false,
+    ipAddress: {
+      // Vercel replaces this header with the visitor's address and forwards it
+      // through the rewrite. Better Auth ignores it when it lists several hops.
+      ipAddressHeaders: ["x-forwarded-for"],
     },
   },
   database: drizzleAdapter(db, {
