@@ -36,6 +36,13 @@
       "when": 1791735636802,
       "tag": "0004_household_features_trigger",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791915676700,
+      "tag": "0005_expense_categories",
+      "breakpoints": true
     }
   ]
 }
