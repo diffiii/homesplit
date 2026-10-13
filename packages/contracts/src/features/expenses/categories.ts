@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { Emoji } from "../../common/emoji";
 import { Id } from "../../common/id";
 
 /** Household-scoped expense category if needed - could be used for budget tracking */
@@ -7,21 +8,28 @@ export const ExpenseCategory = z.object({
   id: Id,
   householdId: Id,
   name: z.string().min(1),
-  icon: z.string().min(1).nullable(),
+  /** Shown as the category's avatar. */
+  icon: Emoji.nullable(),
 });
 export type ExpenseCategory = z.infer<typeof ExpenseCategory>;
 
 const ExpenseCategoryWritableFields = z.object({
   name: z.string().min(1),
-  icon: z.string().min(1).nullable().optional(),
+  icon: Emoji.nullable().optional(),
 });
 
 /** Create an expense category. */
 export const CreateExpenseCategoryRequest = ExpenseCategoryWritableFields;
+export type CreateExpenseCategoryRequest = z.infer<
+  typeof CreateExpenseCategoryRequest
+>;
 
 /** Partial update of writable category fields. */
 export const UpdateExpenseCategoryRequest =
   ExpenseCategoryWritableFields.partial();
+export type UpdateExpenseCategoryRequest = z.infer<
+  typeof UpdateExpenseCategoryRequest
+>;
 
 /**
  * Path params for category-scoped routes (update / delete).

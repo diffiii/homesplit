@@ -4,6 +4,7 @@
 export * from "./common/api-error";
 export * from "./common/datetime";
 export * from "./common/distribute";
+export * from "./common/emoji";
 export * from "./common/id";
 export * from "./common/money";
 export * from "./common/pagination";

@@ -1,16 +1,20 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
+import { Logger } from "@nestjs/common";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { organization } from "better-auth/plugins";
 import { db } from "./db";
 // biome-ignore lint/performance/noNamespaceImport: drizzle schema bag for better-auth adapter
 import * as schema from "./db/schema/auth";
+import { seedDefaultCategories } from "./features/expense-categories/default-categories";
 
 const frontendUrl = process.env.FRONTEND_URL;
 
 if (!frontendUrl) {
   throw new Error("FRONTEND_URL is not set");
 }
+
+const logger = new Logger("Auth");
 
 const previewOrigins = (process.env.FRONTEND_PREVIEW_ORIGINS ?? "")
   .split(",")
@@ -55,5 +59,23 @@ export const auth = betterAuth({
       return Promise.resolve();
     }),
   },
-  plugins: [organization()],
+  plugins: [
+    organization({
+      organizationHooks: {
+        // Runs after Better Auth has committed the household, outside any
+        // transaction. Default categories are a convenience, so a failure
+        // here is logged and the household is still created.
+        afterCreateOrganization: async ({ organization: household }) => {
+          try {
+            await seedDefaultCategories(db, household.id);
+          } catch (error) {
+            logger.error(
+              `Default categories not seeded for household ${household.id}`,
+              error
+            );
+          }
+        },
+      },
+    }),
+  ],
 });
