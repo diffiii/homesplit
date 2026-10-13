@@ -3,6 +3,7 @@ import { AuthModule } from "@thallesp/nestjs-better-auth";
 import { AppController } from "./app.controller";
 import { auth } from "./auth";
 import { closeDb } from "./db";
+import { ExpensesModule } from "./features/expenses/expenses.module";
 import { HouseholdsModule } from "./features/households/households.module";
 
 @Module({
@@ -11,6 +12,7 @@ import { HouseholdsModule } from "./features/households/households.module";
     // Browsers call the API through the frontend origin, never cross-origin.
     AuthModule.forRoot({ auth, disableTrustedOriginsCors: true }),
     HouseholdsModule,
+    ExpensesModule,
   ],
 })
 export class AppModule implements BeforeApplicationShutdown {

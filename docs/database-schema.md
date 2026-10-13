@@ -103,12 +103,20 @@ erDiagram
         boolean shopping_enabled "Default true"
     }
 
+    expense_categories {
+        uuid id PK
+        uuid household_id FK "organization.id"
+        text name
+        text icon "nullable; a single emoji"
+    }
+
     organization ||..o| household_features : toggles
     organization ||..o{ household_membership_history : remembers
     user ||..o{ household_membership_history : was_member
+    organization ||..o{ expense_categories : contains
 ```
 
-`household_membership_history` keeps everyone who has ever been a member, after Better Auth deletes their `member` row; an `AFTER INSERT ON member` trigger fills it (see [Households API](api/households.md#storage)). Its `user_id` key is `ON DELETE RESTRICT`. `household_features` holds one row per organization with module toggles; an `AFTER INSERT ON organization` trigger seeds defaults (same doc). Every other implemented foreign key uses `ON DELETE CASCADE`. `verification` has no foreign keys; `session.active_organization_id` is nullable text with no enforced organization reference. Timestamp columns are PostgreSQL `timestamp` without time zone. Non-unique indexes cover `session.user_id`, `account.user_id`, `verification.identifier`, both member foreign keys, and invitation organization/email. Membership pairs are not constrained to be unique.
+`household_membership_history` keeps everyone who has ever been a member, after Better Auth deletes their `member` row; an `AFTER INSERT ON member` trigger fills it (see [Households API](api/households.md#storage)). Its `user_id` key is `ON DELETE RESTRICT`. `household_features` holds one row per organization with module toggles; an `AFTER INSERT ON organization` trigger seeds defaults (same doc). `expense_categories` holds each household's categories, indexed by `household_id`; new households get a default set from a Better Auth hook (see [Expenses API](api/expenses.md#storage)). Every other implemented foreign key uses `ON DELETE CASCADE`. `verification` has no foreign keys; `session.active_organization_id` is nullable text with no enforced organization reference. Timestamp columns are PostgreSQL `timestamp` without time zone. Non-unique indexes cover `session.user_id`, `account.user_id`, `verification.identifier`, both member foreign keys, and invitation organization/email. Membership pairs are not constrained to be unique.
 
 ## Proposed household data
 
