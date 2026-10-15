@@ -18,6 +18,7 @@
     "prepare": "husky",
     "test:backend": "pnpm --filter \"backend^...\" build && pnpm --filter backend test",
     "test:contracts": "pnpm --filter @homesplit/contracts test",
+    "test:web": "pnpm --filter \"web^...\" build && pnpm --filter web test",
     "typecheck": "pnpm -r typecheck"
   },
   "lint-staged": {
