@@ -53,13 +53,23 @@ export const auth = betterAuth({
     sendOnSignUp: true,
     autoSignInAfterVerification: true,
     expiresIn: 86_400,
-    sendVerificationEmail: async ({ user, url }) => {
+    // The link opens the frontend's /verify-email page rather than Better
+    // Auth's `url`, which verifies on GET, so a mail scanner opening it would
+    // verify the address and get a session.
+    sendVerificationEmail: async ({ user, url, token }) => {
+      const link = new URL("/verify-email", frontendUrl);
+      link.searchParams.set("token", token);
+      link.searchParams.set(
+        "redirectTo",
+        new URL(url).searchParams.get("callbackURL") ?? "/"
+      );
+
       await sendEmail({
         to: user.email,
         subject: "Verify your email address",
         html: `
           <p>Please verify your email address by clicking
-          <a href="${url}">Verify email</a>.</p>
+          <a href="${link.href}">Verify email</a>.</p>
         `,
       });
     },
