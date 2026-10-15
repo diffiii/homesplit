@@ -179,7 +179,7 @@ A departed member who is owed money is written off the same way, with payments t
 
 ### Routes
 
-- Application routes live under `/api`, the Nest global prefix from #24. Better Auth owns `/api/auth/*`, and no application route starts with it.
+- Application routes live under `/api/...` as full paths in the contracts endpoint map; the backend binds them through `@Route` without a Nest global prefix. Better Auth owns `/api/auth/*`, and no application route starts with `/api/auth`.
 - Household routes have the shape `/api/households/:householdId/<collection>[/:<name>Id][/<action>]`. User routes start with `/api/me`, act on the session user, and never contain a user ID.
 - Collections are plural kebab-case nouns, and path params use the contract names. Actions are `POST` requests to a verb segment with an empty body.
 
@@ -230,6 +230,8 @@ Every error from an application route is an [`ApiError`](../packages/contracts/s
 | 403 | `MODULE_DISABLED` | A write hits a disabled module. `details.module` names it. |
 | 404 | `NOT_FOUND` | The household doesn't exist or the caller isn't a current member, a path resource isn't in this household, or the route doesn't exist. These cases look identical. |
 | 409 | A feature code, or `CONFLICT` | A uniqueness or state conflict, including database unique and foreign-key violations, which never surface as 500. |
+| 413 | `PAYLOAD_TOO_LARGE` | The body is over the JSON parser's size limit (100 KB). |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | The body uses a charset or content encoding the parser can't decode. |
 | 429 | `RATE_LIMITED` | The caller hit a per-user limit. |
 | 500 | `INTERNAL_ERROR` | Anything unexpected. The body exposes no internals. |
 
@@ -278,6 +280,33 @@ Why:
 As a result, any signed-in user can check whether an email has an account, which is accepted for now. #31 trims and lowercases the email (Better Auth stores emails lowercased) in the `CreateFriendRequest` schema, before the email check, as `z.string().trim().toLowerCase().pipe(z.email())`, because pipes validate before the service runs and `z.email()` rejects surrounding spaces. #31 also limits `POST /api/me/friend-requests` per user, answering 429 `RATE_LIMITED` over a limit that #31 chooses.
 
 Revisit this if sign-up stops revealing accounts. Better Auth returns a generic sign-up response when `requireEmailVerification` is on or `autoSignIn` is off. At that point, propose a uniform response and its contract change before implementing it.
+
+## Email links
+
+Emails link to three frontend pages. Each link is built as `new URL(path, FRONTEND_URL)`, never from the `url` that Better Auth passes to its email callbacks:
+
+| Path | Sent by | Carries |
+| --- | --- | --- |
+| `/invitations/:invitationId` | #28, `sendInvitationEmail` | The invitation ID |
+| `/verify-email?token=…&redirectTo=…` | #59, `sendVerificationEmail` | The verification token, and where to continue |
+| `/reset-password?token=…&redirectTo=…` | #86, `sendResetPassword` | The reset token, and where to continue |
+
+Why not Better Auth's `url`:
+
+- It points at `GET /api/auth/verify-email` or `GET /api/auth/reset-password/:token`, which act and then redirect. Mail scanners open links in emails, so a scanner would verify the address, and with `autoSignInAfterVerification` it would receive a session.
+- The pages tell an expired link from an invalid one and offer the next step in place, rather than decoding an `?error=` from a redirect.
+
+Returning the user to where they were going:
+
+- `redirectTo` is a path on the frontend origin. Pages follow it only if it starts with a single `/`, and fall back to `/` otherwise (#84).
+- **Invitations.** The page is the destination itself. A signed-out visitor goes to `/sign-in?redirectTo=/invitations/:invitationId`, and switching to sign-up keeps it. Accepting doesn't need a verified email (see [Better Auth endpoints](#better-auth-endpoints)), so the invitee can accept right after signing in. If #59 requires verification before sign-in, the path travels through the verification email instead.
+- **Verification.** The frontend sends its `redirectTo` as `callbackURL` to `sign-up/email` and `send-verification-email`. Better Auth puts it in the `callbackURL` query parameter of the `url` it passes to `sendVerificationEmail`, and #59 copies it into the link's `redirectTo`. The page calls `GET /api/auth/verify-email?token=…` without `callbackURL`, so it gets JSON rather than a redirect, then continues to `redirectTo`.
+- **Password reset.** The forgot-password page sends its `redirectTo` as `redirectTo` to `request-password-reset`. Better Auth puts it in the `callbackURL` query parameter of the `url` it passes to `sendResetPassword`, and #86 copies it into the link's `redirectTo`. The page calls `POST /api/auth/reset-password` with the token and new password. That doesn't sign the user in, so the page then goes to `/sign-in?redirectTo=…`, unless #86 decides otherwise.
+
+What the pages can tell apart in 1.7.7:
+
+- Verification tokens are signed JWTs, not stored rows. An expired one answers `TOKEN_EXPIRED`, and a malformed or tampered one `INVALID_TOKEN`. Reusing a token for an address that's already verified succeeds again, so `/verify-email` can't show "already used" (#85) and shows success instead. The token doesn't depend on a session, so verifying works on another device.
+- Reset tokens are stored and deleted when used, so an expired token and a used one both answer `INVALID_TOKEN`.
 
 ## Route doc template
 

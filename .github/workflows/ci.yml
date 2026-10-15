@@ -35,7 +35,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [backend, contracts]
+        package: [backend, contracts, web]
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -47,8 +47,14 @@ jobs:
           require-lockfile: true
           runtime: node@lts
 
+      - name: Build workspace dependencies
+        run: pnpm --filter "${{ matrix.package }}^..." build
+
       - name: Run typecheck
         run: pnpm --filter ${{ matrix.package }} typecheck
+        env:
+          # `next typegen` evaluates the web rewrites, which need an API origin.
+          API_URL: http://localhost:8080
 
   build:
     name: build (${{ matrix.package }})
@@ -57,7 +63,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [backend, contracts]
+        package: [backend, contracts, web]
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -69,8 +75,51 @@ jobs:
           require-lockfile: true
           runtime: node@lts
 
+      - name: Build workspace dependencies
+        run: pnpm --filter "${{ matrix.package }}^..." build
+
       - name: Run build
         run: pnpm --filter ${{ matrix.package }} build
+        env:
+          API_URL: http://localhost:8080
+
+  test:
+    name: test (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [backend, contracts, web]
+    services:
+      postgres-test:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: homesplit_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d homesplit_test"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@v3
+        with:
+          cache: true
+          require-lockfile: true
+          runtime: node@lts
+
+      - name: Build workspace dependencies
+        run: pnpm --filter "${{ matrix.package }}^..." build
+
+      - name: Run tests
+        run: pnpm --filter ${{ matrix.package }} test
 
   commitlint:
     runs-on: ubuntu-latest

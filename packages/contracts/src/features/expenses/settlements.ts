@@ -2,7 +2,13 @@ import { z } from "zod";
 
 import { IsoDateTime } from "../../common/datetime";
 import { Id } from "../../common/id";
-import { Cents, PositiveCents, PositiveMoney } from "../../common/money";
+import {
+  BoundedPositiveMoney,
+  Cents,
+  CurrencyCode,
+  PositiveCents,
+  PositiveMoney,
+} from "../../common/money";
 import { Pagination, paginatedResponse } from "../../common/pagination";
 import { UserSummary } from "../users";
 
@@ -45,16 +51,10 @@ export type MemberBalance = z.infer<typeof MemberBalance>;
 
 /** Member balances in a single currency; currencies are never netted. */
 export const CurrencyBalances = z.object({
-  currency: z.currencyCode(),
+  currency: CurrencyCode,
   balances: z.array(MemberBalance),
 });
 export type CurrencyBalances = z.infer<typeof CurrencyBalances>;
-
-/** Path params for listing balances in a household. */
-export const ListBalancesParams = z.object({
-  householdId: Id,
-});
-export type ListBalancesParams = z.infer<typeof ListBalancesParams>;
 
 /** Unpaginated balances, one entry per currency. */
 export const BalanceListResponse = z.object({
@@ -89,7 +89,7 @@ export type SettlementSuggestion = z.infer<typeof SettlementSuggestion>;
 
 /** Settlement suggestions in a single currency. */
 export const CurrencySettlementSuggestions = z.object({
-  currency: z.currencyCode(),
+  currency: CurrencyCode,
   suggestions: z.array(SettlementSuggestion),
 });
 export type CurrencySettlementSuggestions = z.infer<
@@ -101,7 +101,7 @@ export const ProcessSettlementRequest = z
   .strictObject({
     payerId: Id,
     payeeId: Id,
-    amount: PositiveMoney,
+    amount: BoundedPositiveMoney,
     note: z.string().min(1).nullable().optional(),
   })
   .superRefine((request, ctx) =>
@@ -113,14 +113,6 @@ export const ProcessSettlementRequest = z
     )
   );
 export type ProcessSettlementRequest = z.infer<typeof ProcessSettlementRequest>;
-
-/** Path params for listing settlement suggestions in a household. */
-export const ListSettlementSuggestionsParams = z.object({
-  householdId: Id,
-});
-export type ListSettlementSuggestionsParams = z.infer<
-  typeof ListSettlementSuggestionsParams
->;
 
 /** List settlement history with offset pagination. */
 export const ListSettlementHistoryQuery = Pagination;

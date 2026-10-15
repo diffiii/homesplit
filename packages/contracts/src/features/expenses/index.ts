@@ -2,80 +2,35 @@ import { z } from "zod";
 
 import { IsoDate, IsoDateTime } from "../../common/datetime";
 import { Id } from "../../common/id";
-import { Cents, PositiveCents, PositiveMoney } from "../../common/money";
+import {
+  BoundedPositiveCents,
+  BoundedPositiveMoney,
+  Cents,
+  PositiveCents,
+  PositiveMoney,
+} from "../../common/money";
 import { Pagination, paginatedResponse } from "../../common/pagination";
 import { UserSummary } from "../users";
+import {
+  ExpenseAllocationInput,
+  FULL_PERCENTAGE_BASIS_POINTS,
+} from "./allocation/input";
 import { ExpenseCategory } from "./categories";
 
 // biome-ignore lint/performance/noBarrelFile: package entry point
+export * from "./allocation";
 export * from "./categories";
 export * from "./settlements";
-
-/** How an expense total is divided among participants. */
-export const SplitMethod = z.enum([
-  "equal",
-  "percentage",
-  "shares",
-  "exact",
-  "adjustment",
-]);
-export type SplitMethod = z.infer<typeof SplitMethod>;
-
-/** 100% expressed in basis points. */
-export const FULL_PERCENTAGE_BASIS_POINTS = 10_000;
-
-const AllocationParticipant = z.strictObject({ userId: Id });
-
-/**
- * Allocation strategy for an expense. Amounts are calculated by the backend;
- * users who don't take part are left out of `participants`.
- */
-export const ExpenseAllocationInput = z.discriminatedUnion("method", [
-  z.strictObject({
-    method: z.literal(SplitMethod.enum.equal),
-    participants: z.array(AllocationParticipant).min(1),
-  }),
-  z.strictObject({
-    method: z.literal(SplitMethod.enum.percentage),
-    participants: z
-      .array(
-        AllocationParticipant.extend({
-          basisPoints: z.int().positive().max(FULL_PERCENTAGE_BASIS_POINTS),
-        })
-      )
-      .min(1),
-  }),
-  z.strictObject({
-    method: z.literal(SplitMethod.enum.shares),
-    participants: z
-      .array(AllocationParticipant.extend({ shares: z.int().positive() }))
-      .min(1),
-  }),
-  z.strictObject({
-    method: z.literal(SplitMethod.enum.exact),
-    participants: z
-      .array(AllocationParticipant.extend({ amountCents: Cents.nonnegative() }))
-      .min(1),
-  }),
-  z.strictObject({
-    method: z.literal(SplitMethod.enum.adjustment),
-    // Remainder after adjustments is split equally, then each adjustment is added.
-    participants: z
-      .array(AllocationParticipant.extend({ adjustmentCents: Cents }))
-      .min(1),
-  }),
-]);
-export type ExpenseAllocationInput = z.infer<typeof ExpenseAllocationInput>;
 
 /** Amount a user actually paid towards an expense. */
 export const ExpensePayerInput = z.strictObject({
   userId: Id,
-  amountCents: PositiveCents,
+  amountCents: BoundedPositiveCents,
 });
 export type ExpensePayerInput = z.infer<typeof ExpensePayerInput>;
 
 const ExpenseFinancialFields = z.strictObject({
-  total: PositiveMoney,
+  total: BoundedPositiveMoney,
   payers: z.array(ExpensePayerInput).min(1),
   allocation: ExpenseAllocationInput,
 });

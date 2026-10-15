@@ -1,12 +1,16 @@
 {
   "name": "@homesplit/contracts",
   "private": true,
-  "description": "Shared API contracts (Zod schemas and types)",
+  "description": "Zod schemas, types, and shared money and allocation logic",
   "type": "commonjs",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./endpoints": {
+      "types": "./dist/endpoints/index.d.ts",
+      "default": "./dist/endpoints/index.js"
     },
     "./features/catalog": {
       "types": "./dist/features/catalog.d.ts",
@@ -44,13 +48,17 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.3"
   }
 }
