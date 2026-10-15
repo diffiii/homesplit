@@ -43,6 +43,8 @@ export const auth = betterAuth({
     provider: "pg",
     schema,
   }),
+  // Profiles change only through PATCH /api/me, which validates `imageUrl`.
+  disabledPaths: ["/update-user"],
   emailAndPassword: {
     enabled: true,
   },
