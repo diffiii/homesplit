@@ -1,10 +1,14 @@
 import { Resend } from "resend";
 
 const { RESEND_API_KEY, MAIL_FROM } = process.env;
+
 const mailFromAddress = MAIL_FROM || "HomeSplit <onboarding@resend.dev>";
+
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
-// Capturing test mails
+const MAX_CAPTURED_EMAILS = 100;
+
+// Captured messages for local tests.
 export const capturedEmails: Array<{
   to: string;
   subject: string;
@@ -18,14 +22,23 @@ interface SendEmailOptions {
 }
 
 export async function sendEmail({ to, subject, html }: SendEmailOptions) {
-  if (
-    process.env.NODE_ENV === "test" ||
-    process.env.NODE_ENV === "development" ||
-    !resend
-  ) {
+  const isTest = process.env.NODE_ENV === "test";
+  const isDevelopment = process.env.NODE_ENV === "development";
+
+  if (isTest || isDevelopment) {
     capturedEmails.push({ to, subject, html });
-    console.log(`[Mail Captured] To: ${to} | Subject: ${subject}`);
+
+    if (capturedEmails.length > MAX_CAPTURED_EMAILS) {
+      capturedEmails.splice(0, capturedEmails.length - MAX_CAPTURED_EMAILS);
+    }
+
+    console.log(`[Mail Captured] Subject: ${subject}`);
+
     return { success: true, captured: true };
+  }
+
+  if (!resend) {
+    throw new Error("Email delivery is not configured: missing RESEND_API_KEY");
   }
 
   const { data, error } = await resend.emails.send({

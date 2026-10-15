@@ -4,10 +4,7 @@ import { organization } from "better-auth/plugins";
 import { db } from "./db";
 // biome-ignore lint/performance/noNamespaceImport: drizzle schema bag for better-auth adapter
 import * as schema from "./db/schema";
-
 import { sendEmail } from "./mail";
-
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
 export const auth = betterAuth({
   advanced: {
@@ -24,22 +21,18 @@ export const auth = betterAuth({
     requireEmailVerification: true,
   },
   emailVerification: {
+    sendOnSignIn: true,
     sendOnSignUp: true,
     autoSignInAfterVerification: true,
-    expiresIn: 3600,
-    sendVerificationEmail: async ({
-      user,
-      token,
-    }: {
-      user: { email: string };
-      token: string;
-    }) => {
-      const verificationUrl = `${FRONTEND_URL}/verify-email?token=${token}`;
-
+    expiresIn: 86_400,
+    sendVerificationEmail: async ({ user, url }) => {
       await sendEmail({
         to: user.email,
         subject: "Verify your email address",
-        html: `<p>Please verify your email by clicking <a href="${verificationUrl}">${verificationUrl}</a>.</p>`,
+        html: `
+          <p>Please verify your email address by clicking
+          <a href="${url}">Verify email</a>.</p>
+        `,
       });
     },
   },
