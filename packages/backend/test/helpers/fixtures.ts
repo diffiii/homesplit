@@ -1,9 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { INestApplication } from "@nestjs/common";
 import type { HouseholdRole } from "@/features/households/access/roles";
+import { capturedEmails } from "@/mail";
 import { createClient, type TestClient } from "./app";
 
 export const TEST_PASSWORD = "correct-horse-battery-staple";
+
+const HREF = /href="([^"]+)"/;
 
 export interface TestUser {
   client: TestClient;
@@ -27,11 +30,18 @@ export async function createUser(
     .send({ email, name, password: TEST_PASSWORD })
     .expect(200);
 
-  const setCookie = response.headers["set-cookie"] as unknown as
+  // Sign-up returns no session until the email is verified, and verifying
+  // signs the user in.
+  const verified = await createClient(app)
+    .get("/api/auth/verify-email")
+    .query({ token: verificationTokenFor(email) })
+    .expect(200);
+
+  const setCookie = verified.headers["set-cookie"] as unknown as
     | string[]
     | undefined;
   if (!setCookie?.length) {
-    throw new Error("Sign-up returned no session cookie");
+    throw new Error("Email verification returned no session cookie");
   }
   const cookie = setCookie.map((value) => value.split(";")[0]).join("; ");
 
@@ -41,6 +51,20 @@ export async function createUser(
     id: response.body.user.id,
     name,
   };
+}
+
+/** The link in the last verification email captured for `email`. */
+export function verificationLinkFor(email: string): URL {
+  const sent = capturedEmails.findLast((captured) => captured.to === email);
+  const href = sent?.html.match(HREF)?.[1];
+  if (!href) {
+    throw new Error(`No verification email captured for ${email}`);
+  }
+  return new URL(href);
+}
+
+export function verificationTokenFor(email: string): string {
+  return verificationLinkFor(email).searchParams.get("token") ?? "";
 }
 
 export async function createHousehold(

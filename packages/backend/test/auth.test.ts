@@ -4,7 +4,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/db";
 import { member, organization, user } from "@/db/schema";
 import { createClient, createTestApp } from "./helpers/app";
-import { createTwoHouseholds, createUser } from "./helpers/fixtures";
+import {
+  createTwoHouseholds,
+  createUser,
+  TEST_PASSWORD,
+  verificationLinkFor,
+} from "./helpers/fixtures";
 
 describe("auth and organization schema", () => {
   let app: INestApplication;
@@ -61,5 +66,39 @@ describe("auth and organization schema", () => {
     expect(listed.body.map((org: { id: string }) => org.id)).toEqual([
       alice.household.id,
     ]);
+  });
+
+  it("emails a verification link to the frontend's page", async () => {
+    const email = `user-${crypto.randomUUID()}@test.local`;
+    await createClient(app)
+      .post("/api/auth/sign-up/email")
+      .send({
+        callbackURL: "/invitations/abc",
+        email,
+        name: "Alice",
+        password: TEST_PASSWORD,
+      })
+      .expect(200);
+
+    const link = verificationLinkFor(email);
+    expect(`${link.origin}${link.pathname}`).toBe(
+      `${process.env.FRONTEND_URL}/verify-email`
+    );
+    expect(link.searchParams.get("token")).toBeTruthy();
+    expect(link.searchParams.get("redirectTo")).toBe("/invitations/abc");
+  });
+
+  it("rejects sign-in until the email is verified", async () => {
+    const email = `user-${crypto.randomUUID()}@test.local`;
+    await createClient(app)
+      .post("/api/auth/sign-up/email")
+      .send({ email, name: "Alice", password: TEST_PASSWORD })
+      .expect(200);
+
+    const signedIn = await createClient(app)
+      .post("/api/auth/sign-in/email")
+      .send({ email, password: TEST_PASSWORD })
+      .expect(403);
+    expect(signedIn.body.code).toBe("EMAIL_NOT_VERIFIED");
   });
 });

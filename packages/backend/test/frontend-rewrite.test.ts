@@ -13,7 +13,7 @@ import { AppModule } from "@/app.module";
 import { db } from "@/db";
 import { session } from "@/db/schema";
 import { createTestApp } from "./helpers/app";
-import { TEST_PASSWORD } from "./helpers/fixtures";
+import { TEST_PASSWORD, verificationTokenFor } from "./helpers/fixtures";
 
 const FRONTEND_URL = process.env.FRONTEND_URL ?? "";
 const PREVIEW_ORIGIN = "https://homesplit-web-git-feature.vercel.app";
@@ -100,7 +100,11 @@ describe("API behind the frontend rewrite", () => {
     });
   };
 
-  const signUp = async (): Promise<{ cookie: string; userId: string }> => {
+  const signUp = async (): Promise<{
+    cookie: string;
+    setCookie: string[];
+    userId: string;
+  }> => {
     const email = `user-${crypto.randomUUID()}@test.local`;
     const signedUp = await call("/api/auth/sign-up/email", {
       body: JSON.stringify({ email, name: "Alice", password: TEST_PASSWORD }),
@@ -109,17 +113,20 @@ describe("API behind the frontend rewrite", () => {
     expect(signedUp.status).toBe(200);
     const { user } = await signedUp.json();
 
+    const verified = await call(
+      `/api/auth/verify-email?token=${verificationTokenFor(email)}`
+    );
+    expect(verified.status).toBe(200);
+
     const signedIn = await call("/api/auth/sign-in/email", {
       body: JSON.stringify({ email, password: TEST_PASSWORD }),
       method: "POST",
     });
     expect(signedIn.status).toBe(200);
-    const cookie = signedIn.headers
-      .getSetCookie()
-      .map((value) => value.split(";")[0])
-      .join("; ");
+    const setCookie = signedIn.headers.getSetCookie();
+    const cookie = setCookie.map((value) => value.split(";")[0]).join("; ");
 
-    return { cookie, userId: user.id };
+    return { cookie, setCookie, userId: user.id };
   };
 
   beforeAll(async () => {
@@ -142,18 +149,11 @@ describe("API behind the frontend rewrite", () => {
   });
 
   it("sets first-party session cookies for the frontend origin", async () => {
-    const response = await call("/api/auth/sign-up/email", {
-      body: JSON.stringify({
-        email: `user-${crypto.randomUUID()}@test.local`,
-        name: "Alice",
-        password: TEST_PASSWORD,
-      }),
-      method: "POST",
-    });
+    const { setCookie } = await signUp();
 
-    const sessionCookie = response.headers
-      .getSetCookie()
-      .find((value) => value.includes("better-auth.session_token="));
+    const sessionCookie = setCookie.find((value) =>
+      value.includes("better-auth.session_token=")
+    );
     const attributes = sessionCookie?.split(";").map((part) => part.trim());
 
     expect(attributes?.[0]).toMatch(SECURE_SESSION_COOKIE);
