@@ -5,7 +5,7 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 import { organization } from "better-auth/plugins";
 import { db } from "./db";
 // biome-ignore lint/performance/noNamespaceImport: drizzle schema bag for better-auth adapter
-import * as schema from "./db/schema";
+import * as schema from "./db/schema/auth";
 import { seedDefaultCategories } from "./features/expense-categories/default-categories";
 import { sendEmail } from "./mail";
 
