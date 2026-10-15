@@ -47,6 +47,22 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
+    // Sign-up answers an existing email like a new one, so it doesn't reveal
+    // accounts. Emailing the owner tells a returning user to sign in, and makes
+    // both cases send an email, so their timing matches too.
+    onExistingUserSignUp: async ({ user }) => {
+      const link = new URL("/sign-in", frontendUrl);
+
+      await sendEmail({
+        to: user.email,
+        subject: "You already have a HomeSplit account",
+        html: `
+          <p>Someone tried to create a HomeSplit account with this email
+          address. If it was you, <a href="${link.href}">sign in</a> instead.
+          If it wasn't, you can ignore this email.</p>
+        `,
+      });
+    },
   },
   emailVerification: {
     sendOnSignIn: true,

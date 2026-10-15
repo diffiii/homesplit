@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/db";
 import { member, organization, user } from "@/db/schema";
+import { capturedEmails } from "@/mail";
 import { createClient, createTestApp } from "./helpers/app";
 import {
   createTwoHouseholds,
@@ -100,5 +101,25 @@ describe("auth and organization schema", () => {
       .send({ email, password: TEST_PASSWORD })
       .expect(403);
     expect(signedIn.body.code).toBe("EMAIL_NOT_VERIFIED");
+  });
+
+  it("answers a sign-up for an existing email like a new one", async () => {
+    const alice = await createUser(app, "Alice");
+
+    const again = await createClient(app)
+      .post("/api/auth/sign-up/email")
+      .send({ email: alice.email, name: "Mallory", password: TEST_PASSWORD })
+      .expect(200);
+    expect(again.body).toMatchObject({
+      token: null,
+      user: { email: alice.email, name: "Mallory" },
+    });
+    expect(again.body.user.id).not.toBe(alice.id);
+
+    const sent = capturedEmails.findLast(
+      (captured) => captured.to === alice.email
+    );
+    expect(sent?.subject).toBe("You already have a HomeSplit account");
+    expect(sent?.html).toContain(`href="${process.env.FRONTEND_URL}/sign-in"`);
   });
 });
