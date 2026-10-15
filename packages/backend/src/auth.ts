@@ -50,7 +50,6 @@ export const auth = betterAuth({
   },
   emailVerification: {
     sendOnSignIn: true,
-    sendOnSignUp: true,
     autoSignInAfterVerification: true,
     expiresIn: 86_400,
     // The link opens the frontend's /verify-email page rather than Better
