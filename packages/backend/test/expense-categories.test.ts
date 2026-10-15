@@ -1,18 +1,17 @@
 import { randomUUID } from "node:crypto";
 import {
-  ApiError,
   ExpenseCategory,
   ExpenseCategoryListResponse,
 } from "@homesplit/contracts";
 import type { INestApplication } from "@nestjs/common";
 import { eq, sql } from "drizzle-orm";
-import type { Response } from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/db";
 import { expenseCategories } from "@/db/schema";
 import { assertCategoryInHousehold } from "@/features/expense-categories/category-reference";
 import { DEFAULT_CATEGORIES } from "@/features/expense-categories/default-categories";
 import type { HouseholdRole } from "@/features/households/access/roles";
+import { expectApiError } from "./helpers/api";
 import { createClient, createTestApp } from "./helpers/app";
 import {
   createHousehold,
@@ -28,10 +27,6 @@ const categoriesPath = (householdId: string) =>
 
 const categoryPath = (householdId: string, categoryId: string) =>
   `${categoriesPath(householdId)}/${categoryId}`;
-
-function expectApiError(response: Response, code: string): void {
-  expect(ApiError.parse(response.body).code).toBe(code);
-}
 
 const storedCategories = (householdId: string) =>
   db
