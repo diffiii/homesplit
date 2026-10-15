@@ -124,6 +124,43 @@ erDiagram
         timestamptz confirmed_at "null while pending"
     }
 
+    expenses {
+        uuid id PK
+        uuid household_id FK "organization.id"
+        text name
+        text description "nullable"
+        bigint total_amount_cents "Strictly positive"
+        text currency "ISO 4217"
+        text allocation_method "equal, percentage, shares, exact, adjustment"
+        uuid author_id FK
+        uuid category_id FK "nullable"
+        date expense_date
+        timestamptz created_at "Default now()"
+        timestamptz updated_at "Default now()"
+    }
+
+    expense_payers {
+        uuid expense_id PK,FK
+        uuid household_id FK "organization.id"
+        uuid user_id PK,FK
+        bigint amount_cents "Strictly positive"
+    }
+
+    expense_allocation_participants {
+        uuid expense_id PK,FK
+        uuid household_id FK "organization.id"
+        uuid user_id PK,FK
+        text allocation_method FK "The expense's"
+        bigint value "nullable; the method's input, null for equal"
+    }
+
+    expense_splits {
+        uuid expense_id PK,FK
+        uuid household_id FK "organization.id"
+        uuid user_id PK,FK
+        bigint amount_cents "Calculated; nonnegative"
+    }
+
     organization ||..o| household_features : toggles
     organization ||..o{ household_membership_history : remembers
     user ||..o{ household_membership_history : was_member
@@ -134,9 +171,18 @@ erDiagram
     user ||..o{ settlements : records
     user |o..o{ settlements : confirms
     household_membership_history ||..o{ settlements : party_to
+    organization ||..o{ expenses : contains
+    expense_categories |o..o{ expenses : categorizes
+    user ||..o{ expenses : authors
+    expenses ||..o{ expense_payers : funded_by
+    expenses ||..o{ expense_allocation_participants : allocated_to
+    expenses ||..o{ expense_splits : has
+    household_membership_history ||..o{ expense_payers : party_to
+    household_membership_history ||..o{ expense_allocation_participants : party_to
+    household_membership_history ||..o{ expense_splits : party_to
 ```
 
-`household_membership_history` keeps everyone who has ever been a member, after Better Auth deletes their `member` row; an `AFTER INSERT ON member` trigger fills it (see [Households API](api/households.md#storage)). Its `user_id` key is `ON DELETE RESTRICT`. `household_features` holds one row per organization with module toggles; an `AFTER INSERT ON organization` trigger seeds defaults (same doc). `expense_categories` holds each household's categories, indexed by `household_id`; new households get a default set from a Better Auth hook (see [Expenses API](api/expenses.md#storage)). `settlements` holds payments between household parties: its user keys are `ON DELETE RESTRICT`, and (`household_id`, `payer_id`) and (`household_id`, `payee_id`) also reference `household_membership_history`; an index on (`household_id`, `created_at`, `id`) serves the history (same doc). Every other implemented foreign key uses `ON DELETE CASCADE`. `verification` has no foreign keys; `session.active_organization_id` is nullable text with no enforced organization reference. Timestamp columns are PostgreSQL `timestamp` without time zone. Non-unique indexes cover `session.user_id`, `account.user_id`, `verification.identifier`, both member foreign keys, and invitation organization/email. Membership pairs are not constrained to be unique.
+`household_membership_history` keeps everyone who has ever been a member, after Better Auth deletes their `member` row; an `AFTER INSERT ON member` trigger fills it (see [Households API](api/households.md#storage)). Its `user_id` key is `ON DELETE RESTRICT`. `household_features` holds one row per organization with module toggles; an `AFTER INSERT ON organization` trigger seeds defaults (same doc). `expense_categories` holds each household's categories, unique on (`household_id`, `id`); new households get a default set from a Better Auth hook (see [Expenses API](api/expenses.md#storage)). `settlements` holds payments between household parties: its user keys are `ON DELETE RESTRICT`, and (`household_id`, `payer_id`) and (`household_id`, `payee_id`) also reference `household_membership_history`; an index on (`household_id`, `created_at`, `id`) serves the history (same doc). `expenses` and its child tables `expense_payers`, `expense_allocation_participants`, and `expense_splits` hold the ledger's expenses (same doc): user keys are `ON DELETE RESTRICT`; (`household_id`, `author_id`) and each child's (`household_id`, `user_id`) reference `household_membership_history`; (`household_id`, `category_id`) references `expense_categories` (`household_id`, `id`) with `ON DELETE RESTRICT`; children reference `expenses` by (`expense_id`, `household_id`) and cascade from both the expense and `organization`; participants also reference the expense's `allocation_method` with `ON UPDATE CASCADE`. Every other implemented foreign key uses `ON DELETE CASCADE`. `verification` has no foreign keys; `session.active_organization_id` is nullable text with no enforced organization reference. Timestamp columns are PostgreSQL `timestamp` without time zone. Non-unique indexes cover `session.user_id`, `account.user_id`, `verification.identifier`, both member foreign keys, and invitation organization/email. Membership pairs are not constrained to be unique.
 
 ## Proposed household data
 
