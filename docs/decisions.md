@@ -275,21 +275,22 @@ Why:
 
 - A fake success would need a made-up `FriendUser` with an ID, which the contract rules out.
 - A uniform 202 with no body needs a contract change and still leaks: a real request appears in the sender's sent list, and an unknown email doesn't.
-- The leak exists already. With the current config, `POST /api/auth/sign-up/email` answers 422 `USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL` for a registered address, to anyone, without signing in.
+- Sign-up no longer reveals accounts, but a uniform response here would need a contract change. Since #59 requires verification, Better Auth answers `POST /api/auth/sign-up/email` for a registered address with the same 200 and a made-up user, and `onExistingUserSignUp` emails the owner to sign in instead. A uniform friend request would have to store requests to unregistered emails and list them as sent, with an email in place of `FriendUser`, so it's a bigger change than the leak it closes.
 
-As a result, any signed-in user can check whether an email has an account, which is accepted for now. #31 trims and lowercases the email (Better Auth stores emails lowercased) in the `CreateFriendRequest` schema, before the email check, as `z.string().trim().toLowerCase().pipe(z.email())`, because pipes validate before the service runs and `z.email()` rejects surrounding spaces. #31 also limits `POST /api/me/friend-requests` per user, answering 429 `RATE_LIMITED` over a limit that #31 chooses.
+As a result, a signed-in user can check whether an email has an account, which is accepted. This endpoint is the only place that reveals it, and it takes a verified account and stays under #31's rate limit. #31 trims and lowercases the email (Better Auth stores emails lowercased) in the `CreateFriendRequest` schema, before the email check, as `z.string().trim().toLowerCase().pipe(z.email())`, because pipes validate before the service runs and `z.email()` rejects surrounding spaces. #31 also limits `POST /api/me/friend-requests` per user, answering 429 `RATE_LIMITED` over a limit that #31 chooses.
 
-Revisit this if sign-up stops revealing accounts. Better Auth returns a generic sign-up response when `requireEmailVerification` is on or `autoSignIn` is off. At that point, propose a uniform response and its contract change before implementing it.
+Revisit this if accounts get enumerated through this endpoint despite the rate limit. At that point, propose requests to unregistered emails, like household invitations, and their contract change before implementing them.
 
 ## Email links
 
-Emails link to three frontend pages. Each link is built as `new URL(path, FRONTEND_URL)`, never from the `url` that Better Auth passes to its email callbacks:
+Emails link to four frontend pages. Each link is built as `new URL(path, FRONTEND_URL)`, never from the `url` that Better Auth passes to its email callbacks:
 
 | Path | Sent by | Carries |
 | --- | --- | --- |
 | `/invitations/:invitationId` | #28, `sendInvitationEmail` | The invitation ID |
 | `/verify-email?token=…&redirectTo=…` | #59, `sendVerificationEmail` | The verification token, and where to continue |
 | `/reset-password?token=…&redirectTo=…` | #86, `sendResetPassword` | The reset token, and where to continue |
+| `/sign-in` | #59, `onExistingUserSignUp` | Nothing. It tells the owner of an existing account to sign in |
 
 Why not Better Auth's `url`:
 
