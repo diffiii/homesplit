@@ -1,12 +1,26 @@
+import { Logger } from "@nestjs/common";
 import { Resend } from "resend";
 
-const { RESEND_API_KEY, MAIL_FROM } = process.env;
+const { MAIL_FROM, NODE_ENV, RESEND_API_KEY } = process.env;
+
+// Better Auth catches and only logs errors from its email callbacks, so a
+// missing key would surface as users who never get an email. Refuse to start.
+if (NODE_ENV === "production" && !RESEND_API_KEY) {
+  throw new Error("RESEND_API_KEY is not set");
+}
 
 const mailFromAddress = MAIL_FROM || "HomeSplit <onboarding@resend.dev>";
 
-const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
+// Tests always capture. Elsewhere, without a key, emails are captured and
+// their links logged, so local sign-ups can still be verified.
+const resend =
+  RESEND_API_KEY && NODE_ENV !== "test" ? new Resend(RESEND_API_KEY) : null;
+
+const logger = new Logger("Mail");
 
 const MAX_CAPTURED_EMAILS = 100;
+
+const HREFS = /href="([^"]+)"/g;
 
 // Captured messages for local tests.
 export const capturedEmails: Array<{
@@ -22,23 +36,19 @@ interface SendEmailOptions {
 }
 
 export async function sendEmail({ to, subject, html }: SendEmailOptions) {
-  const isTest = process.env.NODE_ENV === "test";
-  const isDevelopment = process.env.NODE_ENV === "development";
-
-  if (isTest || isDevelopment) {
+  if (!resend) {
     capturedEmails.push({ to, subject, html });
 
     if (capturedEmails.length > MAX_CAPTURED_EMAILS) {
       capturedEmails.splice(0, capturedEmails.length - MAX_CAPTURED_EMAILS);
     }
 
-    console.log(`[Mail Captured] Subject: ${subject}`);
+    if (NODE_ENV !== "test") {
+      const links = Array.from(html.matchAll(HREFS), ([, href]) => href);
+      logger.log(`Captured "${subject}" to ${to}: ${links.join(" ")}`);
+    }
 
     return { success: true, captured: true };
-  }
-
-  if (!resend) {
-    throw new Error("Email delivery is not configured: missing RESEND_API_KEY");
   }
 
   const { data, error } = await resend.emails.send({
