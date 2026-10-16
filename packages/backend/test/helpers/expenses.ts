@@ -9,7 +9,10 @@ import {
 export interface StoredExpense {
   authorId: string;
   categoryId?: string | null;
+  createdAt?: Date;
+  expenseDate?: string;
   householdId: string;
+  id?: string;
 }
 
 /**
@@ -18,12 +21,20 @@ export interface StoredExpense {
  */
 export async function insertExpense(
   executor: Executor,
-  { authorId, categoryId = null, householdId }: StoredExpense
+  {
+    authorId,
+    categoryId = null,
+    createdAt,
+    expenseDate = "2026-01-15",
+    householdId,
+    id: expenseId,
+  }: StoredExpense
 ): Promise<string> {
   const amountCents = 1000n;
   const [{ id }] = await executor
     .insert(expenses)
     .values({
+      id: expenseId,
       householdId,
       name: "Groceries",
       totalAmountCents: amountCents,
@@ -31,7 +42,8 @@ export async function insertExpense(
       allocationMethod: "equal",
       authorId,
       categoryId,
-      expenseDate: "2026-01-15",
+      expenseDate,
+      createdAt,
     })
     .returning({ id: expenses.id });
   const child = { expenseId: id, householdId, userId: authorId };
