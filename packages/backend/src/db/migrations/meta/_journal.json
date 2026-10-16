@@ -43,6 +43,13 @@
       "when": 1791915676700,
       "tag": "0005_expense_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792157586165,
+      "tag": "0006_optimal_mandrill",
+      "breakpoints": true
     }
   ]
 }

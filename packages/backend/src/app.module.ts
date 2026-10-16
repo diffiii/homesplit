@@ -3,6 +3,7 @@ import { AuthModule } from "@thallesp/nestjs-better-auth";
 import { AppController } from "./app.controller";
 import { auth } from "./auth";
 import { closeDb } from "./db";
+import { ChoresModule } from "./features/chores/chores.module";
 import { ExpenseCategoriesModule } from "./features/expense-categories/expense-categories.module";
 import { HouseholdsModule } from "./features/households/households.module";
 
@@ -13,6 +14,7 @@ import { HouseholdsModule } from "./features/households/households.module";
     AuthModule.forRoot({ auth, disableTrustedOriginsCors: true }),
     HouseholdsModule,
     ExpenseCategoriesModule,
+    ChoresModule,
   ],
 })
 export class AppModule implements BeforeApplicationShutdown {
