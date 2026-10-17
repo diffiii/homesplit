@@ -1,14 +1,15 @@
 import {
-  type AllocatedSplit,
+  allocate,
   type CreateExpenseRequest,
   type Expense,
   ExpenseAllocationInput,
   type ExpenseFinancialSpec,
   type SplitMethod,
   toSafeInteger,
+  type UpdateExpenseRequest,
   type UserSummary,
 } from "@homesplit/contracts";
-import { asc, desc, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, type SQL, sql } from "drizzle-orm";
 import type { Executor, Transaction } from "@/db";
 import {
   expenseAllocationParticipants,
@@ -33,17 +34,20 @@ type ParticipantInput = { userId: string } & Partial<
   Record<ValueField, number>
 >;
 
+/** One expense, only if it's in the household. */
+export const expenseInHousehold = (householdId: string, expenseId: string) =>
+  and(eq(expenses.id, expenseId), eq(expenses.householdId, householdId));
+
 /**
  * Writes an expense's payers, allocation participants, and the splits
- * `allocate` calculated from them. The expense row must already have
+ * `allocate` calculates from them. The expense row must already have
  * `allocation_method` set to `spec.allocation.method`.
  */
-export async function insertFinancialRows(
+async function insertFinancialRows(
   tx: Transaction,
   householdId: string,
   expenseId: string,
-  { payers, allocation }: ExpenseFinancialSpec,
-  splits: AllocatedSplit[]
+  { total, payers, allocation }: ExpenseFinancialSpec
 ): Promise<void> {
   const child = { expenseId, householdId };
   const field = valueFields[allocation.method];
@@ -68,7 +72,7 @@ export async function insertFinancialRows(
     })
   );
   await tx.insert(expenseSplits).values(
-    splits.map(({ userId, amountCents }) => ({
+    allocate(total.amountCents, allocation).map(({ userId, amountCents }) => ({
       ...child,
       userId,
       amountCents: BigInt(amountCents),
@@ -81,8 +85,7 @@ export async function insertAggregate(
   tx: Transaction,
   householdId: string,
   authorId: string,
-  request: CreateExpenseRequest,
-  splits: AllocatedSplit[]
+  request: CreateExpenseRequest
 ): Promise<string> {
   const [{ id }] = await tx
     .insert(expenses)
@@ -98,8 +101,67 @@ export async function insertAggregate(
       allocationMethod: request.allocation.method,
     })
     .returning({ id: expenses.id });
-  await insertFinancialRows(tx, householdId, id, request, splits);
+  await insertFinancialRows(tx, householdId, id, request);
   return id;
+}
+
+/**
+ * Locks the expense's row `FOR UPDATE` until the transaction ends, so writes
+ * to it run one after another. Undefined when it isn't in the household.
+ */
+export async function lockExpense(
+  tx: Transaction,
+  householdId: string,
+  expenseId: string
+): Promise<{ authorId: string } | undefined> {
+  const [row] = await tx
+    .select({ authorId: expenses.authorId })
+    .from(expenses)
+    .where(expenseInHousehold(householdId, expenseId))
+    .for("update");
+  return row;
+}
+
+/**
+ * Patches an expense's descriptive fields and, with `financial`, replaces its
+ * total, payers, allocation participants, and splits as a whole. The caller
+ * holds the expense's row lock.
+ */
+export async function updateAggregate(
+  tx: Transaction,
+  householdId: string,
+  expenseId: string,
+  { financial, ...descriptive }: UpdateExpenseRequest
+): Promise<void> {
+  if (financial) {
+    // Before the method changes, which cascades to the old participants.
+    await tx
+      .delete(expensePayers)
+      .where(eq(expensePayers.expenseId, expenseId));
+    await tx
+      .delete(expenseAllocationParticipants)
+      .where(eq(expenseAllocationParticipants.expenseId, expenseId));
+    await tx
+      .delete(expenseSplits)
+      .where(eq(expenseSplits.expenseId, expenseId));
+  }
+  await tx
+    .update(expenses)
+    .set({
+      ...descriptive,
+      ...(financial && {
+        totalAmountCents: BigInt(financial.total.amountCents),
+        currency: financial.total.currency,
+        allocationMethod: financial.allocation.method,
+      }),
+      // Taken after the row lock, unlike `now()`, so serialized edits get
+      // increasing times.
+      updatedAt: sql`statement_timestamp()`,
+    })
+    .where(expenseInHousehold(householdId, expenseId));
+  if (financial) {
+    await insertFinancialRows(tx, householdId, expenseId, financial);
+  }
 }
 
 const userColumns = { columns: { id: true, name: true, image: true } } as const;

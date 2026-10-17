@@ -5,6 +5,7 @@ import {
   endpoints,
   Id,
   ListExpensesQuery,
+  UpdateExpenseRequest,
 } from "@homesplit/contracts";
 import { Body, Controller, Inject, Param, Query } from "@nestjs/common";
 import {
@@ -12,6 +13,7 @@ import {
   HouseholdRoute,
 } from "@/features/households/access/household.decorators";
 import type { HouseholdContext } from "@/features/households/access/household.guard";
+import { PatchPipe } from "@/http/patch.pipe";
 import { ZodPipe } from "@/http/zod.pipe";
 import { ExpensesService } from "./expenses.service";
 
@@ -45,5 +47,22 @@ export class ExpensesController {
     @Param("expenseId", new ZodPipe(Id)) expenseId: Id
   ): Promise<Expense> {
     return this.expenses.get(household.householdId, expenseId);
+  }
+
+  @HouseholdRoute(endpoints.updateExpense, { module: "expenses" })
+  updateExpense(
+    @CurrentHousehold() household: HouseholdContext,
+    @Param("expenseId", new ZodPipe(Id)) expenseId: Id,
+    @Body(new PatchPipe(UpdateExpenseRequest)) body: UpdateExpenseRequest
+  ): Promise<Expense> {
+    return this.expenses.update(household, expenseId, body);
+  }
+
+  @HouseholdRoute(endpoints.deleteExpense, { module: "expenses" })
+  async deleteExpense(
+    @CurrentHousehold() household: HouseholdContext,
+    @Param("expenseId", new ZodPipe(Id)) expenseId: Id
+  ): Promise<void> {
+    await this.expenses.delete(household, expenseId);
   }
 }

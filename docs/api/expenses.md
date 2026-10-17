@@ -1,6 +1,6 @@
 # Expenses API
 
-Module flag: `expenses` · Tasks: #35, #37, #40 · Contracts: [expenses](../../packages/contracts/src/features/expenses/index.ts), [categories](../../packages/contracts/src/features/expenses/categories.ts), [settlements](../../packages/contracts/src/features/expenses/settlements.ts)
+Module flag: `expenses` · Tasks: #35, #37, #38, #40 · Contracts: [expenses](../../packages/contracts/src/features/expenses/index.ts), [categories](../../packages/contracts/src/features/expenses/categories.ts), [settlements](../../packages/contracts/src/features/expenses/settlements.ts)
 
 ## Routes
 
@@ -13,6 +13,8 @@ Module flag: `expenses` · Tasks: #35, #37, #40 · Contracts: [expenses](../../p
 | GET | `/api/households/:householdId/expenses` | `HouseholdIdParams`, `ListExpensesQuery` | `ExpenseListResponse` | 200 | all |
 | POST | `/api/households/:householdId/expenses` | `HouseholdIdParams`, `CreateExpenseRequest` | `Expense` | 201 | all |
 | GET | `/api/households/:householdId/expenses/:expenseId` | `ExpenseIdParams` | `Expense` | 200 | all |
+| PATCH | `/api/households/:householdId/expenses/:expenseId` | `ExpenseIdParams`, `UpdateExpenseRequest` | `Expense` | 200 | author or admin+ |
+| DELETE | `/api/households/:householdId/expenses/:expenseId` | `ExpenseIdParams` | none | 204 | author or admin+ |
 | GET | `/api/households/:householdId/settlements` | `HouseholdIdParams`, `ListSettlementHistoryQuery` | `SettlementListResponse` | 200 | all |
 | POST | `/api/households/:householdId/settlements` | `HouseholdIdParams`, `ProcessSettlementRequest` | `Settlement` | 201 | party or admin+ |
 | POST | `/api/households/:householdId/settlements/:settlementId/confirm` | `SettlementIdParams` | `ConfirmedSettlement` | 200 | payee, or admin+ who isn't the payer |
@@ -53,14 +55,44 @@ The defaults live in `DEFAULT_CATEGORIES` in `default-categories.ts`, so changin
 - Optional fields: an omitted `description` or `categoryId` is stored as `null`.
 - Reading back: payers, allocation participants, and splits come back sorted by user ID, not in the order sent. A departed member still shows as author, payer, or participant. Another household's expense answers 404, as a missing one does.
 - Ordering: `expenseDate` descending, then `createdAt` descending, then `id` descending. A page past the end has no items and the real `totalItems`.
-- Disabled module: both `GET` routes keep working, and `POST` answers 403 `MODULE_DISABLED`.
-- Repeated requests: `POST` isn't idempotent, so a repeat creates a second expense.
+- Disabled module: both `GET` routes keep working, and `POST`, `PATCH`, and `DELETE` answer 403 `MODULE_DISABLED`.
+- Repeated requests: `POST` isn't idempotent, so a repeat creates a second expense. Repeating a `PATCH` gives the same expense again, with a later `updatedAt`. A repeated `DELETE` answers 404.
 
 #### Writing and reading
 
 `create` runs in one transaction: it locks the household with `lockHouseholdForLedgerWrite`, checks the payers, participants, and category, calculates the splits, and writes the expense and its child rows. A failure at any step stores nothing, and a write that waited for a household's deletion answers 404. A category deleted between the check and the write makes `expenses_category_fk` reject the insert, which answers the generic 409 `CONFLICT`.
 
-`packages/backend/src/features/expenses/expenses/expenses.repository.ts` holds the queries. `insertFinancialRows` writes the payers, participants, and splits, so a financial replacement (#38) can reuse it. `findExpenses` reads expenses with their author, category, and child rows in one relational query (`db.query.expenses`), using the relations at the end of `packages/backend/src/db/schema/expenses.ts`. A page of the list and its `totalItems` are read in one `readSnapshot`.
+`packages/backend/src/features/expenses/expenses/expenses.repository.ts` holds the queries. `insertFinancialRows` calculates the splits with `allocate` and writes them with the payers and participants, for both `insertAggregate` and `updateAggregate`. `findExpenses` reads expenses with their author, category, and child rows in one relational query (`db.query.expenses`), using the relations at the end of `packages/backend/src/db/schema/expenses.ts`. A page of the list and its `totalItems` are read in one `readSnapshot`.
+
+#### Editing
+
+`PATCH` follows the shared [partial-update rules](../decisions.md#responses):
+
+- Descriptive fields (`name`, `description`, `categoryId`, `expenseDate`) are patched one by one. An omitted field stays, and `null` clears `description` or `categoryId`. A descriptive-only patch never touches the total, payers, allocation, or splits, and doesn't re-check payers or participants, so it works on an expense whose payers or participants have left.
+- `financial` replaces the total, payers, allocation, and splits as a whole. It's validated like a create (sums, duplicates, method values), the server recalculates the splits with `allocate`, and the currency may change. There's no partial financial patch: a client that changes one payer sends the whole spec.
+- Server-set fields stay server-set. `UpdateExpenseRequest` is strict, so `author`, `splits`, `createdAt`, and the like answer 400 `VALIDATION_ERROR`. `updatedAt` changes on every successful `PATCH`; `author` and `createdAt` never do.
+- An empty body answers 400 `EMPTY_PATCH`.
+- References and eligibility, by the [historical-edit rules](../decisions.md#historical-expense-edits): in a financial replacement, a user who is already a payer or allocation participant of the stored expense may stay, in either role, even after leaving. Anyone else must be a current member, checked with `assertUsersEligible(tx, householdId, refs, "current")` at `["financial", "payers", i, "userId"]` and `["financial", "allocation", "participants", i, "userId"]`. Users already on the expense aren't looked up, because the child rows' `<table>_party_fk` keys already make them household parties. A removed departed user is no longer on the expense, so a later replacement can't add them back. A non-null `categoryId` must be one of this household's categories.
+- Rights: the service checks that the caller is the author or an admin+ after finding the expense, so another household's or a missing expense answers 404 before any 403.
+
+`update` runs in one transaction: it locks the household with `lockHouseholdForLedgerWrite`, locks the expense row, checks the caller's right and the references, then deletes the old payers, participants, and splits, updates the expense row, and inserts the new child rows with `insertFinancialRows`. The old child rows go first, because changing `allocation_method` cascades to the participants through `expense_allocation_participants_method_fk`, and the old values may not fit the new method. Any failure rolls the whole replacement back, so the expense keeps its old financial state.
+
+#### Deleting
+
+`DELETE` removes the expense; its payers, participants, and splits cascade through `<table>_expense_fk` in the same statement and transaction, so a failure leaves all of them in place. Payments reference no expense, so deleting one never changes recorded payments; #41 recalculates balances from what remains. There's no soft delete or undo.
+
+#### Concurrent edits
+
+Writes to one expense are serialized, and the last one wins. There's no version field or ETag precondition, so the contracts don't change.
+
+- `update` and `delete` lock the expense row `SELECT … FOR UPDATE`, after the household's `FOR SHARE` lock, and every check runs after both locks. A write that waited for another one sees what that one committed.
+- Overlapping financial replacements apply one after the other, each as a whole. The stored expense always matches exactly one request's spec, never a mix, and its splits always come from its own total and allocation.
+- The second replacement's eligibility check uses the payers and participants the first one stored. If the first one removed a departed user and the second keeps them, the second answers 400 `INVALID_REFERENCE`.
+- A descriptive patch that waited for a financial replacement keeps the replacement's financial state, and the reverse, since each writes only its own fields. Two patches to the same descriptive field keep the later one.
+- An edit or delete that waited for a deletion answers 404. A delete that waited for an edit deletes the edited expense.
+- `updatedAt` is the database's `statement_timestamp()` of the update, which runs after the lock, so serialized edits get increasing times.
+
+A client editing from a stale copy overwrites changes made since it read the expense. That's accepted: an expense is usually edited by its author, every response returns the full stored expense, and the edit is visible to everyone. If lost edits become a problem, propose optimistic concurrency as a contract change first, such as `If-Match` with the expense's `updatedAt` and a 412 or 409 on mismatch.
 
 ### Settlements
 
@@ -115,10 +147,11 @@ Shared errors from [the decision record](../decisions.md#errors) apply. Feature 
 
 | Status | Code | When |
 | --- | --- | --- |
-| 400 | `EMPTY_PATCH` | `PATCH /expense-categories/:categoryId` body has no fields after parsing. |
+| 400 | `EMPTY_PATCH` | `PATCH /expense-categories/:categoryId` or `PATCH /expenses/:expenseId` body has no fields after parsing. |
 | 400 | `INVALID_REFERENCE` | A `categoryId` in a request body isn't a category of this household. |
-| 400 | `INVALID_REFERENCE` | An expense payer or participant isn't a current member of this household. `details.issues` has one entry per failing user. |
+| 400 | `INVALID_REFERENCE` | An expense payer or participant isn't a current member of this household and, in a financial replacement, isn't already on the expense. `details.issues` has one entry per failing user. |
 | 400 | `INVALID_REFERENCE` | `payerId` or `payeeId` has never been a member of this household. `details.issues` has one entry per failing field. |
+| 403 | `FORBIDDEN` | Editing or deleting an expense as a `member` who isn't its author. |
 | 403 | `FORBIDDEN` | Recording a payment between two other users, or deleting one, without being admin+. Confirming a payment as its payer, or as a member who isn't its payee. |
 | 409 | `CATEGORY_IN_USE` | Deleting a category that an expense uses. |
 | 409 | `SETTLEMENT_CONFIRMED` | Deleting a confirmed payment. |
