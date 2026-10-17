@@ -10,6 +10,9 @@ Module flag: `expenses` · Tasks: #35, #37, #40 · Contracts: [expenses](../../p
 | POST | `/api/households/:householdId/expense-categories` | `HouseholdIdParams`, `CreateExpenseCategoryRequest` | `ExpenseCategory` | 201 | admin+ |
 | PATCH | `/api/households/:householdId/expense-categories/:categoryId` | `ExpenseCategoryIdParams`, `UpdateExpenseCategoryRequest` | `ExpenseCategory` | 200 | admin+ |
 | DELETE | `/api/households/:householdId/expense-categories/:categoryId` | `ExpenseCategoryIdParams` | none | 204 | admin+ |
+| GET | `/api/households/:householdId/expenses` | `HouseholdIdParams`, `ListExpensesQuery` | `ExpenseListResponse` | 200 | all |
+| POST | `/api/households/:householdId/expenses` | `HouseholdIdParams`, `CreateExpenseRequest` | `Expense` | 201 | all |
+| GET | `/api/households/:householdId/expenses/:expenseId` | `ExpenseIdParams` | `Expense` | 200 | all |
 | GET | `/api/households/:householdId/settlements` | `HouseholdIdParams`, `ListSettlementHistoryQuery` | `SettlementListResponse` | 200 | all |
 | POST | `/api/households/:householdId/settlements` | `HouseholdIdParams`, `ProcessSettlementRequest` | `Settlement` | 201 | party or admin+ |
 | POST | `/api/households/:householdId/settlements/:settlementId/confirm` | `SettlementIdParams` | `ConfirmedSettlement` | 200 | payee, or admin+ who isn't the payer |
@@ -39,6 +42,25 @@ Better Auth's `organizationHooks.afterCreateOrganization` in `packages/backend/s
 - It runs only for `/organization/create`. An `organization` row inserted any other way gets no defaults.
 
 The defaults live in `DEFAULT_CATEGORIES` in `default-categories.ts`, so changing them doesn't need a migration.
+
+### Expenses
+
+- Server-set fields: `id`, `householdId`, `author`, `splits`, `createdAt`, and `updatedAt`. The author is the caller. `CreateExpenseRequest` is strict, so sending any of them answers 400 `VALIDATION_ERROR`.
+- Splits: the server calculates them with `allocate` from `@homesplit/contracts`, the same engine clients run. They're non-negative, so a participant can owe 0, and add up to the total, as the payers do.
+- Payers and participants are independent: a payer needn't take part, and a participant needn't pay. A user appears at most once in each list; a duplicate answers 400 `VALIDATION_ERROR` at its path, such as `["payers", 1, "userId"]`.
+- References and eligibility: payers and participants must be [current members](../decisions.md#referenced-users), checked with `assertUsersEligible(tx, householdId, refs, "current")` at the paths `["payers", i, "userId"]` and `["allocation", "participants", i, "userId"]`. A `categoryId` must be one of this household's categories. Either failure answers 400 `INVALID_REFERENCE`.
+- Currency: every amount is in `total.currency`.
+- Optional fields: an omitted `description` or `categoryId` is stored as `null`.
+- Reading back: payers, allocation participants, and splits come back sorted by user ID, not in the order sent. A departed member still shows as author, payer, or participant. Another household's expense answers 404, as a missing one does.
+- Ordering: `expenseDate` descending, then `createdAt` descending, then `id` descending. A page past the end has no items and the real `totalItems`.
+- Disabled module: both `GET` routes keep working, and `POST` answers 403 `MODULE_DISABLED`.
+- Repeated requests: `POST` isn't idempotent, so a repeat creates a second expense.
+
+#### Writing and reading
+
+`create` runs in one transaction: it locks the household with `lockHouseholdForLedgerWrite`, checks the payers, participants, and category, calculates the splits, and writes the expense and its child rows. A failure at any step stores nothing, and a write that waited for a household's deletion answers 404. A category deleted between the check and the write makes `expenses_category_fk` reject the insert, which answers the generic 409 `CONFLICT`.
+
+`packages/backend/src/features/expenses/expenses/expenses.repository.ts` holds the queries. `insertFinancialRows` writes the payers, participants, and splits, so a financial replacement (#38) can reuse it. `findExpenses` reads expenses with their author, category, and child rows in one relational query (`db.query.expenses`), using the relations at the end of `packages/backend/src/db/schema/expenses.ts`. A page of the list and its `totalItems` are read in one `readSnapshot`.
 
 ### Settlements
 
@@ -94,7 +116,8 @@ Shared errors from [the decision record](../decisions.md#errors) apply. Feature 
 | Status | Code | When |
 | --- | --- | --- |
 | 400 | `EMPTY_PATCH` | `PATCH /expense-categories/:categoryId` body has no fields after parsing. |
-| 400 | `INVALID_REFERENCE` | A `categoryId` in a request body isn't a category of this household (#37). |
+| 400 | `INVALID_REFERENCE` | A `categoryId` in a request body isn't a category of this household. |
+| 400 | `INVALID_REFERENCE` | An expense payer or participant isn't a current member of this household. `details.issues` has one entry per failing user. |
 | 400 | `INVALID_REFERENCE` | `payerId` or `payeeId` has never been a member of this household. `details.issues` has one entry per failing field. |
 | 403 | `FORBIDDEN` | Recording a payment between two other users, or deleting one, without being admin+. Confirming a payment as its payer, or as a member who isn't its payee. |
 | 409 | `CATEGORY_IN_USE` | Deleting a category that an expense uses. |
