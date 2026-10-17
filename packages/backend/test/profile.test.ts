@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { UserSummary } from "@homesplit/contracts";
 import type { INestApplication } from "@nestjs/common";
 import { eq } from "drizzle-orm";
@@ -6,7 +7,7 @@ import { db } from "@/db";
 import { user } from "@/db/schema";
 import { expectApiError } from "./helpers/api";
 import { createClient, createTestApp } from "./helpers/app";
-import { createUser, type TestUser } from "./helpers/fixtures";
+import { createUser, TEST_PASSWORD, type TestUser } from "./helpers/fixtures";
 
 const ME = "/api/me";
 const AVATAR = "https://example.com/avatar.png";
@@ -132,9 +133,23 @@ describe("profile", () => {
       expect((await storedUser(bob.id)).name).toBe("Bob");
     });
 
+    it("trims the name", async () => {
+      const alice = await createUser(app, "Alice");
+
+      const summary = await updateProfile(alice, { name: "  Jan Kowalski  " });
+
+      expect(summary.name).toBe("Jan Kowalski");
+      expect((await storedUser(alice.id)).name).toBe("Jan Kowalski");
+    });
+
     it.each([
       ["a non-URL avatar", { imageUrl: "not a url" }],
+      ["a javascript: avatar", { imageUrl: "javascript:alert(1)" }],
+      ["a data: avatar", { imageUrl: "data:image/png;base64,AAAA" }],
+      ["an http: avatar", { imageUrl: "http://example.com/avatar.png" }],
       ["an empty name", { name: "" }],
+      ["a whitespace-only name", { name: "   " }],
+      ["a name over 100 characters", { name: "a".repeat(101) }],
       ["a null name", { name: null }],
     ])("rejects %s", async (_label, body) => {
       const alice = await createUser(app, "Alice");
@@ -150,6 +165,41 @@ describe("profile", () => {
 
     it("requires a session", async () => {
       await createClient(app).patch(ME).send({ name: "Eve" }).expect(401);
+    });
+  });
+
+  describe("POST /api/auth/sign-up/email", () => {
+    const signUp = (body: object) =>
+      createClient(app)
+        .post("/api/auth/sign-up/email")
+        .send({
+          email: `user-${randomUUID()}@test.local`,
+          password: TEST_PASSWORD,
+          ...body,
+        });
+
+    it("stores a trimmed name and the avatar", async () => {
+      const response = await signUp({
+        name: "  Jan Kowalski  ",
+        image: AVATAR,
+      }).expect(200);
+
+      expect(await storedUser(response.body.user.id)).toMatchObject({
+        name: "Jan Kowalski",
+        image: AVATAR,
+      });
+    });
+
+    it.each([
+      ["a javascript: avatar", { name: "Alice", image: "javascript:alert(1)" }],
+      ["an http: avatar", { name: "Alice", image: "http://example.com/a.png" }],
+      ["a whitespace-only name", { name: "   " }],
+      ["a name over 100 characters", { name: "a".repeat(101) }],
+    ])("rejects %s", async (_label, body) => {
+      const response = await signUp(body).expect(400);
+
+      expectApiError(response, "VALIDATION_ERROR");
+      expect(await db.select().from(user)).toHaveLength(0);
     });
   });
 

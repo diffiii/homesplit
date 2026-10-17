@@ -3,6 +3,7 @@ import { Injectable } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { user } from "@/db/schema";
+import { notFound } from "@/http/app-error";
 import { userSummaryColumns } from "./user-projections";
 
 @Injectable()
@@ -16,6 +17,9 @@ export class UsersService {
       .set({ name, image: imageUrl })
       .where(eq(user.id, userId))
       .returning(userSummaryColumns);
+    if (!row) {
+      throw notFound();
+    }
     return row;
   }
 }
