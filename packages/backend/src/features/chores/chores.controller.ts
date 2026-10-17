@@ -1,15 +1,16 @@
 import {
   type Chore,
   type ChoreListResponse,
-  type CreateChoreRequest,
+  CreateChoreRequest,
   endpoints,
-  type ListChoresQuery,
+  ListChoresQuery,
   UpdateChoreRequest,
 } from "@homesplit/contracts";
 import { Body, Controller, Inject, Param, Query } from "@nestjs/common";
 import type { z } from "zod";
 
 import { PatchPipe } from "@/http/patch.pipe";
+import { ZodPipe } from "@/http/zod.pipe";
 import {
   CurrentHousehold,
   HouseholdRoute,
@@ -29,10 +30,10 @@ export class ChoresController {
     this.chores = chores;
   }
 
-  @HouseholdRoute(endpoints.createChore)
+  @HouseholdRoute(endpoints.createChore, { module: "chores" })
   create(
     @CurrentHousehold() household: HouseholdContext,
-    @Body() body: CreateChoreDto
+    @Body(new ZodPipe(CreateChoreRequest)) body: CreateChoreDto
   ): Promise<Chore> {
     return this.chores.create(household.householdId, household.userId, body);
   }
@@ -40,7 +41,7 @@ export class ChoresController {
   @HouseholdRoute(endpoints.listChores)
   list(
     @CurrentHousehold() household: HouseholdContext,
-    @Query() query: ListChoresQueryDto
+    @Query(new ZodPipe(ListChoresQuery)) query: ListChoresQueryDto
   ): Promise<ChoreListResponse> {
     return this.chores.list(household.householdId, query);
   }
@@ -53,17 +54,16 @@ export class ChoresController {
     return this.chores.getById(household.householdId, choreId);
   }
 
-  @HouseholdRoute(endpoints.updateChore)
+  @HouseholdRoute(endpoints.updateChore, { module: "chores" })
   update(
     @CurrentHousehold() household: HouseholdContext,
     @Param("choreId") choreId: string,
-    @Body(new PatchPipe(UpdateChoreRequest))
-    body: UpdateChoreDto
+    @Body(new PatchPipe(UpdateChoreRequest)) body: UpdateChoreDto
   ): Promise<Chore> {
     return this.chores.update(household.householdId, choreId, body);
   }
 
-  @HouseholdRoute(endpoints.deleteChore)
+  @HouseholdRoute(endpoints.deleteChore, { module: "chores" })
   async delete(
     @CurrentHousehold() household: HouseholdContext,
     @Param("choreId") choreId: string

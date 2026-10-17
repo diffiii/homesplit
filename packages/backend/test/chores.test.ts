@@ -1,8 +1,11 @@
 import { ApiError, Chore, ChoreListResponse } from "@homesplit/contracts";
 import type { INestApplication } from "@nestjs/common";
+import { eq } from "drizzle-orm";
 import type { Response } from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { db } from "@/db";
+import { chores } from "@/db/schema";
 import { createClient, createTestApp } from "./helpers/app";
 import {
   createHousehold,
@@ -121,30 +124,48 @@ describe("chores API", () => {
     });
 
     it("hides completed chores by default and decodes includeCompleted query parameter", async () => {
-      // Create a chore
-      const createRes = await alice.client
+      // 1. Create an open chore
+      const createOpenRes = await alice.client
         .post(choresPath(household.id))
         .send({ name: "Mop floors" })
         .expect(201);
 
-      const chore = Chore.parse(createRes.body);
+      const openChore = Chore.parse(createOpenRes.body);
 
-      // Default list excludes completed (and empty if none open)
+      // 2. Create a completed chore directly
+      const createCompletedRes = await alice.client
+        .post(choresPath(household.id))
+        .send({ name: "Clean windows" })
+        .expect(201);
+
+      const completedChore = Chore.parse(createCompletedRes.body);
+
+      // Mark the second chore as completed in DB
+      await db
+        .update(chores)
+        .set({
+          isCompleted: true,
+          completedAt: new Date().toISOString(), // <-- ZMIANA Z new Date() NA .toISOString()
+          completedById: alice.id,
+        })
+        .where(eq(chores.id, completedChore.id));
+
+      // 3. Default list shows only open chores
       const listDefaultRes = await alice.client
         .get(choresPath(household.id))
         .expect(200);
 
       const defaultList = ChoreListResponse.parse(listDefaultRes.body);
       expect(defaultList.items).toHaveLength(1);
-      expect(defaultList.items[0].id).toBe(chore.id);
+      expect(defaultList.items[0].id).toBe(openChore.id);
 
-      // Query parameter with includeCompleted=true works
+      // 4. Query parameter with includeCompleted=true includes completed chores as well
       const listAllRes = await alice.client
         .get(`${choresPath(household.id)}?includeCompleted=true`)
         .expect(200);
 
       const allList = ChoreListResponse.parse(listAllRes.body);
-      expect(allList.items).toHaveLength(1);
+      expect(allList.items).toHaveLength(2);
     });
   });
 

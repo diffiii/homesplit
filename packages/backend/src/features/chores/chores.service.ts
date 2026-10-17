@@ -10,8 +10,8 @@ import { and, eq, sql } from "drizzle-orm";
 import type { z } from "zod";
 
 import { db } from "@/db";
-import { chores, householdFeatures, member, type user } from "@/db/schema";
-import { AppError, moduleDisabled, notFound } from "@/http/app-error";
+import { chores, member, type user } from "@/db/schema";
+import { AppError, notFound } from "@/http/app-error";
 
 type CreateChoreDto = z.infer<typeof CreateChoreRequest>;
 type UpdateChoreDto = z.infer<typeof UpdateChoreRequest>;
@@ -27,36 +27,25 @@ type ChoreQueryResult = typeof chores.$inferSelect & {
 
 const ISO_DATETIME_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
 
-function toIsoString(value: unknown): string | null {
-  if (!value) {
-    return null;
-  }
+function isValidIsoDateTime(val: string): boolean {
+  return ISO_DATETIME_REGEX.test(val);
+}
+
+function toIsoString(value: unknown): string {
   if (value instanceof Date) {
     return value.toISOString();
   }
   if (typeof value === "string") {
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+    if (!Number.isNaN(d.getTime())) {
+      return d.toISOString();
+    }
   }
-  return null;
-}
-
-function isValidIsoDateTime(val: string): boolean {
-  return ISO_DATETIME_REGEX.test(val);
+  throw new Error("Invalid date encountered while mapping chore");
 }
 
 @Injectable()
 export class ChoresService {
-  private async assertModuleEnabled(householdId: string): Promise<void> {
-    const row = await db.query.householdFeatures.findFirst({
-      where: eq(householdFeatures.organizationId, householdId),
-    });
-
-    if (row && !row.choresEnabled) {
-      throw moduleDisabled("chores");
-    }
-  }
-
   private async assertEligibleMember(
     householdId: string,
     userId: string
@@ -82,8 +71,6 @@ export class ChoresService {
     authorId: string,
     dto: CreateChoreDto
   ): Promise<Chore> {
-    await this.assertModuleEnabled(householdId);
-
     if (dto.dueAt && !isValidIsoDateTime(dto.dueAt)) {
       throw new AppError(
         400,
@@ -181,7 +168,6 @@ export class ChoresService {
     choreId: string,
     dto: UpdateChoreDto
   ): Promise<Chore> {
-    await this.assertModuleEnabled(householdId);
     await this.getById(householdId, choreId);
 
     if (dto.dueAt && !isValidIsoDateTime(dto.dueAt)) {
@@ -223,7 +209,6 @@ export class ChoresService {
   }
 
   async delete(householdId: string, choreId: string): Promise<void> {
-    await this.assertModuleEnabled(householdId);
     await this.getById(householdId, choreId);
 
     await db
@@ -232,11 +217,6 @@ export class ChoresService {
   }
 
   private mapToContract(chore: ChoreQueryResult): Chore {
-    const createdAtIso =
-      toIsoString(chore.createdAt) ?? new Date().toISOString();
-    const updatedAtIso =
-      toIsoString(chore.updatedAt) ?? new Date().toISOString();
-
     const base = {
       id: chore.id,
       householdId: chore.householdId,
@@ -249,32 +229,30 @@ export class ChoresService {
             imageUrl: chore.assignedTo.image ?? null,
           }
         : null,
-      dueAt: toIsoString(chore.dueAt),
+      dueAt: chore.dueAt ? toIsoString(chore.dueAt) : null,
       addedBy: {
         id: chore.addedBy.id,
         name: chore.addedBy.name,
         imageUrl: chore.addedBy.image ?? null,
       },
-      createdAt: createdAtIso,
-      updatedAt: updatedAtIso,
+      createdAt: toIsoString(chore.createdAt),
+      updatedAt: toIsoString(chore.updatedAt),
     };
 
     if (chore.isCompleted) {
+      if (!(chore.completedAt && chore.completedBy)) {
+        throw new Error("Completed chore missing completion metadata");
+      }
+
       return {
         ...base,
         isCompleted: true as const,
-        completedAt: toIsoString(chore.completedAt) ?? new Date().toISOString(),
-        completedBy: chore.completedBy
-          ? {
-              id: chore.completedBy.id,
-              name: chore.completedBy.name,
-              imageUrl: chore.completedBy.image ?? null,
-            }
-          : {
-              id: chore.addedBy.id,
-              name: chore.addedBy.name,
-              imageUrl: chore.addedBy.image ?? null,
-            },
+        completedAt: toIsoString(chore.completedAt),
+        completedBy: {
+          id: chore.completedBy.id,
+          name: chore.completedBy.name,
+          imageUrl: chore.completedBy.image ?? null,
+        },
       };
     }
 
