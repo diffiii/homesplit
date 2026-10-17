@@ -4,6 +4,7 @@ import { AppController } from "./app.controller";
 import { auth } from "./auth";
 import { closeDb } from "./db";
 import { ExpenseCategoriesModule } from "./features/expense-categories/expense-categories.module";
+import { ExpensesModule } from "./features/expenses/expenses.module";
 import { HouseholdsModule } from "./features/households/households.module";
 
 @Module({
@@ -13,6 +14,7 @@ import { HouseholdsModule } from "./features/households/households.module";
     AuthModule.forRoot({ auth, disableTrustedOriginsCors: true }),
     HouseholdsModule,
     ExpenseCategoriesModule,
+    ExpensesModule,
   ],
 })
 export class AppModule implements BeforeApplicationShutdown {

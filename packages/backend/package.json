@@ -17,22 +17,22 @@
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.7.7",
     "@homesplit/contracts": "workspace:*",
-    "@nestjs/common": "^12.1.2",
-    "@nestjs/core": "^12.1.2",
-    "@nestjs/platform-express": "^12.1.2",
+    "@nestjs/common": "^12.1.3",
+    "@nestjs/core": "^12.1.3",
+    "@nestjs/platform-express": "^12.1.3",
     "@thallesp/nestjs-better-auth": "^2.8.0",
     "better-auth": "^1.7.7",
-    "drizzle-orm": "^0.45.3",
+    "drizzle-orm": "^0.45.4",
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@nestjs/cli": "^12.0.8",
-    "@nestjs/schematics": "^12.0.6",
-    "@swc/core": "^1.16.13",
-    "@types/node": "^26.6.4",
+    "@nestjs/schematics": "^12.0.7",
+    "@swc/core": "^1.16.18",
+    "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",
     "@types/supertest": "^7.2.1",
     "auth": "^1.7.7",
@@ -40,6 +40,6 @@
     "supertest": "^7.3.1",
     "typescript": "^6.0.3",
     "unplugin-swc": "^2.0.0",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.4"
   }
 }

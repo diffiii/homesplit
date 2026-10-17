@@ -9,11 +9,12 @@ import { eq, sql } from "drizzle-orm";
 import type { Response } from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/db";
-import { expenseCategories } from "@/db/schema";
+import { expenseCategories, expenses } from "@/db/schema";
 import { assertCategoryInHousehold } from "@/features/expense-categories/category-reference";
 import { DEFAULT_CATEGORIES } from "@/features/expense-categories/default-categories";
 import type { HouseholdRole } from "@/features/households/access/roles";
 import { createClient, createTestApp } from "./helpers/app";
+import { insertExpense } from "./helpers/expenses";
 import {
   createHousehold,
   createTwoHouseholds,
@@ -22,6 +23,7 @@ import {
   type TestHousehold,
   type TestUser,
 } from "./helpers/fixtures";
+import { sendDuring } from "./helpers/locks";
 
 const categoriesPath = (householdId: string) =>
   `/api/households/${householdId}/expense-categories`;
@@ -32,6 +34,9 @@ const categoryPath = (householdId: string, categoryId: string) =>
 function expectApiError(response: Response, code: string): void {
   expect(ApiError.parse(response.body).code).toBe(code);
 }
+
+const storedExpenses = (householdId: string) =>
+  db.select().from(expenses).where(eq(expenses.householdId, householdId));
 
 const storedCategories = (householdId: string) =>
   db
@@ -312,6 +317,55 @@ describe("expense categories", () => {
       );
       await alice.client.delete(path).expect(404);
     });
+
+    it("refuses while an expense uses the category", async () => {
+      const { alice } = await createTwoHouseholds(app);
+      const category = await createCategory(alice, alice.household, {
+        name: "Pets",
+      });
+      const expenseId = await insertExpense(db, {
+        householdId: alice.household.id,
+        authorId: alice.id,
+        categoryId: category.id,
+      });
+      const path = categoryPath(alice.household.id, category.id);
+
+      const response = await alice.client.delete(path).expect(409);
+
+      expectApiError(response, "CATEGORY_IN_USE");
+      expect(await listCategories(alice, alice.household)).toContainEqual(
+        category
+      );
+
+      await db.delete(expenses).where(eq(expenses.id, expenseId));
+      await alice.client.delete(path).expect(204);
+    });
+
+    it("refuses when an expense starts using the category during the delete", async () => {
+      const { alice } = await createTwoHouseholds(app);
+      const category = await createCategory(alice, alice.household, {
+        name: "Pets",
+      });
+
+      // The expense isn't committed when the check runs, so the key rejects
+      // the delete once the expense commits, with the generic conflict.
+      const response = await sendDuring(
+        (tx) =>
+          insertExpense(tx, {
+            householdId: alice.household.id,
+            authorId: alice.id,
+            categoryId: category.id,
+          }),
+        () => alice.client.delete(categoryPath(alice.household.id, category.id))
+      );
+
+      expect(response.status).toBe(409);
+      expectApiError(response, "CONFLICT");
+      expect(await listCategories(alice, alice.household)).toContainEqual(
+        category
+      );
+      expect(await storedExpenses(alice.household.id)).toHaveLength(1);
+    });
   });
 
   describe("household ownership", () => {
@@ -358,6 +412,24 @@ describe("expense categories", () => {
 
       await alice.client.delete(`/api/households/${id}`).expect(204);
 
+      expect(await storedCategories(id)).toEqual([]);
+    });
+
+    it("deletes a household whose expenses use its categories", async () => {
+      const { alice } = await createTwoHouseholds(app);
+      const { id } = alice.household;
+      const category = await createCategory(alice, alice.household, {
+        name: "Pets",
+      });
+      await insertExpense(db, {
+        householdId: id,
+        authorId: alice.id,
+        categoryId: category.id,
+      });
+
+      await alice.client.delete(`/api/households/${id}`).expect(204);
+
+      expect(await storedExpenses(id)).toEqual([]);
       expect(await storedCategories(id)).toEqual([]);
     });
   });
