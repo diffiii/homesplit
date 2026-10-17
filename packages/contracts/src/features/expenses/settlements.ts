@@ -62,18 +62,52 @@ export const BalanceListResponse = z.object({
 });
 export type BalanceListResponse = z.infer<typeof BalanceListResponse>;
 
-/** Ledger entry recording a payment from payer to payee. */
+/** Only confirmed payments count toward balances and suggestions. */
+export const SettlementStatus = z.enum(["pending", "confirmed"]);
+export type SettlementStatus = z.infer<typeof SettlementStatus>;
+
+const SettlementBase = z.object({
+  id: Id,
+  householdId: Id,
+  payer: UserSummary,
+  payee: UserSummary,
+  createdBy: UserSummary,
+  amount: PositiveMoney,
+  note: z.string().min(1).nullable(),
+  createdAt: IsoDateTime,
+});
+
+const PendingSettlementFields = SettlementBase.extend({
+  status: z.literal("pending"),
+  confirmedBy: z.null(),
+  confirmedAt: z.null(),
+});
+
+const ConfirmedSettlementFields = SettlementBase.extend({
+  status: z.literal("confirmed"),
+  confirmedBy: UserSummary,
+  confirmedAt: IsoDateTime,
+});
+
+/** Payment recorded by its payer that nobody has confirmed yet. */
+export const PendingSettlement =
+  PendingSettlementFields.superRefine(refinePaymentUsers);
+export type PendingSettlement = z.infer<typeof PendingSettlement>;
+
+/** Payment that counts toward balances, with who confirmed it and when. */
+export const ConfirmedSettlement =
+  ConfirmedSettlementFields.superRefine(refinePaymentUsers);
+export type ConfirmedSettlement = z.infer<typeof ConfirmedSettlement>;
+
+/**
+ * Ledger entry recording a payment from payer to payee; `status` narrows the
+ * confirmation metadata.
+ */
 export const Settlement = z
-  .object({
-    id: Id,
-    householdId: Id,
-    payer: UserSummary,
-    payee: UserSummary,
-    createdBy: UserSummary,
-    amount: PositiveMoney,
-    note: z.string().min(1).nullable(),
-    createdAt: IsoDateTime,
-  })
+  .discriminatedUnion("status", [
+    PendingSettlementFields,
+    ConfirmedSettlementFields,
+  ])
   .superRefine(refinePaymentUsers);
 export type Settlement = z.infer<typeof Settlement>;
 
@@ -134,3 +168,13 @@ export type SettlementListResponse = z.infer<typeof SettlementListResponse>;
 
 /** Response for processing a settlement. */
 export type ProcessSettlementResponse = Settlement;
+
+/** Path params for settlement-scoped routes (confirm / delete). */
+export const SettlementIdParams = z.object({
+  householdId: Id,
+  settlementId: Id,
+});
+export type SettlementIdParams = z.infer<typeof SettlementIdParams>;
+
+/** Response for confirming a settlement. */
+export type ConfirmSettlementResponse = ConfirmedSettlement;

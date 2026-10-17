@@ -1,5 +1,5 @@
 {
-  "id": "4eadbfab-2d5c-4a84-a77a-465def2ab61d",
+  "id": "a87089f3-d03f-4ba5-bf3f-3c592c43eab8",
   "prevId": "359991f3-e9e8-41f6-bbd6-f0acf199cd9e",
   "version": "7",
   "dialect": "postgresql",
@@ -720,6 +720,232 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.settlements": {
+      "name": "settlements",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "household_id": {
+          "name": "household_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payer_id": {
+          "name": "payer_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payee_id": {
+          "name": "payee_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by_id": {
+          "name": "created_by_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_cents": {
+          "name": "amount_cents",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "confirmed_by_id": {
+          "name": "confirmed_by_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "confirmed_at": {
+          "name": "confirmed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "settlements_history_idx": {
+          "name": "settlements_history_idx",
+          "columns": [
+            {
+              "expression": "household_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "settlements_household_id_organization_id_fk": {
+          "name": "settlements_household_id_organization_id_fk",
+          "tableFrom": "settlements",
+          "tableTo": "organization",
+          "columnsFrom": [
+            "household_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "settlements_payer_id_user_id_fk": {
+          "name": "settlements_payer_id_user_id_fk",
+          "tableFrom": "settlements",
+          "tableTo": "user",
+          "columnsFrom": [
+            "payer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "settlements_payee_id_user_id_fk": {
+          "name": "settlements_payee_id_user_id_fk",
+          "tableFrom": "settlements",
+          "tableTo": "user",
+          "columnsFrom": [
+            "payee_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "settlements_created_by_id_user_id_fk": {
+          "name": "settlements_created_by_id_user_id_fk",
+          "tableFrom": "settlements",
+          "tableTo": "user",
+          "columnsFrom": [
+            "created_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "settlements_confirmed_by_id_user_id_fk": {
+          "name": "settlements_confirmed_by_id_user_id_fk",
+          "tableFrom": "settlements",
+          "tableTo": "user",
+          "columnsFrom": [
+            "confirmed_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "settlements_payer_party_fk": {
+          "name": "settlements_payer_party_fk",
+          "tableFrom": "settlements",
+          "tableTo": "household_membership_history",
+          "columnsFrom": [
+            "household_id",
+            "payer_id"
+          ],
+          "columnsTo": [
+            "organization_id",
+            "user_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "settlements_payee_party_fk": {
+          "name": "settlements_payee_party_fk",
+          "tableFrom": "settlements",
+          "tableTo": "household_membership_history",
+          "columnsFrom": [
+            "household_id",
+            "payee_id"
+          ],
+          "columnsTo": [
+            "organization_id",
+            "user_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "settlements_distinct_parties": {
+          "name": "settlements_distinct_parties",
+          "value": "\"settlements\".\"payer_id\" <> \"settlements\".\"payee_id\""
+        },
+        "settlements_amount_positive": {
+          "name": "settlements_amount_positive",
+          "value": "\"settlements\".\"amount_cents\" > 0"
+        },
+        "settlements_currency_code": {
+          "name": "settlements_currency_code",
+          "value": "\"settlements\".\"currency\" ~ '^[A-Z]{3}$'"
+        },
+        "settlements_note_not_empty": {
+          "name": "settlements_note_not_empty",
+          "value": "\"settlements\".\"note\" <> ''"
+        },
+        "settlements_confirmation": {
+          "name": "settlements_confirmation",
+          "value": "(\"settlements\".\"confirmed_by_id\" IS NULL) = (\"settlements\".\"confirmed_at\" IS NULL)"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.household_features": {
       "name": "household_features",
       "schema": "",
@@ -835,194 +1061,6 @@
           ]
         }
       },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.chores": {
-      "name": "chores",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "household_id": {
-          "name": "household_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "assigned_to_id": {
-          "name": "assigned_to_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "due_at": {
-          "name": "due_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "added_by_id": {
-          "name": "added_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "is_completed": {
-          "name": "is_completed",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "completed_at": {
-          "name": "completed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "completed_by_id": {
-          "name": "completed_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "chores_householdId_idx": {
-          "name": "chores_householdId_idx",
-          "columns": [
-            {
-              "expression": "household_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "chores_assignedToId_idx": {
-          "name": "chores_assignedToId_idx",
-          "columns": [
-            {
-              "expression": "assigned_to_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "chores_addedById_idx": {
-          "name": "chores_addedById_idx",
-          "columns": [
-            {
-              "expression": "added_by_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "chores_household_id_organization_id_fk": {
-          "name": "chores_household_id_organization_id_fk",
-          "tableFrom": "chores",
-          "tableTo": "organization",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "chores_assigned_to_id_user_id_fk": {
-          "name": "chores_assigned_to_id_user_id_fk",
-          "tableFrom": "chores",
-          "tableTo": "user",
-          "columnsFrom": [
-            "assigned_to_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "chores_added_by_id_user_id_fk": {
-          "name": "chores_added_by_id_user_id_fk",
-          "tableFrom": "chores",
-          "tableTo": "user",
-          "columnsFrom": [
-            "added_by_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "chores_completed_by_id_user_id_fk": {
-          "name": "chores_completed_by_id_user_id_fk",
-          "tableFrom": "chores",
-          "tableTo": "user",
-          "columnsFrom": [
-            "completed_by_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
