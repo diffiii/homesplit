@@ -7,10 +7,10 @@ import {
   SettlementListResponse,
 } from "@homesplit/contracts";
 import type { INestApplication } from "@nestjs/common";
-import { eq, sql } from "drizzle-orm";
-import type { Response, Test } from "supertest";
+import { eq } from "drizzle-orm";
+import type { Response } from "supertest";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { db, type Transaction } from "@/db";
+import { db } from "@/db";
 import { organization, settlements } from "@/db/schema";
 import { SettlementsService } from "@/features/expenses/settlements/settlements.service";
 import { createClient, createTestApp } from "./helpers/app";
@@ -22,6 +22,7 @@ import {
   type TestHousehold,
   type TestUser,
 } from "./helpers/fixtures";
+import { sendDuring } from "./helpers/locks";
 
 const settlementsPath = (householdId: string) =>
   `/api/households/${householdId}/settlements`;
@@ -46,34 +47,6 @@ function expectApiError(response: Response, code: string): ApiError {
 
 const storedSettlements = (householdId: string) =>
   db.select().from(settlements).where(eq(settlements.householdId, householdId));
-
-/**
- * Sends a request while a transaction holds the locks `hold` took, and commits
- * once the request waits on them.
- */
-async function sendDuring(
-  hold: (tx: Transaction) => Promise<unknown>,
-  send: () => Test
-): Promise<Response> {
-  // Wrapped in an object, so the transaction commits without awaiting it.
-  const { request } = await db.transaction(async (tx) => {
-    await hold(tx);
-    // `then` sends the request.
-    const sent = send().then((response) => response);
-    await vi.waitFor(
-      async () => {
-        const { rows } = await db.execute(sql`
-          SELECT 1 FROM pg_stat_activity
-          WHERE datname = current_database() AND wait_event_type = 'Lock'
-        `);
-        expect(rows).not.toEqual([]);
-      },
-      { interval: 20, timeout: 3000 }
-    );
-    return { request: sent };
-  });
-  return request;
-}
 
 describe("settlements", () => {
   let app: INestApplication;

@@ -7,8 +7,8 @@ import type {
 import { Injectable } from "@nestjs/common";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { expenseCategories } from "@/db/schema";
-import { notFound } from "@/http/app-error";
+import { expenseCategories, expenses } from "@/db/schema";
+import { AppError, notFound } from "@/http/app-error";
 
 const inHousehold = (householdId: string, categoryId: string) =>
   and(
@@ -57,8 +57,30 @@ export class ExpenseCategoriesService {
     return row;
   }
 
+  /**
+   * Refuses while any expense uses the category. An expense committed after
+   * the check makes `expenses_category_fk` reject the delete, which answers
+   * the generic 409 `CONFLICT`.
+   */
   async delete(householdId: string, categoryId: string): Promise<void> {
-    // TODO: #37 answer 409 CATEGORY_IN_USE while an expense uses the category
+    const [used] = await db
+      .select({ id: expenses.id })
+      .from(expenses)
+      .where(
+        and(
+          eq(expenses.householdId, householdId),
+          eq(expenses.categoryId, categoryId)
+        )
+      )
+      .limit(1);
+    if (used) {
+      throw new AppError(
+        409,
+        "CATEGORY_IN_USE",
+        "An expense uses this category"
+      );
+    }
+
     const deleted = await db
       .delete(expenseCategories)
       .where(inHousehold(householdId, categoryId))

@@ -1,6 +1,6 @@
 # Expenses API
 
-Module flag: `expenses` · Tasks: #35, #40 · Contracts: [expenses](../../packages/contracts/src/features/expenses/index.ts), [categories](../../packages/contracts/src/features/expenses/categories.ts), [settlements](../../packages/contracts/src/features/expenses/settlements.ts)
+Module flag: `expenses` · Tasks: #35, #37, #40 · Contracts: [expenses](../../packages/contracts/src/features/expenses/index.ts), [categories](../../packages/contracts/src/features/expenses/categories.ts), [settlements](../../packages/contracts/src/features/expenses/settlements.ts)
 
 ## Routes
 
@@ -28,7 +28,8 @@ In the settlement rows, a party is the payer or the payee, as in the [permission
 - References and eligibility: none in these routes. Routes that take a `categoryId` in the body call `assertCategoryInHousehold(executor, householdId, categoryId, path?)` from `packages/backend/src/features/expense-categories/category-reference.ts`. A missing category and another household's both answer 400 `INVALID_REFERENCE`, with `path` (default `["categoryId"]`) in `details.issues`.
 - Ordering: categories are listed by name ascending, ignoring case, then by `id`. The list is unpaginated.
 - Default categories: a new household starts with Groceries 🛒, Utilities 💡, Rent 🏠, Transport 🚗, Dining out 🍽️, Entertainment 🎬, and Other 📦. They're ordinary rows that an admin+ can rename or delete. Households that existed before #35 get none.
-- Repeated and concurrent requests: `POST` isn't idempotent, so a repeat creates a second category. A repeated `DELETE` answers 404. #37 adds the check that keeps a category in use from being deleted.
+- Categories in use: deleting a category that any expense uses answers 409 `CATEGORY_IN_USE`, and the category stays. The service checks for such an expense first. An expense committed after that check makes `expenses_category_fk` reject the delete, which answers the generic 409 `CONFLICT`. Deleting the household still deletes both.
+- Repeated and concurrent requests: `POST` isn't idempotent, so a repeat creates a second category. A repeated `DELETE` answers 404.
 
 #### Seeding default categories
 
@@ -96,7 +97,7 @@ Shared errors from [the decision record](../decisions.md#errors) apply. Feature 
 | 400 | `INVALID_REFERENCE` | A `categoryId` in a request body isn't a category of this household (#37). |
 | 400 | `INVALID_REFERENCE` | `payerId` or `payeeId` has never been a member of this household. `details.issues` has one entry per failing field. |
 | 403 | `FORBIDDEN` | Recording a payment between two other users, or deleting one, without being admin+. Confirming a payment as its payer, or as a member who isn't its payee. |
-| 409 | `CATEGORY_IN_USE` | Deleting a category that an expense uses (#37). |
+| 409 | `CATEGORY_IN_USE` | Deleting a category that an expense uses. |
 | 409 | `SETTLEMENT_CONFIRMED` | Deleting a confirmed payment. |
 
 ## Storage
@@ -110,9 +111,58 @@ Shared errors from [the decision record](../decisions.md#errors) apply. Feature 
 | `name` | `text`, not null |
 | `icon` | `text`, nullable; a single emoji |
 
-- `expense_categories_household_id_idx` indexes `household_id` for the list.
+- `expense_categories_household_id_id_key`, unique on (`household_id`, `id`), serves the list and is the target of `expenses_category_fk`.
 - The emoji rule is enforced by the contract schema, not by a database constraint.
 - Deleting a household deletes its categories.
+
+`expenses`:
+
+| Column | Definition |
+| --- | --- |
+| `id` | `uuid`, PK, default `gen_random_uuid()` |
+| `household_id` | `uuid`, not null, FK to `organization.id`, `ON DELETE CASCADE` |
+| `name` | `text`, not null |
+| `description` | `text`, nullable |
+| `total_amount_cents` | `bigint`, not null |
+| `currency` | `text`, not null; every child row's amounts are in it |
+| `allocation_method` | `text`, not null: `equal`, `percentage`, `shares`, `exact`, or `adjustment` |
+| `author_id` | `uuid`, not null, FK to `user.id`, `ON DELETE RESTRICT` |
+| `category_id` | `uuid`, nullable |
+| `expense_date` | `date`, not null |
+| `created_at` | `timestamptz`, not null, default `now()` |
+| `updated_at` | `timestamptz`, not null, default `now()` |
+
+- `expenses_category_fk` references `expense_categories` (`household_id`, `id`) from (`household_id`, `category_id`), `ON DELETE RESTRICT`, so a category from another household can't be stored and one in use can't be deleted. A null `category_id` isn't checked.
+- `expenses_author_party_fk` references `household_membership_history` from (`household_id`, `author_id`).
+- Checks: `expenses_total_amount_positive` (`total_amount_cents > 0`), `expenses_currency_code` (three capital letters), `expenses_allocation_method`, `expenses_name_not_empty`, and `expenses_description_not_empty`. The amount limit and the list of supported currencies are enforced by the contract schema only.
+- Unique keys on (`id`, `household_id`) and (`id`, `household_id`, `allocation_method`) are targets for the child rows' composite keys.
+- Indexes: `expenses_list_idx` on (`household_id`, `expense_date`, `created_at`, `id`) serves the list, read backward; `expenses_category_idx` on (`household_id`, `category_id`) serves the in-use check; `expenses_currency_idx` on (`household_id`, `currency`) serves per-currency accounting.
+
+`expense_payers`, `expense_allocation_participants`, and `expense_splits` share these columns and keys:
+
+| Column | Definition |
+| --- | --- |
+| `expense_id` | `uuid`, not null |
+| `household_id` | `uuid`, not null, FK to `organization.id`, `ON DELETE CASCADE` |
+| `user_id` | `uuid`, not null, FK to `user.id`, `ON DELETE RESTRICT` |
+
+- PK (`expense_id`, `user_id`), so a user appears once per table and expense. Reads order child rows by `user_id`, which the key serves; the order the client sent isn't stored. Amounts don't depend on it, because the allocation engine breaks rounding ties by user ID.
+- `<table>_expense_fk` references `expenses` (`id`, `household_id`) from (`expense_id`, `household_id`), `ON DELETE CASCADE`, so a child row stays in its expense's household and is deleted with it.
+- `<table>_party_fk` references `household_membership_history` from (`household_id`, `user_id`), so a user from another household can't be stored. Whether the user is a current member is checked by the service, not the key.
+- `household_id` also cascades from `organization` directly. If child rows were deleted only through their expense, they'd still exist when the household's cascade deletes the membership history, and `<table>_party_fk` would reject the household's deletion.
+- No child row stores a currency; amounts are in the expense's `currency`.
+
+Each table adds:
+
+| Table | Columns | Checks |
+| --- | --- | --- |
+| `expense_payers` | `amount_cents bigint` not null | `> 0` |
+| `expense_allocation_participants` | `allocation_method text` not null; `value bigint` nullable: basis points, shares, exact amount in cents, or adjustment in cents, by method | `expense_allocation_participants_value`: `equal` has no value; `percentage` 1 to 10,000; `shares > 0`; `exact >= 0`; `adjustment` set, any sign |
+| `expense_splits` | `amount_cents bigint` not null | `>= 0` |
+
+- Participants repeat the expense's `allocation_method` so the check can see it. `expense_allocation_participants_method_fk` references `expenses` (`id`, `household_id`, `allocation_method`) with `ON UPDATE CASCADE`, so changing an expense's method without replacing its participants fails their check. Reads map `value` to the contract field for the method: `basisPoints`, `shares`, `amountCents`, or `adjustmentCents`.
+- `expense_payers_member_idx` and `expense_splits_member_idx` on (`household_id`, `user_id`) serve per-member accounting.
+- Splits are calculated by the server and never accepted from clients.
 
 `settlements`:
 

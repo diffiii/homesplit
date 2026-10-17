@@ -17,7 +17,8 @@ interface ErrorReply {
   status: number;
 }
 
-const CONFLICT_CODES = new Set(["23505", "23503"]);
+// unique_violation, foreign_key_violation, and restrict_violation (`ON DELETE RESTRICT`).
+const CONFLICT_CODES = new Set(["23505", "23503", "23001"]);
 
 const CLIENT_ERRORS = new Map([
   [400, { code: "VALIDATION_ERROR", message: "Invalid request" }],
