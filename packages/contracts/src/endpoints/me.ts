@@ -1,3 +1,4 @@
+import { UserBalanceListResponse } from "../features/expenses";
 import {
   CreateFriendRequest,
   FriendRequest,
@@ -21,6 +22,12 @@ export const meEndpoints = {
     body: UpdateProfileRequest,
     status: 200,
     response: UserSummary,
+  },
+  listMyBalances: {
+    method: "GET",
+    path: `${ME}/balances`,
+    status: 200,
+    response: UserBalanceListResponse,
   },
   listFriendships: {
     method: "GET",

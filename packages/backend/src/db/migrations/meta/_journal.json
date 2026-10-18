@@ -57,6 +57,13 @@
       "when": 1792079703164,
       "tag": "0007_expenses",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792342065343,
+      "tag": "0008_settlement_party_indexes",
+      "breakpoints": true
     }
   ]
 }
