@@ -8,6 +8,8 @@ import {
 } from "@homesplit/contracts";
 import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { db } from "@/db";
+import { settlements } from "@/db/schema";
 import { createClient, createTestApp } from "./helpers/app";
 import {
   createHousehold,
@@ -413,14 +415,21 @@ describe("balances", () => {
 
     it("stays readable while the expenses module is off", async () => {
       const { alice, carol, household } = await setup();
-      await spend(alice, household, {
-        payers: [[alice, 1000]],
-        participants: [alice, carol],
-      });
+      // `expenses` only turns off while the household is settled up.
       await alice.client
         .patch(`${householdPath(household)}/features`)
         .send({ expenses: false })
         .expect(200);
+      await db.insert(settlements).values({
+        householdId: household.id,
+        payerId: alice.id,
+        payeeId: carol.id,
+        createdById: carol.id,
+        amountCents: 500n,
+        currency: "PLN",
+        confirmedById: carol.id,
+        confirmedAt: new Date(),
+      });
 
       expect(byName(await balances(carol, household))).toEqual({
         PLN: { Alice: 500, Dave: 0, Carol: -500 },
