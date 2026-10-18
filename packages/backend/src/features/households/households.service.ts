@@ -6,6 +6,7 @@ import { Injectable } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { householdFeatures, organization } from "@/db/schema";
+import { assertHouseholdSettledUp } from "@/features/expenses/household-ledger-lock";
 import { notFound } from "@/http/app-error";
 import {
   patchToFeatureSet,
@@ -28,37 +29,31 @@ export class HouseholdsService {
     return rowToHouseholdFeatures(row);
   }
 
-  async updateFeatures(
+  updateFeatures(
     householdId: string,
     patch: UpdateHouseholdFeaturesRequest
   ): Promise<HouseholdFeatures> {
     const set = patchToFeatureSet(patch);
-    const [row] = await db
-      .update(householdFeatures)
-      .set(set)
-      .where(eq(householdFeatures.organizationId, householdId))
-      .returning();
-    if (!row) {
-      throw notFound();
-    }
-    // TODO: #40 reject turning off expenses while balances are non-zero
-
-    return rowToHouseholdFeatures(row);
+    return db.transaction(async (tx) => {
+      // Members can always settle up, so `expenses` stays on until they have.
+      if (patch.expenses === false) {
+        await assertHouseholdSettledUp(tx, householdId);
+      }
+      const [row] = await tx
+        .update(householdFeatures)
+        .set(set)
+        .where(eq(householdFeatures.organizationId, householdId))
+        .returning();
+      if (!row) {
+        throw notFound();
+      }
+      return rowToHouseholdFeatures(row);
+    });
   }
 
   async deleteHousehold(householdId: string): Promise<void> {
     await db.transaction(async (tx) => {
-      const [locked] = await tx
-        .select({ id: organization.id })
-        .from(organization)
-        .where(eq(organization.id, householdId))
-        .for("update");
-      if (!locked) {
-        throw notFound();
-      }
-
-      // TODO: later we should check balances before deleting the household
-
+      await assertHouseholdSettledUp(tx, householdId);
       await tx.delete(organization).where(eq(organization.id, householdId));
     });
   }

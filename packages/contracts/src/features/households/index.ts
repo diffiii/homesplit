@@ -9,6 +9,13 @@ export const HouseholdIdParams = z.object({
 });
 export type HouseholdIdParams = z.infer<typeof HouseholdIdParams>;
 
+/** Compact household shape for lists that span several households. */
+export const HouseholdSummary = z.object({
+  id: Id,
+  name: z.string().min(1),
+});
+export type HouseholdSummary = z.infer<typeof HouseholdSummary>;
+
 /** Per-household feature toggles; all three default to enabled at persistence time. */
 export const HouseholdFeatures = z.object(
   Object.fromEntries(FEATURE_IDS.map((id) => [id, z.boolean()])) as {

@@ -1,6 +1,6 @@
 # Expenses API
 
-Module flag: `expenses` · Tasks: #35, #37, #38, #40 · Contracts: [expenses](../../packages/contracts/src/features/expenses/index.ts), [categories](../../packages/contracts/src/features/expenses/categories.ts), [settlements](../../packages/contracts/src/features/expenses/settlements.ts)
+Module flag: `expenses` · Tasks: #35, #37, #38, #40, #41 · Contracts: [expenses](../../packages/contracts/src/features/expenses/index.ts), [categories](../../packages/contracts/src/features/expenses/categories.ts), [settlements](../../packages/contracts/src/features/expenses/settlements.ts)
 
 ## Routes
 
@@ -19,6 +19,8 @@ Module flag: `expenses` · Tasks: #35, #37, #38, #40 · Contracts: [expenses](..
 | POST | `/api/households/:householdId/settlements` | `HouseholdIdParams`, `ProcessSettlementRequest` | `Settlement` | 201 | party or admin+ |
 | POST | `/api/households/:householdId/settlements/:settlementId/confirm` | `SettlementIdParams` | `ConfirmedSettlement` | 200 | payee, or admin+ who isn't the payer |
 | DELETE | `/api/households/:householdId/settlements/:settlementId` | `SettlementIdParams` | none | 204 | pending only: party or admin+ |
+| GET | `/api/households/:householdId/balances` | `HouseholdIdParams` | `BalanceListResponse` | 200 | all |
+| GET | `/api/me/balances` | none | `UserBalanceListResponse` | 200 | any signed-in user, for themselves |
 
 In the settlement rows, a party is the payer or the payee, as in the [permission matrix](../decisions.md#roles-and-permissions). Every current member passes the route-level check, and the service checks the party rule, answering 403 `FORBIDDEN`.
 
@@ -113,7 +115,7 @@ Payments aren't checked against balances. A payment may be larger than what the 
 - A balance changes whenever an expense is added, edited, or deleted. A limit would reject a real payment because of an expense somebody hasn't entered yet, or accept one that a later edit turns into an overpayment anyway.
 - [Writing off a debt by splitting it](../decisions.md#writing-off-debts) records payments from the debtor to members the debtor doesn't owe.
 
-So #41 has no balance-based restriction to implement.
+So #41 has no balance-based restriction to implement; a balances test checks that an overpayment is accepted and turns into a debt the other way.
 
 #### Repeated requests
 
@@ -140,6 +142,38 @@ Every transaction that writes a payment first locks the household's `organizatio
 Confirming and deleting also lock the payment's row `FOR UPDATE`. When both arrive together, the second one sees the first one's result: a confirmation after a deletion answers 404, and a deletion after a confirmation answers 409.
 
 A page of the history and its `totalItems` are read in one read-only `REPEATABLE READ` transaction (`readSnapshot` in `packages/backend/src/db/index.ts`).
+
+### Balances
+
+Balances are computed on every request from the stored payers, splits, and confirmed payments. There's no cache table.
+
+- Formula: for each user and currency, balance = paid on expenses − allocated shares (splits) + payments sent − payments received. Positive means the user is owed money. Pending payments don't count. Currencies are never converted or netted.
+- Zero sum: within a currency, payers and splits of each expense both add up to its total, and each payment adds its amount to one party and subtracts it from the other, so every currency's balances add up to zero.
+- Expense edits and deletions: balances follow whatever is stored at the time of the request. A deleted expense stops counting, and payments, which reference no expense, keep counting on their own.
+- Settled-up checks: deleting a household, turning off `expenses`, and leaving require zero balances; see [Settled-up checks](households.md#settled-up-checks).
+
+#### `GET /balances`
+
+- Currencies: a currency is listed only while some balance in it isn't zero. A household without expenses or payments, or one that's settled up, answers `{ items: [] }`.
+- Members: each listed currency has every current member, at zero if their balance in it is zero, and every [departed member](../decisions.md#departed-members) whose balance in it isn't zero.
+- Ordering: currencies by code ascending; within a currency, `amountCents` descending (creditors first), then user ID ascending.
+- Disabled module: the route keeps working.
+
+#### `GET /api/me/balances`
+
+The session user's own balances in every household where they're a current member, in one request and one query. Clients use it for a cross-household summary instead of calling `GET /balances` once per household.
+
+- Households: only those the user is a current member of. A household they've left doesn't appear, since departed members have no access, even if they still owe or are owed money there. The module flag doesn't matter.
+- Currencies: each entry's `households` lists the households where the user's balance in that currency isn't zero, and `amountCents` is their sum, which may be zero when the user is owed in one household and owes in another. A currency with no such household isn't listed, so a user who is settled everywhere gets `{ items: [] }`.
+- Ordering: currencies by code ascending; within a currency, `amountCents` descending, then household ID ascending.
+
+#### Querying
+
+`packages/backend/src/features/expenses/balances/balances.repository.ts` builds both queries from one ledger: a `UNION ALL` of four branches, payers (+), splits (−), confirmed payments by their payer (+), and by their payee (−), summed by currency and user, or by currency and household. Each child table is its own branch, joined only to its expense for the currency, so a payer row never multiplies a split row. `GET /balances` filters every branch by household, and `GET /api/me/balances` by the user's own rows in the households listed in `member` for them. The filter goes into each branch rather than around the union: around it, `user_id` alone can't seek the (`household_id`, `user_id`) indexes. Users and households are joined after summing, so each is looked up once.
+
+- `GET /balances` reads the sums and the current members in one read-only `REPEATABLE READ` transaction (`readSnapshot`), so both see the same snapshot. `GET /api/me/balances` is a single statement.
+- Sums arrive as strings and go through `toSafeInteger`. A user's total across households is summed as `bigint` first.
+- Indexes: the household scope uses `expense_payers_member_idx` and `expense_splits_member_idx` on their `household_id` prefix, any `expenses` index on `household_id`, and `settlements_history_idx`. The user scope looks up `member` by `user_id` and then seeks (`household_id`, `user_id`) in the child tables and (`household_id`, `payer_id`) or (`household_id`, `payee_id`) in `settlements`. With 2,000 households of 5 members, 100 expenses and 520 payments each, and 505,000 users, `GET /balances` ran in about 3.5 ms and `GET /api/me/balances` in about 1.3 ms, using only index scans. The cost grows with the ledger rows read: a household's whole ledger, or the user's own rows in their households.
 
 ## Errors
 
@@ -239,5 +273,6 @@ Each table adds:
 - There's no status column. A payment is pending while `confirmed_at` is null, and `settlements_confirmation` keeps `confirmed_by_id` and `confirmed_at` either both null or both set.
 - `settlements_payer_party_fk` and `settlements_payee_party_fk` reference `household_membership_history` (`organization_id`, `user_id`) from (`household_id`, `payer_id`) and (`household_id`, `payee_id`), so a party from another household can't be stored.
 - Checks: `settlements_distinct_parties` (`payer_id <> payee_id`), `settlements_amount_positive` (`amount_cents > 0`), `settlements_currency_code` (three capital letters), and `settlements_note_not_empty`. The amount limit and the list of supported currencies are enforced by the contract schema only.
-- `settlements_history_idx` on (`household_id`, `created_at`, `id`) serves the history, read backward.
+- `settlements_history_idx` on (`household_id`, `created_at`, `id`) serves the history, read backward, and the household's payments in balances.
+- `settlements_payer_idx` on (`household_id`, `payer_id`) and `settlements_payee_idx` on (`household_id`, `payee_id`) serve one party's payments, as in `GET /api/me/balances`, and the referencing side of the two party keys.
 - Deleting a household deletes its payments.
