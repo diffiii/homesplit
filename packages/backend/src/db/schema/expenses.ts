@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
   bigint,
@@ -297,3 +297,43 @@ export const expenseSplits = pgTable(
     index("expense_splits_member_idx").on(table.householdId, table.userId),
   ]
 );
+
+// Relations for `db.query`, which reads an expense with its child rows in one
+// query. They don't change the database.
+
+export const expensesRelations = relations(expenses, ({ one, many }) => ({
+  author: one(user, { fields: [expenses.authorId], references: [user.id] }),
+  category: one(expenseCategories, {
+    fields: [expenses.categoryId],
+    references: [expenseCategories.id],
+  }),
+  payers: many(expensePayers),
+  participants: many(expenseAllocationParticipants),
+  splits: many(expenseSplits),
+}));
+
+export const expensePayersRelations = relations(expensePayers, ({ one }) => ({
+  expense: one(expenses, {
+    fields: [expensePayers.expenseId],
+    references: [expenses.id],
+  }),
+  user: one(user, { fields: [expensePayers.userId], references: [user.id] }),
+}));
+
+export const expenseAllocationParticipantsRelations = relations(
+  expenseAllocationParticipants,
+  ({ one }) => ({
+    expense: one(expenses, {
+      fields: [expenseAllocationParticipants.expenseId],
+      references: [expenses.id],
+    }),
+  })
+);
+
+export const expenseSplitsRelations = relations(expenseSplits, ({ one }) => ({
+  expense: one(expenses, {
+    fields: [expenseSplits.expenseId],
+    references: [expenses.id],
+  }),
+  user: one(user, { fields: [expenseSplits.userId], references: [user.id] }),
+}));
