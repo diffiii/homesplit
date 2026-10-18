@@ -150,6 +150,7 @@ Balances are computed on every request from the stored payers, splits, and confi
 - Formula: for each user and currency, balance = paid on expenses − allocated shares (splits) + payments sent − payments received. Positive means the user is owed money. Pending payments don't count. Currencies are never converted or netted.
 - Zero sum: within a currency, payers and splits of each expense both add up to its total, and each payment adds its amount to one party and subtracts it from the other, so every currency's balances add up to zero.
 - Expense edits and deletions: balances follow whatever is stored at the time of the request. A deleted expense stops counting, and payments, which reference no expense, keep counting on their own.
+- Settled-up checks: deleting a household, turning off `expenses`, and leaving require zero balances; see [Settled-up checks](households.md#settled-up-checks).
 
 #### `GET /balances`
 

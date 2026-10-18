@@ -154,6 +154,30 @@ export function userBalances(executor: Executor, userId: string) {
     .orderBy(sums.currency, desc(sums.amountCents), organization.id);
 }
 
+/**
+ * Whether any balance in the household isn't zero, or, with `userId`, any of
+ * that user's balances in it.
+ */
+export async function hasUnsettledBalances(
+  executor: Executor,
+  householdId: string,
+  userId?: string
+): Promise<boolean> {
+  const rows = ledger((household, party) =>
+    and(
+      eq(household, householdId),
+      userId === undefined ? undefined : eq(party, userId)
+    )
+  );
+  const unsettled = await executor
+    .select({ currency: rows.currency })
+    .from(rows)
+    .groupBy(rows.currency, rows.userId)
+    .having(sql`sum(${rows.amountCents}) <> 0`)
+    .limit(1);
+  return unsettled.length > 0;
+}
+
 /** The household's current members, as `UserSummary`s. */
 export function currentMembers(executor: Executor, householdId: string) {
   return executor
