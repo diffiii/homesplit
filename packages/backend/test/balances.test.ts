@@ -4,6 +4,7 @@ import {
   Expense,
   Settlement,
   SettlementListResponse,
+  SettlementSuggestionListResponse,
   UserBalanceListResponse,
 } from "@homesplit/contracts";
 import type { INestApplication } from "@nestjs/common";
@@ -129,6 +130,16 @@ describe("balances", () => {
       );
     }
     return parsed;
+  }
+
+  async function suggestions(
+    reader: TestUser,
+    household: TestHousehold
+  ): Promise<SettlementSuggestionListResponse> {
+    const response = await reader.client
+      .get(`${householdPath(household)}/settlement-suggestions`)
+      .expect(200);
+    return SettlementSuggestionListResponse.parse(response.body);
   }
 
   async function myBalances(
@@ -457,6 +468,177 @@ describe("balances", () => {
       });
 
       expect(await balances(bob, bob.household)).toEqual({ items: [] });
+    });
+  });
+
+  describe("suggestions", () => {
+    /** Suggestions by currency, as `payer->payee:amount` with names. */
+    const compact = ({ items }: SettlementSuggestionListResponse) =>
+      Object.fromEntries(
+        items.map(({ currency, suggestions: group }) => [
+          currency,
+          group.map(
+            ({ payer, payee, amountCents }) =>
+              `${payer.name}->${payee.name}:${amountCents}`
+          ),
+        ])
+      );
+
+    it("suggests transfers that settle every currency once recorded", async () => {
+      const { alice, carol, dave, household } = await setup();
+      await spend(alice, household, {
+        payers: [
+          [alice, 6000],
+          [carol, 3000],
+        ],
+        participants: [alice, carol, dave],
+      });
+      await spend(dave, household, {
+        payers: [[dave, 900]],
+        participants: [alice, carol, dave],
+        currency: "EUR",
+      });
+      const users = new Map(
+        [alice, carol, dave].map((member) => [member.id, member])
+      );
+
+      const result = await suggestions(carol, household);
+
+      expect(result).toEqual({
+        items: [
+          {
+            currency: "EUR",
+            suggestions: [
+              {
+                payer: { id: alice.id, name: "Alice", imageUrl: null },
+                payee: { id: dave.id, name: "Dave", imageUrl: null },
+                amountCents: 300,
+              },
+              {
+                payer: { id: carol.id, name: "Carol", imageUrl: null },
+                payee: { id: dave.id, name: "Dave", imageUrl: null },
+                amountCents: 300,
+              },
+            ].sort((a, b) => (a.payer.id < b.payer.id ? -1 : 1)),
+          },
+          {
+            currency: "PLN",
+            suggestions: [
+              {
+                payer: { id: dave.id, name: "Dave", imageUrl: null },
+                payee: { id: alice.id, name: "Alice", imageUrl: null },
+                amountCents: 3000,
+              },
+            ],
+          },
+        ],
+      });
+
+      await Promise.all(
+        result.items.flatMap(({ currency, suggestions: group }) =>
+          group.map(({ payer, payee, amountCents }) => {
+            const recorder = users.get(payee.id);
+            const debtor = users.get(payer.id);
+            if (!(recorder && debtor)) {
+              throw new Error("Suggested a user outside the household");
+            }
+            return pay(recorder, household, debtor, amountCents, currency);
+          })
+        )
+      );
+
+      expect(await balances(alice, household)).toEqual({ items: [] });
+      expect(await suggestions(alice, household)).toEqual({ items: [] });
+    });
+
+    it("lists nothing for a household without expenses or payments", async () => {
+      const { alice, household } = await setup();
+
+      expect(await suggestions(alice, household)).toEqual({ items: [] });
+    });
+
+    it("answers the same on every request", async () => {
+      const { alice, carol, dave, household } = await setup();
+      const erin = await createUser(app, "Erin");
+      await inviteAndAccept(alice, household, erin);
+      await spend(alice, household, {
+        payers: [
+          [alice, 1200],
+          [carol, 800],
+        ],
+        participants: [alice, carol, dave, erin],
+      });
+
+      const first = await suggestions(alice, household);
+
+      expect(compact(first).PLN).toHaveLength(3);
+      expect(await suggestions(dave, household)).toEqual(first);
+      expect(await suggestions(erin, household)).toEqual(first);
+    });
+
+    it("includes departed members, whose payments can still be recorded", async () => {
+      const { alice, carol, dave, household } = await setup();
+      await spend(alice, household, {
+        payers: [[alice, 900]],
+        participants: [alice, carol, dave],
+      });
+      await removeMember(alice, household, dave);
+
+      const result = await suggestions(carol, household);
+      const [{ suggestions: group }] = result.items;
+
+      expect(compact(result)).toEqual({
+        PLN: [carol.id, dave.id]
+          .sort()
+          .map((id) => `${id === carol.id ? "Carol" : "Dave"}->Alice:300`),
+      });
+      // Alice, an owner, records each one, so both are confirmed at once.
+      await Promise.all(
+        group.map(({ payer, payee, amountCents }) =>
+          alice.client
+            .post(`${householdPath(household)}/settlements`)
+            .send({
+              payerId: payer.id,
+              payeeId: payee.id,
+              amount: { amountCents, currency: "PLN" },
+            })
+            .expect(201)
+        )
+      );
+
+      expect(await suggestions(carol, household)).toEqual({ items: [] });
+    });
+
+    it("stays readable while the expenses module is off", async () => {
+      const { alice, carol, household } = await setup();
+      await alice.client
+        .patch(`${householdPath(household)}/features`)
+        .send({ expenses: false })
+        .expect(200);
+      await db.insert(settlements).values({
+        householdId: household.id,
+        payerId: alice.id,
+        payeeId: carol.id,
+        createdById: carol.id,
+        amountCents: 500n,
+        currency: "PLN",
+        confirmedById: carol.id,
+        confirmedAt: new Date(),
+      });
+
+      expect(compact(await suggestions(carol, household))).toEqual({
+        PLN: ["Carol->Alice:500"],
+      });
+    });
+
+    it("answers 401 without a session and 404 to non-members", async () => {
+      const { alice, bob, carol, household } = await setup();
+      await removeMember(alice, household, carol);
+      const path = `${householdPath(household)}/settlement-suggestions`;
+
+      await createClient(app).get(path).expect(401);
+      await bob.client.get(path).expect(404);
+      await carol.client.get(path).expect(404);
     });
   });
 

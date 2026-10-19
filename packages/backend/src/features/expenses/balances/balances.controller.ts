@@ -1,6 +1,7 @@
 import {
   type BalanceListResponse,
   endpoints,
+  type SettlementSuggestionListResponse,
   type UserBalanceListResponse,
 } from "@homesplit/contracts";
 import { Controller, Inject } from "@nestjs/common";
@@ -26,6 +27,13 @@ export class BalancesController {
     @CurrentHousehold() household: HouseholdContext
   ): Promise<BalanceListResponse> {
     return this.balances.listForHousehold(household.householdId);
+  }
+
+  @HouseholdRoute(endpoints.listSettlementSuggestions)
+  listSettlementSuggestions(
+    @CurrentHousehold() household: HouseholdContext
+  ): Promise<SettlementSuggestionListResponse> {
+    return this.balances.listSuggestions(household.householdId);
   }
 
   /** One query for all of the user's households, not one per household. */
