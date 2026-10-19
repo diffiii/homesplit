@@ -122,7 +122,7 @@ Foreign keys in application tables delete as follows:
 - **To `organization`:** `CASCADE` from every household table. The settled-up check in `DELETE /api/households/:householdId`, serialized against ledger writes, is what protects the ledger.
 - **To `user`:** `RESTRICT` from every household table, including membership history, and `CASCADE` only from friend requests and friendships.
 - **Expense child rows** (payers, allocation participants, and splits) cascade from their expense.
-- **Expenses to categories:** `RESTRICT`. Deleting a category that any expense uses answers 409 `CATEGORY_IN_USE`; the service checks first, and the key catches races. Deleting a household still works, because PostgreSQL checks the key only after the cascade has removed both the expenses and the categories.
+- **Expenses to categories:** `RESTRICT`. Deleting a category that any expense uses answers 409 `CATEGORY_IN_USE`; the service checks first, and the key catches races, which answer the generic 409 `CONFLICT`. Deleting a household still works, because PostgreSQL checks the key only after the cascade has removed both the expenses and the categories.
 
 Better Auth's generated tables keep their own `CASCADE` keys. A task that stores files outside PostgreSQL (#44) also cleans up objects whose rows are gone.
 

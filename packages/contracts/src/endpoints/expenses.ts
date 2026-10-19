@@ -1,5 +1,6 @@
 import {
   BalanceListResponse,
+  ConfirmedSettlement,
   CreateExpenseCategoryRequest,
   CreateExpenseRequest,
   Expense,
@@ -12,6 +13,7 @@ import {
   ListSettlementHistoryQuery,
   ProcessSettlementRequest,
   Settlement,
+  SettlementIdParams,
   SettlementListResponse,
   SettlementSuggestionListResponse,
   UpdateExpenseCategoryRequest,
@@ -23,6 +25,7 @@ import { HOUSEHOLD } from "./paths";
 
 const CATEGORY = `${HOUSEHOLD}/expense-categories/:categoryId`;
 const EXPENSE = `${HOUSEHOLD}/expenses/:expenseId`;
+const SETTLEMENT = `${HOUSEHOLD}/settlements/:settlementId`;
 
 export const expenseEndpoints = {
   listExpenseCategories: {
@@ -110,6 +113,20 @@ export const expenseEndpoints = {
     body: ProcessSettlementRequest,
     status: 201,
     response: Settlement,
+  },
+  deleteSettlement: {
+    method: "DELETE",
+    path: SETTLEMENT,
+    params: SettlementIdParams,
+    status: 204,
+    response: null,
+  },
+  confirmSettlement: {
+    method: "POST",
+    path: `${SETTLEMENT}/confirm`,
+    params: SettlementIdParams,
+    status: 200,
+    response: ConfirmedSettlement,
   },
   listBalances: {
     method: "GET",
