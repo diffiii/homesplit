@@ -1,6 +1,6 @@
 # Expenses API
 
-Module flag: `expenses` · Tasks: #35, #37, #38, #40, #41 · Contracts: [expenses](../../packages/contracts/src/features/expenses/index.ts), [categories](../../packages/contracts/src/features/expenses/categories.ts), [settlements](../../packages/contracts/src/features/expenses/settlements.ts)
+Module flag: `expenses` · Tasks: #35, #37, #38, #40, #41, #42 · Contracts: [expenses](../../packages/contracts/src/features/expenses/index.ts), [categories](../../packages/contracts/src/features/expenses/categories.ts), [settlements](../../packages/contracts/src/features/expenses/settlements.ts)
 
 ## Routes
 
@@ -20,6 +20,7 @@ Module flag: `expenses` · Tasks: #35, #37, #38, #40, #41 · Contracts: [expense
 | POST | `/api/households/:householdId/settlements/:settlementId/confirm` | `SettlementIdParams` | `ConfirmedSettlement` | 200 | payee, or admin+ who isn't the payer |
 | DELETE | `/api/households/:householdId/settlements/:settlementId` | `SettlementIdParams` | none | 204 | pending only: party or admin+ |
 | GET | `/api/households/:householdId/balances` | `HouseholdIdParams` | `BalanceListResponse` | 200 | all |
+| GET | `/api/households/:householdId/settlement-suggestions` | `HouseholdIdParams` | `SettlementSuggestionListResponse` | 200 | all |
 | GET | `/api/me/balances` | none | `UserBalanceListResponse` | 200 | any signed-in user, for themselves |
 
 In the settlement rows, a party is the payer or the payee, as in the [permission matrix](../decisions.md#roles-and-permissions). Every current member passes the route-level check, and the service checks the party rule, answering 403 `FORBIDDEN`.
@@ -157,6 +158,17 @@ Balances are computed on every request from the stored payers, splits, and confi
 - Currencies: a currency is listed only while some balance in it isn't zero. A household without expenses or payments, or one that's settled up, answers `{ items: [] }`.
 - Members: each listed currency has every current member, at zero if their balance in it is zero, and every [departed member](../decisions.md#departed-members) whose balance in it isn't zero.
 - Ordering: currencies by code ascending; within a currency, `amountCents` descending (creditors first), then user ID ascending.
+- Disabled module: the route keeps working.
+
+#### `GET /settlement-suggestions`
+
+Transfers that, once recorded as confirmed payments, bring every balance in their currency to zero. They're computed from the `GET /balances` sums on every request, never stored, and never recorded automatically; a client records each one with `POST /settlements`.
+
+- Currencies: one entry for each currency `GET /balances` lists, so a settled household answers `{ items: [] }`. Currencies are never netted, and each suggestion's currency is its entry's.
+- Suggestions: each one is a positive amount from a debtor to a different creditor. Every user with a non-zero balance has a ledger row in the household, so they're a [household party](../decisions.md#membership-history) and `POST /settlements` accepts them, departed members included. Current members at zero never appear.
+- Algorithm: `suggestSettlements` in `packages/backend/src/features/expenses/balances/settlement-suggestions.ts` sorts creditors and debtors each by amount descending, then user ID ascending, and walks both lists in step: the current debtor pays the current creditor the smaller of what they owe and are owed, and whoever reaches zero gives way to the next in their list. Since a currency's balances add up to zero, both lists run out together.
+- Complexity: O(n log n) for n non-zero balances in a currency, dominated by the sort, with at most n − 1 suggestions. That's not a promise of the fewest transfers: finding those is NP-hard, and the greedy walk can miss pairs that would cancel exactly.
+- Ordering: currencies by code ascending; within a currency, the order the walk produces them, which starts with the largest debtor paying the largest creditor. The output depends only on the balances, so repeated requests on an unchanged ledger, and equal balances read in another order, give the same suggestions.
 - Disabled module: the route keeps working.
 
 #### `GET /api/me/balances`

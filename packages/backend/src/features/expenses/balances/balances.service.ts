@@ -1,6 +1,7 @@
 import {
   type BalanceListResponse,
   type MemberBalance,
+  type SettlementSuggestionListResponse,
   toSafeInteger,
   type UserBalanceListResponse,
 } from "@homesplit/contracts";
@@ -11,6 +12,7 @@ import {
   householdBalances,
   userBalances,
 } from "./balances.repository";
+import { suggestSettlements } from "./settlement-suggestions";
 
 /** Groups rows by currency, keeping the order they came in. */
 function groupByCurrency<T extends { currency: string }>(rows: T[]) {
@@ -52,6 +54,27 @@ export class BalancesService {
       });
       return { items };
     });
+  }
+
+  /**
+   * Suggests transfers that settle every currency with a non-zero balance,
+   * computed from the balances on each request and never stored.
+   */
+  async listSuggestions(
+    householdId: string
+  ): Promise<SettlementSuggestionListResponse> {
+    const sums = await householdBalances(db, householdId);
+
+    const items = groupByCurrency(sums).map(([currency, rows]) => ({
+      currency,
+      suggestions: suggestSettlements(
+        rows.map((row) => ({
+          user: row.user,
+          amountCents: toSafeInteger(row.amountCents),
+        }))
+      ),
+    }));
+    return { items };
   }
 
   /**
