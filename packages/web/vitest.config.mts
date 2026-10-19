@@ -7,5 +7,7 @@ export default defineConfig({
   },
   test: {
     include: ["src/**/*.spec.ts"],
+    // A zone west of UTC with DST, so date helpers can't pass by accident in UTC.
+    env: { TZ: "America/New_York" },
   },
 });
