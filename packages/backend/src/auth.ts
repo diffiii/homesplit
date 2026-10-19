@@ -1,5 +1,5 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
-import { Id } from "@homesplit/contracts";
+import { AvatarUrl, DisplayName, Id } from "@homesplit/contracts";
 import { Logger } from "@nestjs/common";
 import { betterAuth } from "better-auth";
 import {
@@ -8,6 +8,7 @@ import {
   getSessionFromCtx,
 } from "better-auth/api";
 import { organization } from "better-auth/plugins";
+import { z } from "zod";
 import { db } from "./db";
 // biome-ignore lint/performance/noNamespaceImport: drizzle schema bag for better-auth adapter
 import * as schema from "./db/schema/auth";
@@ -26,6 +27,11 @@ const previewOrigins = (process.env.FRONTEND_PREVIEW_ORIGINS ?? "")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
+
+const NewUserProfile = z.object({
+  name: DisplayName,
+  image: AvatarUrl.nullish(),
+});
 
 export const auth = betterAuth({
   // The browser reaches the API only through the frontend's `/api/*` rewrite,
@@ -49,6 +55,29 @@ export const auth = betterAuth({
     provider: "pg",
     schema,
   }),
+  databaseHooks: {
+    user: {
+      create: {
+        before: (user) => {
+          const result = NewUserProfile.safeParse(user);
+          if (!result.success) {
+            const issues = result.error.issues.map(({ path, message }) => ({
+              path,
+              message,
+            }));
+            throw new APIError("BAD_REQUEST", {
+              code: "VALIDATION_ERROR",
+              message: "Invalid request",
+              details: { issues },
+            });
+          }
+          return Promise.resolve({ data: { ...user, name: result.data.name } });
+        },
+      },
+    },
+  },
+  // Profiles change only through PATCH /api/me, which validates `imageUrl`.
+  disabledPaths: ["/update-user"],
   emailAndPassword: {
     enabled: true,
   },

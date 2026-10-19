@@ -6,6 +6,7 @@ import { closeDb } from "./db";
 import { ExpenseCategoriesModule } from "./features/expense-categories/expense-categories.module";
 import { ExpensesModule } from "./features/expenses/expenses.module";
 import { HouseholdsModule } from "./features/households/households.module";
+import { UsersModule } from "./features/users/users.module";
 
 @Module({
   controllers: [AppController],
@@ -15,6 +16,7 @@ import { HouseholdsModule } from "./features/households/households.module";
     HouseholdsModule,
     ExpenseCategoriesModule,
     ExpensesModule,
+    UsersModule,
   ],
 })
 export class AppModule implements BeforeApplicationShutdown {
