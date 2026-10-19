@@ -43,9 +43,12 @@ export const FriendRequest = z.object({
 });
 export type FriendRequest = z.infer<typeof FriendRequest>;
 
-/** Create a friend request by recipient email; requester is the authenticated user. */
+/**
+ * Create a friend request by recipient email; requester is the authenticated user.
+ * The email is trimmed and lowercased before validation, matching how Better Auth stores it.
+ */
 export const CreateFriendRequest = z.object({
-  email: z.email(),
+  email: z.string().trim().toLowerCase().pipe(z.email()),
 });
 export type CreateFriendRequest = z.infer<typeof CreateFriendRequest>;
 

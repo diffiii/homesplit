@@ -85,6 +85,13 @@
       "when": 1792611674557,
       "tag": "0011_chore_completion",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792709828920,
+      "tag": "0012_friend_requests",
+      "breakpoints": true
     }
   ]
 }

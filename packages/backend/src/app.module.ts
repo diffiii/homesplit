@@ -6,6 +6,7 @@ import { closeDb } from "./db";
 import { ChoresModule } from "./features/chores/chores.module";
 import { ExpenseCategoriesModule } from "./features/expense-categories/expense-categories.module";
 import { ExpensesModule } from "./features/expenses/expenses.module";
+import { FriendsModule } from "./features/friends/friends.module";
 import { HouseholdsModule } from "./features/households/households.module";
 import { UsersModule } from "./features/users/users.module";
 
@@ -18,6 +19,7 @@ import { UsersModule } from "./features/users/users.module";
     ExpenseCategoriesModule,
     ChoresModule,
     ExpensesModule,
+    FriendsModule,
     UsersModule,
   ],
 })
