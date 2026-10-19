@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ApiError, HouseholdFeatures } from "@homesplit/contracts";
+import { HouseholdFeatures } from "@homesplit/contracts";
 import type { INestApplication } from "@nestjs/common";
 import { eq, sql } from "drizzle-orm";
-import type { Response } from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/db";
 import { householdFeatures, organization } from "@/db/schema";
+import { expectApiError } from "./helpers/api";
 import { createClient, createTestApp } from "./helpers/app";
 import {
   createHousehold,
@@ -27,10 +27,6 @@ const TRIGGER_MIGRATION = join(
 
 const featuresPath = (householdId: string) =>
   `/api/households/${householdId}/features`;
-
-function expectApiError(response: Response, code: string): void {
-  expect(ApiError.parse(response.body).code).toBe(code);
-}
 
 describe("household features", () => {
   let app: INestApplication;
