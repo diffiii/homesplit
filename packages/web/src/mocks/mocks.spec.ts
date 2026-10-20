@@ -531,6 +531,46 @@ describe("Better Auth routes", () => {
     });
   });
 
+  it.each([0, 60_000])(
+    "invite again when the previous invitation expired %i ms ago",
+    async (elapsed) => {
+      const time = Date.now();
+      vi.spyOn(Date, "now").mockReturnValue(time);
+      const invitation = db.state.invitations.find(
+        ({ email }) => email === "ewa@example.com"
+      );
+      if (!invitation) {
+        throw new Error("Expected Ewa's seeded invitation");
+      }
+      const input = {
+        householdId: invitation.householdId,
+        email: invitation.email,
+        role: "member" as const,
+      };
+      await expect(failure(households.invite(input))).resolves.toMatchObject({
+        status: 400,
+        code: "USER_IS_ALREADY_INVITED_TO_THIS_ORGANIZATION",
+      });
+
+      invitation.expiresAt = new Date(time - elapsed).toISOString();
+      const replacement = await households.invite(input);
+      expect(replacement).toMatchObject({
+        email: input.email,
+        organizationId: input.householdId,
+        status: "pending",
+      });
+      expect(replacement?.id).not.toBe(invitation.id);
+      expect(new Date(replacement?.expiresAt ?? "").getTime()).toBeGreaterThan(
+        time
+      );
+
+      await expect(failure(households.invite(input))).resolves.toMatchObject({
+        status: 400,
+        code: "USER_IS_ALREADY_INVITED_TO_THIS_ORGANIZATION",
+      });
+    }
+  );
+
   it("accept an invitation", async () => {
     const invitation = db.state.invitations.find(
       ({ email }) => email === "alice@example.com"

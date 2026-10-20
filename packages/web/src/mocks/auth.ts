@@ -531,7 +531,8 @@ export function createAuthHandlers(
           (existing) =>
             existing.householdId === caller.householdId &&
             existing.email === email &&
-            existing.status === "pending"
+            existing.status === "pending" &&
+            Date.parse(existing.expiresAt) > Date.now()
         )
       ) {
         throw authError(
