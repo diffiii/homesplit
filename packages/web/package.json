@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "next build",
+    "build": "node -e \"require('node:fs').rmSync('public/mockServiceWorker.js', { force: true })\" && next build",
     "dev": "msw init public --no-save && next dev",
     "start": "next start",
     "test": "vitest run",
