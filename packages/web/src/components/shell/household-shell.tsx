@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { ThemeMenu } from "@/components/theme-menu";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,10 +38,9 @@ import {
 import { UserAvatar } from "@/components/user-avatar";
 import { useHouseholdFeatures } from "@/hooks/use-household-features";
 import { useRequiredSession } from "@/hooks/use-required-session";
-import { signOut } from "@/lib/api/auth-client";
 import { householdQueries } from "@/lib/api/household-queries";
-import { getQueryClient } from "@/lib/api/query-client";
-import { SIGN_IN_PATH } from "@/lib/api/session";
+import { HOUSEHOLDS_PATH, rememberHousehold } from "@/lib/last-household";
+import { signOutAndReset } from "@/lib/sign-out";
 import { HouseholdContext } from "./household-context";
 import { HOUSEHOLD_NAV, householdPath, isActive } from "./household-nav";
 
@@ -55,6 +54,9 @@ interface HouseholdShellProps {
  * and a top bar with bottom navigation on phones.
  */
 export function HouseholdShell({ householdId, children }: HouseholdShellProps) {
+  // Signing in opens this household again next time.
+  useEffect(() => rememberHousehold(householdId), [householdId]);
+
   return (
     <HouseholdContext value={householdId}>
       <SidebarProvider>
@@ -228,7 +230,7 @@ function HouseholdSwitcher({ householdId }: { householdId: string }) {
           ))}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem render={<Link href="/" />}>
+        <DropdownMenuItem render={<Link href={HOUSEHOLDS_PATH} />}>
           <LayoutGridIcon aria-hidden />
           All households
         </DropdownMenuItem>
@@ -272,11 +274,4 @@ export function UserMenu({ showName = false }: { showName?: boolean }) {
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
-
-/** Sign out, then drop everything cached for this user before showing sign-in. */
-async function signOutAndReset() {
-  await signOut();
-  getQueryClient().clear();
-  window.location.assign(SIGN_IN_PATH);
 }

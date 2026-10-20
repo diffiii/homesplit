@@ -199,11 +199,20 @@ export function createAuth({ baseURL, fetch }: AuthClientOptions = {}) {
       unwrap(organization.rejectInvitation({ invitationId })),
   };
 
+  /** Email-and-password accounts. Signing in or up sets the session cookie. */
+  const account = {
+    signUp: (body: { name: string; email: string; password: string }) =>
+      unwrap(client.signUp.email(body)),
+
+    signIn: (body: { email: string; password: string }) =>
+      unwrap(client.signIn.email(body)),
+
+    signOut: () => unwrap(client.signOut()),
+  };
+
   return {
+    account,
     households,
-    signIn: client.signIn,
-    signOut: client.signOut,
-    signUp: client.signUp,
     getSession: client.getSession,
     useSession: client.useSession,
   };
@@ -215,5 +224,4 @@ export function createAuth({ baseURL, fetch }: AuthClientOptions = {}) {
  * so nothing can call its `useActiveOrganization`-style hooks, which read the
  * session's active organization.
  */
-export const { households, signIn, signOut, signUp, getSession, useSession } =
-  createAuth();
+export const { account, households, getSession, useSession } = createAuth();
