@@ -1,8 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { ApiError } from "@homesplit/contracts";
 import type { INestApplication } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
-import type { Response } from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/db";
 import {
@@ -13,6 +11,7 @@ import {
   session,
 } from "@/db/schema";
 import type { HouseholdRole } from "@/features/households/access/roles";
+import { expectApiError } from "./helpers/api";
 import { createTestApp } from "./helpers/app";
 import {
   createTwoHouseholds,
@@ -24,10 +23,6 @@ import {
   type TestUser,
 } from "./helpers/fixtures";
 import { HouseholdProbeModule, probePath } from "./helpers/household-probe";
-
-function expectApiError(response: Response, code: string): void {
-  expect(ApiError.parse(response.body).code).toBe(code);
-}
 
 describe("household access", () => {
   let app: INestApplication;

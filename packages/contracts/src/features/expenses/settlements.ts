@@ -10,6 +10,7 @@ import {
   PositiveMoney,
 } from "../../common/money";
 import { Pagination, paginatedResponse } from "../../common/pagination";
+import { HouseholdSummary } from "../households";
 import { UserSummary } from "../users";
 
 /** Rejects payments where payer and payee are the same user. */
@@ -61,6 +62,30 @@ export const BalanceListResponse = z.object({
   items: z.array(CurrencyBalances),
 });
 export type BalanceListResponse = z.infer<typeof BalanceListResponse>;
+
+/** The session user's balance in one household and currency. */
+export const UserHouseholdBalance = z.object({
+  household: HouseholdSummary,
+  amountCents: Cents,
+});
+export type UserHouseholdBalance = z.infer<typeof UserHouseholdBalance>;
+
+/**
+ * The session user's balances in a single currency across their households;
+ * `amountCents` is their sum.
+ */
+export const UserCurrencyBalances = z.object({
+  currency: CurrencyCode,
+  amountCents: Cents,
+  households: z.array(UserHouseholdBalance),
+});
+export type UserCurrencyBalances = z.infer<typeof UserCurrencyBalances>;
+
+/** Unpaginated balances of the session user, one entry per currency. */
+export const UserBalanceListResponse = z.object({
+  items: z.array(UserCurrencyBalances),
+});
+export type UserBalanceListResponse = z.infer<typeof UserBalanceListResponse>;
 
 /** Only confirmed payments count toward balances and suggestions. */
 export const SettlementStatus = z.enum(["pending", "confirmed"]);

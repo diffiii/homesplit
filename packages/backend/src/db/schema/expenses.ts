@@ -104,6 +104,10 @@ export const settlements = pgTable(
       table.createdAt,
       table.id
     ),
+    // Serve one party's payments in a household, such as a user's balances
+    // across their households, and the party keys above.
+    index("settlements_payer_idx").on(table.householdId, table.payerId),
+    index("settlements_payee_idx").on(table.householdId, table.payeeId),
   ]
 );
 

@@ -1,12 +1,19 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
+import { AvatarUrl, DisplayName, Id } from "@homesplit/contracts";
 import { Logger } from "@nestjs/common";
 import { betterAuth } from "better-auth";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import {
+  APIError,
+  createAuthMiddleware,
+  getSessionFromCtx,
+} from "better-auth/api";
 import { organization } from "better-auth/plugins";
+import { z } from "zod";
 import { db } from "./db";
 // biome-ignore lint/performance/noNamespaceImport: drizzle schema bag for better-auth adapter
 import * as schema from "./db/schema/auth";
 import { seedDefaultCategories } from "./features/expense-categories/default-categories";
+import { hasUnsettledBalances } from "./features/expenses/balances/balances.repository";
 
 const frontendUrl = process.env.FRONTEND_URL;
 
@@ -20,6 +27,11 @@ const previewOrigins = (process.env.FRONTEND_PREVIEW_ORIGINS ?? "")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
+
+const NewUserProfile = z.object({
+  name: DisplayName,
+  image: AvatarUrl.nullish(),
+});
 
 export const auth = betterAuth({
   // The browser reaches the API only through the frontend's `/api/*` rewrite,
@@ -43,20 +55,70 @@ export const auth = betterAuth({
     provider: "pg",
     schema,
   }),
+  databaseHooks: {
+    user: {
+      create: {
+        before: (user) => {
+          const result = NewUserProfile.safeParse(user);
+          if (!result.success) {
+            const issues = result.error.issues.map(({ path, message }) => ({
+              path,
+              message,
+            }));
+            throw new APIError("BAD_REQUEST", {
+              code: "VALIDATION_ERROR",
+              message: "Invalid request",
+              details: { issues },
+            });
+          }
+          return Promise.resolve({ data: { ...user, name: result.data.name } });
+        },
+      },
+    },
+  },
+  // Profiles change only through PATCH /api/me, which validates `imageUrl`.
+  disabledPaths: ["/update-user"],
   emailAndPassword: {
     enabled: true,
   },
   hooks: {
-    // Households are deleted only through DELETE /api/households/:householdId,
-    // which checks and deletes in one transaction.
-    before: createAuthMiddleware((ctx) => {
+    before: createAuthMiddleware(async (ctx) => {
+      // Households are deleted only through DELETE /api/households/:householdId,
+      // which checks and deletes in one transaction.
       if (ctx.path === "/organization/delete") {
         throw new APIError("NOT_FOUND", {
           code: "NOT_FOUND",
           message: "Not found",
         });
       }
-      return Promise.resolve();
+
+      // Members settle up before they leave. `/organization/leave` calls no
+      // organization hook, so the check runs here, before Better Auth's write
+      // and outside its transaction: an expense committed in between can
+      // still leave a departed member with a balance, as a removal can.
+      if (ctx.path === "/organization/leave") {
+        const organizationId: unknown = ctx.body?.organizationId;
+        const householdId = Id.safeParse(organizationId);
+        // Better Auth would pass any string to a `uuid` column and fail with
+        // 500. It answers a missing ID or session itself.
+        if (typeof organizationId === "string" && !householdId.success) {
+          throw new APIError("BAD_REQUEST", {
+            code: "VALIDATION_ERROR",
+            message: "organizationId must be a UUID",
+          });
+        }
+        const session = await getSessionFromCtx(ctx);
+        if (
+          session &&
+          householdId.success &&
+          (await hasUnsettledBalances(db, householdId.data, session.user.id))
+        ) {
+          throw new APIError("CONFLICT", {
+            code: "UNSETTLED_BALANCE",
+            message: "Settle up before leaving the household",
+          });
+        }
+      }
     }),
   },
   plugins: [

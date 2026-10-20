@@ -61,8 +61,15 @@
     {
       "idx": 8,
       "version": "7",
+      "when": 1792342065343,
+      "tag": "0008_settlement_party_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
       "when": 1792272479405,
-      "tag": "0008_mute_tusk",
+      "tag": "0009_chores",
       "breakpoints": true
     }
   ]

@@ -10,9 +10,17 @@ export const UserSummary = z.object({
 });
 export type UserSummary = z.infer<typeof UserSummary>;
 
+/** Display name a user sets at sign-up or in their profile, trimmed. */
+export const DisplayName = z.string().trim().min(1).max(100);
+export type DisplayName = z.infer<typeof DisplayName>;
+
+/** Avatar link. Only https, so it can't hold a `javascript:` or `data:` URL. */
+export const AvatarUrl = z.url({ protocol: /^https$/ });
+export type AvatarUrl = z.infer<typeof AvatarUrl>;
+
 /** Partial profile update (display name / avatar). */
 export const UpdateProfileRequest = z.object({
-  name: z.string().min(1).optional(),
-  imageUrl: z.url().nullable().optional(),
+  name: DisplayName.optional(),
+  imageUrl: AvatarUrl.nullable().optional(),
 });
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequest>;

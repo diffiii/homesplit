@@ -1,15 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { ApiError } from "@homesplit/contracts";
 import type { INestApplication } from "@nestjs/common";
-import type { Response } from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { expectApiError } from "./helpers/api";
 import { createClient, createTestApp, type TestClient } from "./helpers/app";
 import { createUser } from "./helpers/fixtures";
 import { ProbeModule } from "./helpers/probe";
-
-function expectApiError(response: Response, code: string): void {
-  expect(ApiError.parse(response.body).code).toBe(code);
-}
 
 describe("contract validation and errors", () => {
   let app: INestApplication;
