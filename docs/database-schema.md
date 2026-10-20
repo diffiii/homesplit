@@ -168,6 +168,13 @@ erDiagram
         timestamptz created_at
     }
 
+    friendships {
+        uuid id PK
+        uuid user_a_id FK "user.id; smaller of the pair"
+        uuid user_b_id FK "user.id; larger of the pair"
+        timestamptz created_at
+    }
+
     organization ||..o| household_features : toggles
     organization ||..o{ household_membership_history : remembers
     user ||..o{ household_membership_history : was_member
@@ -189,9 +196,11 @@ erDiagram
     household_membership_history ||..o{ expense_splits : party_to
     user ||..o{ friend_requests : sends
     user ||..o{ friend_requests : receives
+    user ||..o{ friendships : participant_a
+    user ||..o{ friendships : participant_b
 ```
 
-`household_membership_history` keeps everyone who has ever been a member, after Better Auth deletes their `member` row; an `AFTER INSERT ON member` trigger fills it (see [Households API](api/households.md#storage)). Its `user_id` key is `ON DELETE RESTRICT`. `household_features` holds one row per organization with module toggles; an `AFTER INSERT ON organization` trigger seeds defaults (same doc). `expense_categories` holds each household's categories, unique on (`household_id`, `id`); new households get a default set from a Better Auth hook (see [Expenses API](api/expenses.md#storage)). `settlements` holds payments between household parties: its user keys are `ON DELETE RESTRICT`, and (`household_id`, `payer_id`) and (`household_id`, `payee_id`) also reference `household_membership_history`; an index on (`household_id`, `created_at`, `id`) serves the history, and indexes on (`household_id`, `payer_id`) and (`household_id`, `payee_id`) serve one party's payments (same doc). `expenses` and its child tables `expense_payers`, `expense_allocation_participants`, and `expense_splits` hold the ledger's expenses (same doc): user keys are `ON DELETE RESTRICT`; (`household_id`, `author_id`) and each child's (`household_id`, `user_id`) reference `household_membership_history`; (`household_id`, `category_id`) references `expense_categories` (`household_id`, `id`) with `ON DELETE RESTRICT`; children reference `expenses` by (`expense_id`, `household_id`) and cascade from both the expense and `organization`; participants also reference the expense's `allocation_method` with `ON UPDATE CASCADE`. `friend_requests` holds pending friend requests, with at most one per pair of users in either direction (see [Users and friends API](api/users-friends.md#storage)). Every other implemented foreign key uses `ON DELETE CASCADE`. `verification` has no foreign keys; `session.active_organization_id` is nullable text with no enforced organization reference. Timestamp columns are PostgreSQL `timestamp` without time zone. Non-unique indexes cover `session.user_id`, `account.user_id`, `verification.identifier`, both member foreign keys, and invitation organization/email. Membership pairs are not constrained to be unique.
+`household_membership_history` keeps everyone who has ever been a member, after Better Auth deletes their `member` row; an `AFTER INSERT ON member` trigger fills it (see [Households API](api/households.md#storage)). Its `user_id` key is `ON DELETE RESTRICT`. `household_features` holds one row per organization with module toggles; an `AFTER INSERT ON organization` trigger seeds defaults (same doc). `expense_categories` holds each household's categories, unique on (`household_id`, `id`); new households get a default set from a Better Auth hook (see [Expenses API](api/expenses.md#storage)). `settlements` holds payments between household parties: its user keys are `ON DELETE RESTRICT`, and (`household_id`, `payer_id`) and (`household_id`, `payee_id`) also reference `household_membership_history`; an index on (`household_id`, `created_at`, `id`) serves the history, and indexes on (`household_id`, `payer_id`) and (`household_id`, `payee_id`) serve one party's payments (same doc). `expenses` and its child tables `expense_payers`, `expense_allocation_participants`, and `expense_splits` hold the ledger's expenses (same doc): user keys are `ON DELETE RESTRICT`; (`household_id`, `author_id`) and each child's (`household_id`, `user_id`) reference `household_membership_history`; (`household_id`, `category_id`) references `expense_categories` (`household_id`, `id`) with `ON DELETE RESTRICT`; children reference `expenses` by (`expense_id`, `household_id`) and cascade from both the expense and `organization`; participants also reference the expense's `allocation_method` with `ON UPDATE CASCADE`. `friend_requests` holds pending friend requests, with at most one per pair of users in either direction, and `friendships` holds accepted ones, one row per pair with the smaller user ID first (see [Users and friends API](api/users-friends.md#storage)). Every other implemented foreign key uses `ON DELETE CASCADE`. `verification` has no foreign keys; `session.active_organization_id` is nullable text with no enforced organization reference. Timestamp columns are PostgreSQL `timestamp` without time zone. Non-unique indexes cover `session.user_id`, `account.user_id`, `verification.identifier`, both member foreign keys, and invitation organization/email. Membership pairs are not constrained to be unique.
 
 ## Proposed household data
 
@@ -323,30 +332,6 @@ erDiagram
     USERS |o..o{ SHOPPING_ITEMS : purchases
 ```
 
-## Proposed friendships
-
-`friend_requests` is implemented (see above). The `USERS` entity below is the same table as in the household diagram. Participant IDs are inferred: the API returns the other user from the authenticated user's perspective, rather than exposing both participants.
-
-```mermaid
-erDiagram
-    USERS {
-        uuid id PK
-        text name
-        text email
-        text image_url "nullable"
-    }
-
-    FRIENDSHIPS {
-        uuid id PK
-        uuid user_a_id FK "Inferred participant"
-        uuid user_b_id FK "Inferred participant"
-        timestamptz created_at
-    }
-
-    USERS ||..o{ FRIENDSHIPS : participant_a
-    USERS ||..o{ FRIENDSHIPS : participant_b
-```
-
 ## Proposed attachments and receipts
 
 These tables support backlog tasks [4.3](backlog/tasks/4-expenses/4.3-attachments/4.3.0-epic.md) and [7](backlog/tasks/7-ai-receipts/7.0-epic.md) and have no contracts yet. `HOUSEHOLDS`, `USERS`, `EXPENSES`, and `SHOPPING_ITEMS` are the entities from the household diagram.
@@ -428,9 +413,8 @@ erDiagram
 - `MemberBalance` / `CurrencyBalances`, `UserHouseholdBalance` / `UserCurrencyBalances`, and `SettlementSuggestion` / `CurrencySettlementSuggestions` are computed responses, not tables. Balances and suggestions are grouped by currency, and currencies are never netted. A positive member balance means the user is owed money; a negative balance means they owe money. Settlements record strictly positive payments between distinct users within a household and have no direct expense or split reference. A settlement's `status` isn't stored: it's `pending` while `confirmed_at` is null, and `confirmedBy` / `confirmedAt` map to `confirmed_by_id` / `confirmed_at`. Splits have no settlement state.
 - Chore `dueAt` is a nullable ISO 8601 UTC datetime (for example, `2026-10-06T16:00:00Z`), mapped to `timestamptz due_at`. Creation and updates may omit the deadline; an explicit null clears it. Clients convert local deadline input to UTC and display it in the user's local time zone. Date-only values are not accepted; expense `expenseDate` remains a calendar date.
 - Chore completion and shopping purchase metadata follow their state flags: open chores and unpurchased items require null actor/timestamp fields; completed chores and purchased items require both fields. The conditional columns in the diagram express those contract invariants. The `chores_completion` check enforces the chore one; the shopping check is not implemented yet.
-- Accepting a friend request removes the request and creates a friendship. There is no request status field in the current contracts.
 - Organization membership and invitations already exist as `member` and `invitation`. Their mapping to the household API is not defined yet. The proposed household entity only models its inferred ID and existing feature flags. Notification contracts are empty.
 - Pagination and chore/shopping boolean filters now decode raw URL query strings. They are request handling concerns and introduce no persistence columns.
-- In the proposed diagrams, UUIDs, calendar dates, and UTC timestamps come from the shared contract primitives, and SQL type choices and composite keys are illustrative. Application indexes, friendship participant-pair uniqueness rules, deletion policies, and cross-household consistency checks remain unspecified. The implemented `user.email` column is already unique.
+- In the proposed diagrams, UUIDs, calendar dates, and UTC timestamps come from the shared contract primitives, and SQL type choices and composite keys are illustrative. Application indexes, deletion policies, and cross-household consistency checks remain unspecified. The implemented `user.email` column is already unique.
 
 Sources: [users](../packages/contracts/src/features/users/index.ts), [households](../packages/contracts/src/features/households/index.ts), [feature catalog](../packages/contracts/src/features/catalog.ts), [expenses](../packages/contracts/src/features/expenses/index.ts), [categories](../packages/contracts/src/features/expenses/categories.ts), [settlements](../packages/contracts/src/features/expenses/settlements.ts), [chores](../packages/contracts/src/features/chores/index.ts), [shopping](../packages/contracts/src/features/shopping/index.ts), [friends](../packages/contracts/src/features/friends/index.ts), [money primitives](../packages/contracts/src/common/money.ts), [pagination](../packages/contracts/src/common/pagination.ts), and [query decoders](../packages/contracts/src/common/query.ts).
