@@ -1,0 +1,352 @@
+import type {
+  CurrencyCode,
+  ExpenseAllocationInput,
+  ExpenseCategory,
+  HouseholdFeatures,
+} from "@homesplit/contracts";
+import type { HouseholdRole } from "@/lib/api/auth-client";
+import type {
+  MockChore,
+  MockExpense,
+  MockHousehold,
+  MockInvitation,
+  MockMember,
+  MockSettlement,
+  MockShoppingItem,
+  MockState,
+  MockUser,
+} from "./db";
+
+/** Every seeded user's password. */
+export const MOCK_PASSWORD = "homesplit";
+
+/** The categories the backend gives every new household. */
+const DEFAULT_CATEGORIES = [
+  ["Groceries", "🛒"],
+  ["Utilities", "💡"],
+  ["Rent", "🏠"],
+  ["Transport", "🚗"],
+  ["Dining out", "🍽️"],
+  ["Entertainment", "🎬"],
+  ["Other", "📦"],
+] as const;
+
+export function defaultCategories(
+  householdId: string,
+  id: () => string = () => crypto.randomUUID()
+): ExpenseCategory[] {
+  return DEFAULT_CATEGORIES.map(([name, icon]) => ({
+    id: id(),
+    householdId,
+    name,
+    icon,
+  }));
+}
+
+export function emptyState(): MockState {
+  return {
+    sessionUserId: null,
+    users: [],
+    households: [],
+    members: [],
+    history: [],
+    invitations: [],
+    categories: [],
+    expenses: [],
+    settlements: [],
+    chores: [],
+    shoppingItems: [],
+    friendships: [],
+    friendRequests: [],
+  };
+}
+
+const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
+
+/** When something happened, in days (and hours) before the factory's `now`. */
+export interface Ago {
+  daysAgo?: number;
+  hoursAgo?: number;
+}
+
+type Payers = [user: MockUser, amountCents: number][];
+
+export interface ExpenseInput extends Ago {
+  allocation?: ExpenseAllocationInput;
+  amountCents: number;
+  author: MockUser;
+  category?: string;
+  currency?: CurrencyCode;
+  description?: string;
+  name: string;
+  /** Equal split among these users, unless `allocation` is given. */
+  participants?: MockUser[];
+  /** The author pays everything, unless given. */
+  payers?: Payers;
+}
+
+/**
+ * Builds mock data with sequential IDs, so the same scenario always has the
+ * same IDs, and times relative to `now`, so it always looks recent.
+ */
+export class MockFactory {
+  readonly state = emptyState();
+  readonly #now: number;
+  #lastId = 0;
+
+  constructor(now = Date.now()) {
+    this.#now = now;
+  }
+
+  id(): string {
+    this.#lastId += 1;
+    return `00000000-0000-4000-8000-${this.#lastId.toString(16).padStart(12, "0")}`;
+  }
+
+  time({ daysAgo = 0, hoursAgo = 0 }: Ago = {}): string {
+    return new Date(
+      this.#now - daysAgo * DAY_MS - hoursAgo * HOUR_MS
+    ).toISOString();
+  }
+
+  /** A calendar date, as the user's device would give it in UTC. */
+  date(ago: Ago = {}): string {
+    return this.time(ago).slice(0, "YYYY-MM-DD".length);
+  }
+
+  user(name: string, email: string, image: string | null = null): MockUser {
+    const user = {
+      id: this.id(),
+      name,
+      email,
+      image,
+      password: MOCK_PASSWORD,
+      createdAt: this.time({ daysAgo: 400 }),
+    };
+    this.state.users.push(user);
+    return user;
+  }
+
+  household(
+    name: string,
+    features: Partial<HouseholdFeatures> = {},
+    ago: Ago = { daysAgo: 365 }
+  ): MockHousehold {
+    const household = {
+      id: this.id(),
+      name,
+      slug: this.id(),
+      createdAt: this.time(ago),
+      features: { expenses: true, chores: true, shopping: true, ...features },
+    };
+    this.state.households.push(household);
+    this.state.categories.push(
+      ...defaultCategories(household.id, () => this.id())
+    );
+    return household;
+  }
+
+  join(
+    household: MockHousehold,
+    user: MockUser,
+    role: HouseholdRole,
+    ago: Ago = { daysAgo: 300 }
+  ): MockMember {
+    const member = {
+      id: this.id(),
+      householdId: household.id,
+      userId: user.id,
+      role,
+      createdAt: this.time(ago),
+    };
+    this.state.members.push(member);
+    this.state.history.push({
+      householdId: household.id,
+      userId: user.id,
+      firstJoinedAt: member.createdAt,
+    });
+    return member;
+  }
+
+  /** Leave: the member row goes, and the history row stays. */
+  leave(household: MockHousehold, user: MockUser): void {
+    this.state.members = this.state.members.filter(
+      (member) =>
+        !(member.householdId === household.id && member.userId === user.id)
+    );
+  }
+
+  category(household: MockHousehold, name: string): ExpenseCategory {
+    const category = this.state.categories.find(
+      (row) => row.householdId === household.id && row.name === name
+    );
+    if (!category) {
+      throw new Error(`No category ${name} in ${household.name}`);
+    }
+    return category;
+  }
+
+  expense(household: MockHousehold, input: ExpenseInput): MockExpense {
+    const { author, amountCents, currency = "PLN" } = input;
+    const createdAt = this.time(input);
+    const expense = {
+      id: this.id(),
+      householdId: household.id,
+      name: input.name,
+      description: input.description ?? null,
+      total: { amountCents, currency },
+      payers: (input.payers ?? [[author, amountCents]]).map(
+        ([user, amount]) => ({ userId: user.id, amountCents: amount })
+      ),
+      authorId: author.id,
+      categoryId: input.category
+        ? this.category(household, input.category).id
+        : null,
+      expenseDate: this.date(input),
+      allocation: input.allocation ?? {
+        method: "equal",
+        participants: (input.participants ?? [author]).map(({ id }) => ({
+          userId: id,
+        })),
+      },
+      createdAt,
+      updatedAt: createdAt,
+    } satisfies MockExpense;
+    this.state.expenses.push(expense);
+    return expense;
+  }
+
+  settlement(
+    household: MockHousehold,
+    input: Ago & {
+      amountCents: number;
+      confirmed: boolean;
+      createdBy?: MockUser;
+      currency?: CurrencyCode;
+      note?: string;
+      payee: MockUser;
+      payer: MockUser;
+    }
+  ): MockSettlement {
+    const createdBy = input.createdBy ?? input.payer;
+    const createdAt = this.time(input);
+    const settlement = {
+      id: this.id(),
+      householdId: household.id,
+      payerId: input.payer.id,
+      payeeId: input.payee.id,
+      createdById: createdBy.id,
+      amount: {
+        amountCents: input.amountCents,
+        currency: input.currency ?? "PLN",
+      },
+      note: input.note ?? null,
+      createdAt,
+      confirmedById: input.confirmed
+        ? (createdBy === input.payer ? input.payee : createdBy).id
+        : null,
+      confirmedAt: input.confirmed ? createdAt : null,
+    };
+    this.state.settlements.push(settlement);
+    return settlement;
+  }
+
+  chore(
+    household: MockHousehold,
+    input: Ago & {
+      addedBy: MockUser;
+      assignedTo?: MockUser;
+      completedBy?: MockUser;
+      description?: string;
+      /** Days from now; negative is overdue. */
+      dueInDays?: number;
+      name: string;
+    }
+  ): MockChore {
+    const createdAt = this.time(input);
+    const completedAt = input.completedBy ? this.time() : null;
+    const chore = {
+      id: this.id(),
+      householdId: household.id,
+      name: input.name,
+      description: input.description ?? null,
+      assignedToId: input.assignedTo?.id ?? null,
+      dueAt:
+        input.dueInDays === undefined
+          ? null
+          : this.time({ daysAgo: -input.dueInDays }),
+      addedById: input.addedBy.id,
+      createdAt,
+      updatedAt: completedAt ?? createdAt,
+      completedAt,
+      completedById: input.completedBy?.id ?? null,
+    };
+    this.state.chores.push(chore);
+    return chore;
+  }
+
+  shoppingItem(
+    household: MockHousehold,
+    input: Ago & {
+      addedBy: MockUser;
+      name: string;
+      purchasedBy?: MockUser;
+      quantity?: number;
+      unit?: string;
+    }
+  ): MockShoppingItem {
+    const item = {
+      id: this.id(),
+      householdId: household.id,
+      name: input.name,
+      quantity: input.quantity ?? 1,
+      unit: input.unit ?? null,
+      addedById: input.addedBy.id,
+      addedAt: this.time(input),
+      purchasedById: input.purchasedBy?.id ?? null,
+      purchasedAt: input.purchasedBy ? this.time() : null,
+    };
+    this.state.shoppingItems.push(item);
+    return item;
+  }
+
+  invitation(
+    household: MockHousehold,
+    input: { email: string; inviter: MockUser; role: HouseholdRole }
+  ): MockInvitation {
+    const invitation = {
+      id: this.id(),
+      householdId: household.id,
+      email: input.email,
+      role: input.role,
+      status: "pending" as const,
+      inviterId: input.inviter.id,
+      createdAt: this.time({ daysAgo: 1 }),
+      expiresAt: this.time({ daysAgo: -1 }),
+    };
+    this.state.invitations.push(invitation);
+    return invitation;
+  }
+
+  friendship(a: MockUser, b: MockUser, ago: Ago = { daysAgo: 100 }): void {
+    this.state.friendships.push({
+      id: this.id(),
+      userIds: [a.id, b.id],
+      createdAt: this.time(ago),
+    });
+  }
+
+  friendRequest(from: MockUser, to: MockUser, ago: Ago = { daysAgo: 2 }): void {
+    this.state.friendRequests.push({
+      id: this.id(),
+      fromId: from.id,
+      toId: to.id,
+      createdAt: this.time(ago),
+    });
+  }
+
+  signIn(user: MockUser | null): void {
+    this.state.sessionUserId = user?.id ?? null;
+  }
+}

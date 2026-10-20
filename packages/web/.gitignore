@@ -3,3 +3,5 @@
 /.vercel/
 *.tsbuildinfo
 next-env.d.ts
+# Copied from msw by `pnpm dev`, so production builds never serve it.
+/public/mockServiceWorker.js
