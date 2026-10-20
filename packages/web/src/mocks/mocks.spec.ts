@@ -286,6 +286,53 @@ describe("application routes", () => {
     ]);
   });
 
+  it("filter expenses like the backend", async () => {
+    const all = (
+      await api("listExpenses", { ...flat(), query: { pageSize: 100 } })
+    ).items;
+    const list = async (query: object) =>
+      (
+        await api("listExpenses", {
+          ...flat(),
+          query: { pageSize: 100, ...query },
+        })
+      ).items;
+    const [{ category, payers }] = all.filter((expense) => expense.category);
+    const userId = payers[0].user.id;
+
+    expect(await list({ categoryId: category?.id })).toEqual(
+      all.filter((expense) => expense.category?.id === category?.id)
+    );
+    expect(await list({ categoryId: "none" })).toEqual(
+      all.filter((expense) => expense.category === null)
+    );
+    expect(await list({ userId })).toEqual(
+      all.filter((expense) =>
+        [
+          ...expense.payers.map(({ user }) => user.id),
+          ...expense.allocation.participants.map((p) => p.userId),
+        ].includes(userId)
+      )
+    );
+    // Scenario dates are relative to today, so the bounds come from the list.
+    const from = all[10].expenseDate;
+    const to = all[3].expenseDate;
+    const between = await list({ from, to });
+    expect(between.length).toBeGreaterThanOrEqual(8);
+    expect(between).toEqual(
+      all.filter(({ expenseDate }) => expenseDate >= from && expenseDate <= to)
+    );
+    expect(await list({ userId: OTHER_ID })).toEqual([]);
+    await expect(
+      failure(
+        api("listExpenses", {
+          ...flat(),
+          query: { from: "2026-02-01", to: "2026-01-31" },
+        })
+      )
+    ).resolves.toMatchObject({ status: 400, code: "VALIDATION_ERROR" });
+  });
+
   it("repeat idempotent actions without changing the result", async () => {
     const { householdId: id } = flat().params;
     const [chore] = (await api("listChores", flat())).items;

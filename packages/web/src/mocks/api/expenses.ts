@@ -4,7 +4,9 @@ import {
   type Expense,
   type ExpenseAllocationInput,
   type ExpensePayerInput,
+  type ListExpensesQuery,
   type Settlement,
+  UNCATEGORIZED,
 } from "@homesplit/contracts";
 import { type MockDb, type MockExpense, type MockSettlement, now } from "../db";
 import { conflict, forbidden, invalidReference } from "../errors";
@@ -125,6 +127,27 @@ function assertAuthorOrAdmin(
   }
 }
 
+/** Every given `ListExpensesQuery` filter matches, as in the backend. */
+function matchesFilters(
+  expense: MockExpense,
+  { categoryId, userId, from, to }: ListExpensesQuery
+) {
+  const inCategory =
+    categoryId === undefined ||
+    expense.categoryId === (categoryId === UNCATEGORIZED ? null : categoryId);
+  const onExpense =
+    userId === undefined ||
+    [...expense.payers, ...expense.allocation.participants].some(
+      (entry) => entry.userId === userId
+    );
+  return (
+    inCategory &&
+    onExpense &&
+    (from === undefined || expense.expenseDate >= from) &&
+    (to === undefined || expense.expenseDate <= to)
+  );
+}
+
 const isParty = (settlement: MockSettlement, userId: string) =>
   settlement.payerId === userId || settlement.payeeId === userId;
 
@@ -193,7 +216,9 @@ export const expenseRoutes: MockRoutes = {
       paginate(
         sortBy(
           db.state.expenses.filter(
-            ({ householdId }) => householdId === household.id
+            (expense) =>
+              expense.householdId === household.id &&
+              matchesFilters(expense, query)
           ),
           desc((expense) => expense.expenseDate),
           desc((expense) => expense.createdAt),

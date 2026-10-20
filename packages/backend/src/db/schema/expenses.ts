@@ -182,7 +182,15 @@ export const expenses = pgTable(
       table.createdAt,
       table.id
     ),
-    index("expenses_category_idx").on(table.householdId, table.categoryId),
+    // The same order within a category, or with `category_id IS NULL`; its
+    // prefix serves the in-use check.
+    index("expenses_category_idx").on(
+      table.householdId,
+      table.categoryId,
+      table.expenseDate,
+      table.createdAt,
+      table.id
+    ),
     index("expenses_currency_idx").on(table.householdId, table.currency),
   ]
 );

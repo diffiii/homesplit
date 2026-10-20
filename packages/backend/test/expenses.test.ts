@@ -488,4 +488,171 @@ describe("expenses", () => {
       });
     });
   });
+
+  describe("list filters", () => {
+    const ids = (response: ExpenseListResponse) =>
+      response.items.map((item) => item.id);
+
+    it("matches one category, or uncategorized expenses with `none`", async () => {
+      const { alice, household } = await setup();
+      const category = await categoryOf(household);
+      const groceries = await create(alice, household, {
+        ...expense(alice, [alice]),
+        categoryId: category.id,
+      });
+      const other = await create(alice, household, expense(alice, [alice]));
+
+      const inCategory = await list(
+        alice,
+        household,
+        `?categoryId=${category.id}`
+      );
+      const uncategorized = await list(alice, household, "?categoryId=none");
+
+      expect(inCategory).toMatchObject({ totalItems: 1 });
+      expect(ids(inCategory)).toEqual([groceries.id]);
+      expect(uncategorized).toMatchObject({ totalItems: 1 });
+      expect(ids(uncategorized)).toEqual([other.id]);
+    });
+
+    it("matches a payer or an allocation participant, departed or not", async () => {
+      const { alice, carol, dave, household } = await setup();
+      const paidByCarol = await create(alice, household, {
+        ...expense(carol, [alice]),
+        expenseDate: "2026-10-03",
+      });
+      const sharedWithCarol = await create(alice, household, {
+        ...expense(alice, [alice, carol]),
+        expenseDate: "2026-10-02",
+      });
+      await create(alice, household, expense(alice, [alice, dave]));
+      await removeMember(alice, household, carol);
+
+      const response = await list(alice, household, `?userId=${carol.id}`);
+
+      expect(response).toMatchObject({ totalItems: 2 });
+      expect(ids(response)).toEqual([paidByCarol.id, sharedWithCarol.id]);
+    });
+
+    it("bounds `expenseDate` by `from` and `to`, both inclusive", async () => {
+      const { alice, household } = await setup();
+      const on = (expenseDate: string) =>
+        insertExpense(db, {
+          householdId: household.id,
+          authorId: alice.id,
+          expenseDate,
+        });
+      const before = await on("2026-09-30");
+      const first = await on("2026-10-01");
+      const last = await on("2026-10-31");
+      const after = await on("2026-11-01");
+
+      const october = await list(
+        alice,
+        household,
+        "?from=2026-10-01&to=2026-10-31"
+      );
+      const fromLast = await list(alice, household, "?from=2026-10-31");
+      const toFirst = await list(alice, household, "?to=2026-10-01");
+      const oneDay = await list(
+        alice,
+        household,
+        "?from=2026-10-01&to=2026-10-01"
+      );
+
+      expect(ids(october)).toEqual([last, first]);
+      expect(ids(fromLast)).toEqual([after, last]);
+      expect(ids(toFirst)).toEqual([first, before]);
+      expect(ids(oneDay)).toEqual([first]);
+    });
+
+    it("rejects `from` after `to` and malformed values", async () => {
+      const { alice, household } = await setup();
+      const queries = [
+        "?from=2026-10-02&to=2026-10-01",
+        "?from=2026-13-01",
+        "?to=yesterday",
+        "?categoryId=uncategorized",
+        "?userId=alice",
+      ];
+
+      const responses = await Promise.all(
+        queries.map((query) =>
+          alice.client.get(`${expensesPath(household.id)}${query}`)
+        )
+      );
+
+      for (const response of responses) {
+        expect(response.status).toBe(400);
+        expectApiError(response, "VALIDATION_ERROR");
+      }
+      expect(
+        expectApiError(responses[0], "VALIDATION_ERROR").details
+      ).toMatchObject({ issues: [{ path: ["from"] }] });
+    });
+
+    it("combines filters with AND, keeping the order and pagination", async () => {
+      const { alice, carol, household } = await setup();
+      const category = await categoryOf(household);
+      const matching = (expenseDate: string) =>
+        create(alice, household, {
+          ...expense(alice, [alice, carol]),
+          categoryId: category.id,
+          expenseDate,
+        });
+      const newest = await matching("2026-10-20");
+      const middle = await matching("2026-10-10");
+      const oldest = await matching("2026-10-05");
+      // Each misses one filter.
+      await create(alice, household, {
+        ...expense(alice, [alice]),
+        categoryId: category.id,
+        expenseDate: "2026-10-15",
+      });
+      await create(alice, household, {
+        ...expense(alice, [alice, carol]),
+        expenseDate: "2026-10-15",
+      });
+      await matching("2026-09-30");
+
+      const filters = `categoryId=${category.id}&userId=${carol.id}&from=2026-10-01`;
+      const first = await list(alice, household, `?${filters}&pageSize=2`);
+      const second = await list(
+        alice,
+        household,
+        `?${filters}&pageSize=2&page=2`
+      );
+
+      expect(first).toMatchObject({ page: 1, pageSize: 2, totalItems: 3 });
+      expect(ids(first)).toEqual([newest.id, middle.id]);
+      expect(second).toMatchObject({ page: 2, pageSize: 2, totalItems: 3 });
+      expect(ids(second)).toEqual([oldest.id]);
+    });
+
+    it("matches nothing for another household's or unknown IDs", async () => {
+      const { alice, bob, household } = await setup();
+      await create(alice, household, expense(alice, [alice]));
+      await create(bob, bob.household, expense(bob, [bob]));
+      const theirCategory = await categoryOf(bob.household);
+
+      const queries = [
+        `?categoryId=${theirCategory.id}`,
+        `?userId=${bob.id}`,
+        "?userId=00000000-0000-4000-8000-000000000000",
+      ];
+
+      const responses = await Promise.all(
+        queries.map((query) => list(alice, household, query))
+      );
+
+      for (const response of responses) {
+        expect(response).toEqual({
+          items: [],
+          page: 1,
+          pageSize: 20,
+          totalItems: 0,
+        });
+      }
+    });
+  });
 });

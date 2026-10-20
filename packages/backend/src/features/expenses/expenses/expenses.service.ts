@@ -7,7 +7,6 @@ import type {
   UpdateExpenseRequest,
 } from "@homesplit/contracts";
 import { Injectable } from "@nestjs/common";
-import { eq } from "drizzle-orm";
 import { db, type Executor, readSnapshot, type Transaction } from "@/db";
 import { expenses } from "@/db/schema";
 import { assertCategoryInHousehold } from "@/features/expense-categories/category-reference";
@@ -21,6 +20,7 @@ import { hasRole } from "@/features/households/access/roles";
 import { forbidden, notFound } from "@/http/app-error";
 import {
   expenseInHousehold,
+  expensesMatching,
   findExpenses,
   insertAggregate,
   lockExpense,
@@ -79,18 +79,15 @@ async function lockExpenseForWrite(
 export class ExpensesService {
   list(
     householdId: string,
-    { page, pageSize }: ListExpensesQuery
+    { page, pageSize, ...filters }: ListExpensesQuery
   ): Promise<ExpenseListResponse> {
     return readSnapshot(async (tx) => {
-      const items = await findExpenses(
-        tx,
-        eq(expenses.householdId, householdId),
-        { limit: pageSize, offset: (page - 1) * pageSize }
-      );
-      const totalItems = await tx.$count(
-        expenses,
-        eq(expenses.householdId, householdId)
-      );
+      const where = expensesMatching(tx, householdId, filters);
+      const items = await findExpenses(tx, where, {
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+      });
+      const totalItems = await tx.$count(expenses, where);
       return { items, page, pageSize, totalItems };
     });
   }

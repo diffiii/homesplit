@@ -181,8 +181,23 @@ export const UpdateExpenseRequest = ExpenseDescriptiveFields.partial().extend({
 });
 export type UpdateExpenseRequest = z.infer<typeof UpdateExpenseRequest>;
 
-/** List expenses with offset pagination. */
-export const ListExpensesQuery = Pagination;
+/** `categoryId` value that matches expenses without a category. */
+export const UNCATEGORIZED = "none";
+
+/**
+ * List expenses with offset pagination. Every given filter must match:
+ * `categoryId` (or `UNCATEGORIZED`), `userId` as a payer or allocation
+ * participant, and `from` / `to` as inclusive bounds on `expenseDate`.
+ */
+export const ListExpensesQuery = Pagination.extend({
+  categoryId: z.union([Id, z.literal(UNCATEGORIZED)]).optional(),
+  userId: Id.optional(),
+  from: IsoDate.optional(),
+  to: IsoDate.optional(),
+}).refine(({ from, to }) => !(from && to && from > to), {
+  message: "`from` must not be after `to`",
+  path: ["from"],
+});
 export type ListExpensesQuery = z.infer<typeof ListExpensesQuery>;
 
 /** Paginated expense response list. */

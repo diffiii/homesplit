@@ -4,12 +4,26 @@ import {
   type Expense,
   ExpenseAllocationInput,
   type ExpenseFinancialSpec,
+  type ListExpensesQuery,
   type SplitMethod,
   toSafeInteger,
+  UNCATEGORIZED,
   type UpdateExpenseRequest,
   type UserSummary,
 } from "@homesplit/contracts";
-import { and, asc, desc, eq, type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  exists,
+  gte,
+  isNull,
+  lte,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import type { Executor, Transaction } from "@/db";
 import {
   expenseAllocationParticipants,
@@ -37,6 +51,52 @@ type ParticipantInput = { userId: string } & Partial<
 /** One expense, only if it's in the household. */
 export const expenseInHousehold = (householdId: string, expenseId: string) =>
   and(eq(expenses.id, expenseId), eq(expenses.householdId, householdId));
+
+export type ExpenseListFilters = Omit<ListExpensesQuery, "page" | "pageSize">;
+
+const categoryFilter = (categoryId: ExpenseListFilters["categoryId"]) => {
+  if (categoryId === undefined) {
+    return;
+  }
+  return categoryId === UNCATEGORIZED
+    ? isNull(expenses.categoryId)
+    : eq(expenses.categoryId, categoryId);
+};
+
+/** The user has a row in `table` for the expense; its primary key serves it. */
+const onExpense = (
+  executor: Executor,
+  table: typeof expensePayers | typeof expenseAllocationParticipants,
+  userId: string
+) =>
+  exists(
+    executor
+      .select({ one: sql`1` })
+      .from(table)
+      .where(and(eq(table.expenseId, expenses.id), eq(table.userId, userId)))
+  );
+
+/**
+ * The household's expenses matching every given filter. IDs from another
+ * household match nothing.
+ */
+export const expensesMatching = (
+  executor: Executor,
+  householdId: string,
+  { categoryId, userId, from, to }: ExpenseListFilters
+) =>
+  and(
+    eq(expenses.householdId, householdId),
+    categoryFilter(categoryId),
+    userId === undefined
+      ? undefined
+      : or(
+          onExpense(executor, expensePayers, userId),
+          onExpense(executor, expenseAllocationParticipants, userId)
+        ),
+    from === undefined ? undefined : gte(expenses.expenseDate, from),
+    to === undefined ? undefined : lte(expenses.expenseDate, to)
+  );
 
 /**
  * Writes an expense's payers, allocation participants, and the splits
