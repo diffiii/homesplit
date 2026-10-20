@@ -64,6 +64,13 @@
       "when": 1792342065343,
       "tag": "0008_settlement_party_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792524717549,
+      "tag": "0009_chores",
+      "breakpoints": true
     }
   ]
 }
