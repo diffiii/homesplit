@@ -143,3 +143,47 @@ describe("blockDisabledPaths", () => {
     expect(BLOCKED_AUTH_PATHS.has("/organization/set-active")).toBe(true);
   });
 });
+
+describe("account", () => {
+  it("signs up, in, and out with email and password", async () => {
+    const { account, sent } = setup(() =>
+      Response.json({ token: "t", user: {} })
+    );
+    await account.signUp({
+      name: "Ada",
+      email: "ada@example.com",
+      password: "correct horse",
+    });
+    await account.signIn({ email: "ada@example.com", password: "x" });
+    await account.signOut();
+    expect(sent.map(({ method, path }) => `${method} ${path}`)).toEqual([
+      "POST /sign-up/email",
+      "POST /sign-in/email",
+      "POST /sign-out",
+    ]);
+    expect(sent[0]?.body).toEqual({
+      name: "Ada",
+      email: "ada@example.com",
+      password: "correct horse",
+    });
+  });
+
+  it("throws a rejected sign-in as ApiRequestError from auth", async () => {
+    const { account } = setup(() =>
+      Response.json(
+        {
+          code: "INVALID_EMAIL_OR_PASSWORD",
+          message: "Invalid email or password",
+        },
+        { status: 401, statusText: "Unauthorized" }
+      )
+    );
+    await expect(
+      account.signIn({ email: "ada@example.com", password: "x" })
+    ).rejects.toMatchObject({
+      source: "auth",
+      status: 401,
+      code: "INVALID_EMAIL_OR_PASSWORD",
+    });
+  });
+});

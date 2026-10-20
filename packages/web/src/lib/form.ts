@@ -56,17 +56,16 @@ export function applyServerErrors(
   form: Pick<AnyFormApi, "fieldInfo" | "setErrorMap">,
   error: unknown
 ): void {
-  const { fields, form: formError } = serverErrors(
-    error,
-    new Set(Object.keys(form.fieldInfo))
+  showServerErrors(
+    form,
+    serverErrors(error, new Set(Object.keys(form.fieldInfo)))
   );
-  form.setErrorMap({ onServer: { form: formError, fields } });
 }
 
-/** Show a message of the screen's own above the submit button, such as wrong credentials. */
-export function showFormError(
+/** Show messages of the screen's own, such as a taken email, the same way. */
+export function showServerErrors(
   form: Pick<AnyFormApi, "setErrorMap">,
-  message: string
+  { fields, form: formError }: ServerErrors
 ): void {
-  form.setErrorMap({ onServer: { form: message, fields: {} } });
+  form.setErrorMap({ onServer: { form: formError, fields } });
 }

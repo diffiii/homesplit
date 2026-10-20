@@ -13,6 +13,7 @@ import { isApiRequestError } from "@/lib/api/api-error";
 import { households } from "@/lib/api/auth-client";
 import { errorMessage } from "@/lib/api/error-message";
 import { queryKeys } from "@/lib/api/query-keys";
+import { HOUSEHOLDS_PATH } from "@/lib/last-household";
 
 /** Placeholder settings: appearance and leaving. The households epic adds the rest. */
 export default function SettingsPage() {
@@ -86,7 +87,7 @@ function LeaveHousehold() {
             await queryClient.invalidateQueries({
               queryKey: queryKeys.households(),
             });
-            router.replace("/");
+            router.replace(HOUSEHOLDS_PATH);
           }}
           title="Leave this household?"
           trigger={

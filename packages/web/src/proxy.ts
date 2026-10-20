@@ -21,6 +21,7 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   // Pages only: not the `/api/*` rewrite, Next.js assets, files like the
-  // manifest, or the development-only `/dev/*` pages, which need no backend.
-  matcher: ["/((?!api/|_next/|dev/|.*\\.[^/]*$).*)"],
+  // manifest, the iOS home screen icon, which has no extension, or the
+  // development-only `/dev/*` pages, which need no backend.
+  matcher: ["/((?!api/|_next/|dev/|apple-icon$|.*\\.[^/]*$).*)"],
 };
