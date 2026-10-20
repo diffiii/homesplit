@@ -251,7 +251,6 @@ export function UserMenu({ showName = false }: { showName?: boolean }) {
       <DropdownMenuTrigger
         render={
           <Button
-            aria-label={showName ? undefined : "Account"}
             className={cn(showName && "min-w-0 flex-1 justify-start px-1")}
             size={showName ? "lg" : "icon"}
             variant="ghost"
@@ -259,7 +258,12 @@ export function UserMenu({ showName = false }: { showName?: boolean }) {
         }
       >
         <UserAvatar decorative size="sm" user={summary} />
-        {showName ? <span className="truncate">{user.name}</span> : null}
+        {/* Not `aria-label`, which would have to contain the visible initials. */}
+        {showName ? (
+          <span className="truncate">{user.name}</span>
+        ) : (
+          <span className="sr-only">Account</span>
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48">
         <DropdownMenuGroup>

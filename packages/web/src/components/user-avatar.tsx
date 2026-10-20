@@ -40,7 +40,10 @@ export function UserAvatar({
       size={size}
     >
       {user.imageUrl ? <AvatarImage alt="" src={user.imageUrl} /> : null}
-      <AvatarFallback>{initials(user.name)}</AvatarFallback>
+      {/* The kit's muted text falls short of 4.5:1 contrast on the muted fill. */}
+      <AvatarFallback className="text-foreground">
+        {initials(user.name)}
+      </AvatarFallback>
       {departed ? (
         <AvatarBadge className="bg-muted-foreground">
           <LogOutIcon aria-hidden />

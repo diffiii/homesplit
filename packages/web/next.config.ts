@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // End-to-end tests start their own `next dev` in `.next-e2e`, since `next dev`
+  // locks its directory and yours may be running.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   turbopack: {
     rules: {
       "*.css": {
