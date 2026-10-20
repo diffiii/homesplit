@@ -253,6 +253,7 @@ Requests are checked in this order, so each failure has one predictable answer. 
 - Paginated lists take `page` (default 1) and `pageSize` (default 20, maximum 100) and return `{ items, page, pageSize, totalItems }` with the values applied. A page past the end returns 200 with empty `items` and the real `totalItems`. Items and total come from one read-only `REPEATABLE READ` transaction, so both queries see the same snapshot; under PostgreSQL's default `READ COMMITTED`, each query would see its own.
 - Unpaginated lists return `{ items }`.
 - Every order ends with `id`, so rows with equal sort keys never swap places between requests.
+- Filters narrow a list without changing its order or pagination, and `totalItems` counts only what matches. Several filters combine with AND. An ID that isn't the household's matches nothing rather than answering an error.
 
 | List | Order |
 | --- | --- |

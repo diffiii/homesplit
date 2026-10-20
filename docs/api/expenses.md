@@ -1,6 +1,6 @@
 # Expenses API
 
-Module flag: `expenses` · Tasks: #35, #37, #38, #40, #41, #42 · Contracts: [expenses](../../packages/contracts/src/features/expenses/index.ts), [categories](../../packages/contracts/src/features/expenses/categories.ts), [settlements](../../packages/contracts/src/features/expenses/settlements.ts)
+Module flag: `expenses` · Tasks: #35, #37, #38, #40, #41, #42, #103 · Contracts: [expenses](../../packages/contracts/src/features/expenses/index.ts), [categories](../../packages/contracts/src/features/expenses/categories.ts), [settlements](../../packages/contracts/src/features/expenses/settlements.ts)
 
 ## Routes
 
@@ -58,6 +58,7 @@ The defaults live in `DEFAULT_CATEGORIES` in `default-categories.ts`, so changin
 - Optional fields: an omitted `description` or `categoryId` is stored as `null`.
 - Reading back: payers, allocation participants, and splits come back sorted by user ID, not in the order sent. A departed member still shows as author, payer, or participant. Another household's expense answers 404, as a missing one does.
 - Ordering: `expenseDate` descending, then `createdAt` descending, then `id` descending. A page past the end has no items and the real `totalItems`.
+- Filters: see [Filtering the list](#filtering-the-list).
 - Disabled module: both `GET` routes keep working, and `POST`, `PATCH`, and `DELETE` answer 403 `MODULE_DISABLED`.
 - Repeated requests: `POST` isn't idempotent, so a repeat creates a second expense. Repeating a `PATCH` gives the same expense again, with a later `updatedAt`. A repeated `DELETE` answers 404.
 
@@ -66,6 +67,33 @@ The defaults live in `DEFAULT_CATEGORIES` in `default-categories.ts`, so changin
 `create` runs in one transaction: it locks the household with `lockHouseholdForLedgerWrite`, checks the payers, participants, and category, calculates the splits, and writes the expense and its child rows. A failure at any step stores nothing, and a write that waited for a household's deletion answers 404. A category deleted between the check and the write makes `expenses_category_fk` reject the insert, which answers the generic 409 `CONFLICT`.
 
 `packages/backend/src/features/expenses/expenses/expenses.repository.ts` holds the queries. `insertFinancialRows` calculates the splits with `allocate` and writes them with the payers and participants, for both `insertAggregate` and `updateAggregate`. `findExpenses` reads expenses with their author, category, and child rows in one relational query (`db.query.expenses`), using the relations at the end of `packages/backend/src/db/schema/expenses.ts`. A page of the list and its `totalItems` are read in one `readSnapshot`.
+
+#### Filtering the list
+
+`GET /expenses` takes optional filters in `ListExpensesQuery`, next to `page` and `pageSize`. Each given filter must match, so they combine with AND, and an omitted one matches everything.
+
+| Parameter | Matches |
+| --- | --- |
+| `categoryId` | Expenses in that category. The value `none` (`UNCATEGORIZED` in the contracts) matches expenses without one. |
+| `userId` | Expenses where the user is a payer or an allocation participant. Being only the author doesn't count. |
+| `from` | `expenseDate` on or after this `IsoDate`. |
+| `to` | `expenseDate` on or before this `IsoDate`. |
+
+- The order and pagination stay as without filters, and `totalItems` counts only the matching expenses.
+- `categoryId` is one value: an ID or `none`, never both. A separate `uncategorized` flag would allow contradictory combinations.
+- `userId` accepts any user and isn't checked against the household. A [departed member](../decisions.md#departed-members) still matches the expenses they're on, and a user who has never been a member matches nothing.
+- IDs from another household, and unknown ones, match nothing: the answer is 200 with empty `items` and `totalItems` 0, not an error.
+- `from` after `to` answers 400 `VALIDATION_ERROR` with the path `["from"]`. `from` equal to `to` matches that one day. A malformed ID or date, or a `categoryId` other than an ID or `none`, also answers 400 `VALIDATION_ERROR`.
+
+`expensesMatching` in `expenses.repository.ts` builds the condition, used for both the page and `totalItems`. The user filter is two correlated `EXISTS` subqueries, on `expense_payers` and `expense_allocation_participants`, each served by the table's (`expense_id`, `user_id`) primary key.
+
+Indexes keep the list order under every filter:
+
+- No filter, or only `from` and `to`: `expenses_list_idx`, read backward, with the dates as a range after `household_id`.
+- `categoryId`, with or without dates: `expenses_category_idx` on (`household_id`, `category_id`, `expense_date`, `created_at`, `id`), read backward the same way. `category_id IS NULL` uses it too.
+- `userId`: the list goes through either index in order and checks each expense with the two primary-key lookups, stopping once the page is full; `totalItems` checks every expense the other filters leave.
+
+With 2,000 households of 5 members and 100 expenses each, a filtered page and its count each ran in under 2 ms, using only index scans.
 
 #### Editing
 
@@ -238,7 +266,7 @@ Shared errors from [the decision record](../decisions.md#errors) apply. Feature 
 - `expenses_author_party_fk` references `household_membership_history` from (`household_id`, `author_id`).
 - Checks: `expenses_total_amount_positive` (`total_amount_cents > 0`), `expenses_currency_code` (three capital letters), `expenses_allocation_method`, `expenses_name_not_empty`, and `expenses_description_not_empty`. The amount limit and the list of supported currencies are enforced by the contract schema only.
 - Unique keys on (`id`, `household_id`) and (`id`, `household_id`, `allocation_method`) are targets for the child rows' composite keys.
-- Indexes: `expenses_list_idx` on (`household_id`, `expense_date`, `created_at`, `id`) serves the list, read backward; `expenses_category_idx` on (`household_id`, `category_id`) serves the in-use check; `expenses_currency_idx` on (`household_id`, `currency`) serves per-currency accounting.
+- Indexes: `expenses_list_idx` on (`household_id`, `expense_date`, `created_at`, `id`) serves the list, read backward; `expenses_category_idx` on (`household_id`, `category_id`, `expense_date`, `created_at`, `id`) serves the category filter in the list order and, by its prefix, the in-use check; `expenses_currency_idx` on (`household_id`, `currency`) serves per-currency accounting.
 
 `expense_payers`, `expense_allocation_participants`, and `expense_splits` share these columns and keys:
 

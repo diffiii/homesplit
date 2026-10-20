@@ -31,10 +31,10 @@ export function encodeQuery<E extends Endpoint & { query: z.ZodObject }>(
   endpoint: E,
   query: QueryInput<E>
 ): Record<string, string> {
-  const encoded = z.encode(endpoint.query.partial(), query) as Record<
-    string,
-    unknown
-  >;
+  // Rebuilt from the shape, since `.partial()` rejects schemas with
+  // refinements; the backend checks those when it parses the request.
+  const partial = z.object(endpoint.query.shape).partial();
+  const encoded = z.encode(partial, query) as Record<string, unknown>;
   const search: Record<string, string> = {};
   for (const [key, value] of Object.entries(encoded)) {
     if (value !== undefined) {

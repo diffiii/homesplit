@@ -80,6 +80,12 @@ describe("encodeQuery", () => {
       encodeQuery(endpoints.listChores, { page: 2, includeCompleted: true })
     ).toEqual({ page: "2", includeCompleted: "true" });
     expect(encodeQuery(endpoints.listExpenses, {})).toEqual({});
+    expect(
+      encodeQuery(endpoints.listExpenses, {
+        categoryId: "none",
+        to: "2026-10-31",
+      })
+    ).toEqual({ categoryId: "none", to: "2026-10-31" });
     // @ts-expect-error page is a number, not a string
     expect(() => encodeQuery(endpoints.listExpenses, { page: "2" })).toThrow();
   });
