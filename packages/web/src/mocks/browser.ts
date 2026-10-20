@@ -1,6 +1,6 @@
 import { setupWorker } from "msw/browser";
 import type { HouseholdRole } from "@/lib/api/auth-client";
-import { MockDb, type MockState } from "./db";
+import { MockDb } from "./db";
 import { createHandlers } from "./handlers";
 import { DEFAULT_NETWORK, type MockNetwork } from "./routes";
 import {
@@ -9,25 +9,22 @@ import {
   SCENARIOS,
   type ScenarioName,
 } from "./scenarios";
-
-const STORAGE_KEY = "homesplit:mocks";
-/** Bump when `MockState` changes shape, so saved data is rebuilt instead of misread. */
-const STORAGE_VERSION = 1;
+import {
+  MOCK_STORAGE_KEY,
+  MOCK_STORAGE_VERSION,
+  type SavedMocks,
+} from "./storage";
 
 /** The cookie the proxy looks for; Better Auth's real one is HTTP-only. */
 const SESSION_COOKIE = "better-auth.session_token";
 
-interface Saved {
-  network: MockNetwork;
-  scenario: ScenarioName;
-  state: MockState;
-  version: number;
-}
-
-function load(): Partial<Saved> {
+function load(): Partial<SavedMocks> {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
-    if (saved.version === STORAGE_VERSION && isScenarioName(saved.scenario)) {
+    const saved = JSON.parse(localStorage.getItem(MOCK_STORAGE_KEY) ?? "{}");
+    if (
+      saved.version === MOCK_STORAGE_VERSION &&
+      isScenarioName(saved.scenario)
+    ) {
       return saved;
     }
   } catch {
@@ -98,13 +95,13 @@ async function start(): Promise<MockControls> {
   const db = new MockDb(saved.state ?? SCENARIOS[scenario].build());
 
   const save = () => {
-    const data: Saved = {
-      version: STORAGE_VERSION,
+    const data: SavedMocks = {
+      version: MOCK_STORAGE_VERSION,
       scenario,
       network,
       state: db.state,
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(data));
     syncSessionCookie(db.state.sessionUserId);
   };
   db.subscribe(save);
