@@ -6,6 +6,7 @@
     "build": "node -e \"require('node:fs').rmSync('public/mockServiceWorker.js', { force: true })\" && next build",
     "dev": "msw init public --no-save && next dev",
     "e2e": "playwright test",
+    "e2e:backend": "playwright test --config playwright.backend.config.ts",
     "e2e:ui": "playwright test --ui",
     "start": "next start",
     "test": "vitest run",

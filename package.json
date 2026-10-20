@@ -14,6 +14,7 @@
     "dev:backend": "pnpm --filter backend dev",
     "dev:web": "pnpm --filter web... --parallel dev",
     "e2e:web": "pnpm --filter \"web^...\" build && pnpm --filter web e2e",
+    "e2e:web:backend": "pnpm --filter \"web^...\" --filter \"backend^...\" build && pnpm --filter web e2e:backend",
     "lint": "ultracite check",
     "lint:fix": "ultracite fix",
     "prepare": "husky",
