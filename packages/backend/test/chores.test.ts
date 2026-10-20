@@ -1,11 +1,11 @@
-import { ApiError, Chore, ChoreListResponse } from "@homesplit/contracts";
+import { Chore, ChoreListResponse } from "@homesplit/contracts";
 import type { INestApplication } from "@nestjs/common";
 import { eq } from "drizzle-orm";
-import type { Response } from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { db } from "@/db";
 import { chores } from "@/db/schema";
+import { expectApiError } from "./helpers/api";
 import { createClient, createTestApp } from "./helpers/app";
 import {
   createHousehold,
@@ -17,10 +17,6 @@ import {
 
 const choresPath = (householdId: string) =>
   `/api/households/${householdId}/chores`;
-
-function expectApiError(response: Response, code: string): void {
-  expect(ApiError.parse(response.body).code).toBe(code);
-}
 
 describe("chores API", () => {
   let app: INestApplication;
@@ -145,7 +141,7 @@ describe("chores API", () => {
         .update(chores)
         .set({
           isCompleted: true,
-          completedAt: new Date().toISOString(), // <-- ZMIANA Z new Date() NA .toISOString()
+          completedAt: new Date().toISOString(),
           completedById: alice.id,
         })
         .where(eq(chores.id, completedChore.id));

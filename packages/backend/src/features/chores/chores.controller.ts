@@ -3,6 +3,7 @@ import {
   type ChoreListResponse,
   CreateChoreRequest,
   endpoints,
+  Id,
   ListChoresQuery,
   UpdateChoreRequest,
 } from "@homesplit/contracts";
@@ -49,7 +50,7 @@ export class ChoresController {
   @HouseholdRoute(endpoints.getChore)
   getOne(
     @CurrentHousehold() household: HouseholdContext,
-    @Param("choreId") choreId: string
+    @Param("choreId", new ZodPipe(Id)) choreId: string
   ): Promise<Chore> {
     return this.chores.getById(household.householdId, choreId);
   }
@@ -57,7 +58,7 @@ export class ChoresController {
   @HouseholdRoute(endpoints.updateChore, { module: "chores" })
   update(
     @CurrentHousehold() household: HouseholdContext,
-    @Param("choreId") choreId: string,
+    @Param("choreId", new ZodPipe(Id)) choreId: string,
     @Body(new PatchPipe(UpdateChoreRequest)) body: UpdateChoreDto
   ): Promise<Chore> {
     return this.chores.update(household.householdId, choreId, body);
@@ -66,7 +67,7 @@ export class ChoresController {
   @HouseholdRoute(endpoints.deleteChore, { module: "chores" })
   async delete(
     @CurrentHousehold() household: HouseholdContext,
-    @Param("choreId") choreId: string
+    @Param("choreId", new ZodPipe(Id)) choreId: string
   ): Promise<void> {
     await this.chores.delete(household.householdId, choreId);
   }

@@ -10,77 +10,53 @@ import { and, eq, sql } from "drizzle-orm";
 import type { z } from "zod";
 
 import { db } from "@/db";
-import { chores, member, type user } from "@/db/schema";
-import { AppError, notFound } from "@/http/app-error";
+import { chores } from "@/db/schema";
+import { assertUsersEligible } from "@/features/households/access/household-access";
+import { notFound } from "@/http/app-error";
 
 type CreateChoreDto = z.infer<typeof CreateChoreRequest>;
 type UpdateChoreDto = z.infer<typeof UpdateChoreRequest>;
 type ListChoresQueryDto = z.infer<typeof ListChoresQuery>;
 
-type UserWithSummaryFields = typeof user.$inferSelect;
+interface UserSummary {
+  id: string;
+  image: string | null;
+  name: string;
+}
 
-type ChoreQueryResult = typeof chores.$inferSelect & {
-  addedBy: UserWithSummaryFields;
-  assignedTo: UserWithSummaryFields | null;
-  completedBy: UserWithSummaryFields | null;
+type ChoreQueryResult = Omit<
+  typeof chores.$inferSelect,
+  "createdAt" | "updatedAt" | "dueAt" | "completedAt"
+> & {
+  createdAt: string | Date;
+  updatedAt: string | Date;
+  dueAt: string | Date | null;
+  completedAt: string | Date | null;
+  addedBy: UserSummary;
+  assignedTo: UserSummary | null;
+  completedBy: UserSummary | null;
 };
 
-const ISO_DATETIME_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
-
-function isValidIsoDateTime(val: string): boolean {
-  return ISO_DATETIME_REGEX.test(val);
-}
-
-function toIsoString(value: unknown): string {
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-  if (typeof value === "string") {
-    const d = new Date(value);
-    if (!Number.isNaN(d.getTime())) {
-      return d.toISOString();
-    }
-  }
-  throw new Error("Invalid date encountered while mapping chore");
-}
+const userSummaryFields = {
+  id: true,
+  name: true,
+  image: true,
+} as const;
 
 @Injectable()
 export class ChoresService {
-  private async assertEligibleMember(
-    householdId: string,
-    userId: string
-  ): Promise<void> {
-    const row = await db.query.member.findFirst({
-      where: and(
-        eq(member.organizationId, householdId),
-        eq(member.userId, userId)
-      ),
-    });
-
-    if (!row) {
-      throw new AppError(
-        400,
-        "INVALID_REFERENCE",
-        "Assigned user is not an eligible household member"
-      );
-    }
-  }
-
   async create(
     householdId: string,
     authorId: string,
     dto: CreateChoreDto
   ): Promise<Chore> {
-    if (dto.dueAt && !isValidIsoDateTime(dto.dueAt)) {
-      throw new AppError(
-        400,
-        "VALIDATION_ERROR",
-        "dueAt must be a full ISO 8601 datetime"
-      );
-    }
-
     if (dto.assignedToId) {
-      await this.assertEligibleMember(householdId, dto.assignedToId);
+      await assertUsersEligible(
+        db,
+        householdId,
+        [{ path: ["assignedToId"], userId: dto.assignedToId }],
+        "current"
+      );
     }
 
     const [inserted] = await db
@@ -124,9 +100,9 @@ export class ChoresService {
     const items = await db.query.chores.findMany({
       where: combinedWhere,
       with: {
-        addedBy: true,
-        assignedTo: true,
-        completedBy: true,
+        addedBy: { columns: userSummaryFields },
+        assignedTo: { columns: userSummaryFields },
+        completedBy: { columns: userSummaryFields },
       },
       orderBy: (choresTable, { asc, sql: sqlOrder }) => [
         asc(choresTable.isCompleted),
@@ -139,7 +115,9 @@ export class ChoresService {
     });
 
     return {
-      items: items.map((item) => this.mapToContract(item)),
+      items: items.map((item) =>
+        this.mapToContract(item as unknown as ChoreQueryResult)
+      ),
       page,
       pageSize,
       totalItems,
@@ -150,9 +128,9 @@ export class ChoresService {
     const chore = await db.query.chores.findFirst({
       where: and(eq(chores.id, choreId), eq(chores.householdId, householdId)),
       with: {
-        addedBy: true,
-        assignedTo: true,
-        completedBy: true,
+        addedBy: { columns: userSummaryFields },
+        assignedTo: { columns: userSummaryFields },
+        completedBy: { columns: userSummaryFields },
       },
     });
 
@@ -160,7 +138,7 @@ export class ChoresService {
       throw notFound();
     }
 
-    return this.mapToContract(chore);
+    return this.mapToContract(chore as unknown as ChoreQueryResult);
   }
 
   async update(
@@ -170,16 +148,13 @@ export class ChoresService {
   ): Promise<Chore> {
     await this.getById(householdId, choreId);
 
-    if (dto.dueAt && !isValidIsoDateTime(dto.dueAt)) {
-      throw new AppError(
-        400,
-        "VALIDATION_ERROR",
-        "dueAt must be a full ISO 8601 datetime"
-      );
-    }
-
     if (dto.assignedToId !== undefined && dto.assignedToId !== null) {
-      await this.assertEligibleMember(householdId, dto.assignedToId);
+      await assertUsersEligible(
+        db,
+        householdId,
+        [{ path: ["assignedToId"], userId: dto.assignedToId }],
+        "current"
+      );
     }
 
     const updateData: Partial<typeof chores.$inferInsert> = {};
@@ -229,14 +204,14 @@ export class ChoresService {
             imageUrl: chore.assignedTo.image ?? null,
           }
         : null,
-      dueAt: chore.dueAt ? toIsoString(chore.dueAt) : null,
+      dueAt: chore.dueAt ? new Date(chore.dueAt).toISOString() : null,
       addedBy: {
         id: chore.addedBy.id,
         name: chore.addedBy.name,
         imageUrl: chore.addedBy.image ?? null,
       },
-      createdAt: toIsoString(chore.createdAt),
-      updatedAt: toIsoString(chore.updatedAt),
+      createdAt: new Date(chore.createdAt).toISOString(),
+      updatedAt: new Date(chore.updatedAt).toISOString(),
     };
 
     if (chore.isCompleted) {
@@ -247,7 +222,7 @@ export class ChoresService {
       return {
         ...base,
         isCompleted: true as const,
-        completedAt: toIsoString(chore.completedAt),
+        completedAt: new Date(chore.completedAt).toISOString(),
         completedBy: {
           id: chore.completedBy.id,
           name: chore.completedBy.name,
