@@ -1,4 +1,8 @@
 export const SIGN_IN_PATH = "/sign-in";
+export const SIGN_UP_PATH = "/sign-up";
+
+/** Where a signed-in user goes when nothing asked for another page. */
+export const HOME_PATH = "/";
 
 /**
  * Pages for signed-out visitors. Every other page needs a session, and the
@@ -6,7 +10,7 @@ export const SIGN_IN_PATH = "/sign-in";
  */
 export const SIGNED_OUT_PATHS: ReadonlySet<string> = new Set([
   SIGN_IN_PATH,
-  "/sign-up",
+  SIGN_UP_PATH,
   "/forgot-password",
   "/reset-password",
   "/verify-email",
@@ -16,9 +20,22 @@ export function isSignedOutPath(pathname: string): boolean {
   return SIGNED_OUT_PATHS.has(pathname);
 }
 
+/** `page`, continuing to `redirectTo` afterwards. The home page needs no parameter. */
+function withRedirect(page: string, redirectTo: string | null | undefined) {
+  const target = safeRedirectPath(redirectTo);
+  return target === HOME_PATH
+    ? page
+    : `${page}?${new URLSearchParams({ redirectTo: target })}`;
+}
+
 /** The sign-in page, continuing to `redirectTo` once the user is signed in. */
-export function signInUrl(redirectTo: string): string {
-  return `${SIGN_IN_PATH}?${new URLSearchParams({ redirectTo })}`;
+export function signInUrl(redirectTo?: string | null): string {
+  return withRedirect(SIGN_IN_PATH, redirectTo);
+}
+
+/** The sign-up page, continuing to `redirectTo` once the account exists. */
+export function signUpUrl(redirectTo?: string | null): string {
+  return withRedirect(SIGN_UP_PATH, redirectTo);
 }
 
 let redirecting = false;
@@ -40,19 +57,42 @@ export function redirectToSignIn(): void {
 }
 
 /**
- * Where to go after signing in: `redirectTo` if it's a path on this origin,
- * starting with a single `/`, and `/` otherwise, so a link can't send the user
- * to another site.
+ * Stop `redirectToSignIn` while signing out, which ends the session on
+ * purpose and goes to sign-in without a `redirectTo`. Call the returned
+ * function if signing out fails.
+ */
+export function pauseSignInRedirects(): () => void {
+  const wasRedirecting = redirecting;
+  redirecting = true;
+  return () => {
+    redirecting = wasRedirecting;
+  };
+}
+
+// Only its origin matters: a path that resolves anywhere else leaves the site.
+const SAME_ORIGIN = "https://homesplit.invalid";
+
+/**
+ * Where to go after signing in: `redirectTo` if it's a path on this origin
+ * other than a signed-out page, and `/` otherwise, so a link can't send the
+ * user to another site. The path is resolved the way the browser will
+ * resolve it, so tricks like `/\evil.test` or a tab in `/\t/evil.test` don't
+ * get through.
  */
 export function safeRedirectPath(
   redirectTo: string | null | undefined
 ): string {
-  if (
-    !redirectTo?.startsWith("/") ||
-    redirectTo.startsWith("//") ||
-    redirectTo.startsWith("/\\")
-  ) {
-    return "/";
+  if (!redirectTo?.startsWith("/")) {
+    return HOME_PATH;
   }
-  return redirectTo;
+  let url: URL;
+  try {
+    url = new URL(redirectTo, SAME_ORIGIN);
+  } catch {
+    return HOME_PATH;
+  }
+  if (url.origin !== SAME_ORIGIN || isSignedOutPath(url.pathname)) {
+    return HOME_PATH;
+  }
+  return `${url.pathname}${url.search}${url.hash}`;
 }

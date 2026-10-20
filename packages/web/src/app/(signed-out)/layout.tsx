@@ -1,4 +1,4 @@
-import { HouseIcon } from "lucide-react";
+import { Logo } from "@/components/logo";
 import { ThemeMenu } from "@/components/theme-menu";
 
 /** Sign-in, sign-up, and the pages emails link to: one centered column. */
@@ -7,7 +7,7 @@ export default function SignedOutLayout({ children }: LayoutProps<"/">) {
     <div className="flex min-h-svh flex-col">
       <header className="flex h-14 items-center justify-between px-4">
         <span className="flex items-center gap-2 font-semibold">
-          <HouseIcon aria-hidden className="size-5 text-primary" />
+          <Logo className="size-5" />
           HomeSplit
         </span>
         <ThemeMenu />
