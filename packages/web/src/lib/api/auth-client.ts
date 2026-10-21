@@ -107,7 +107,6 @@ export function createAuth({ baseURL, fetch }: AuthClientOptions = {}) {
         organization.create({
           name,
           slug: crypto.randomUUID(),
-          keepCurrentActiveOrganization: true,
         })
       ),
 

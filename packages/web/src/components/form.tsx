@@ -93,7 +93,7 @@ function FieldShell({ label, description, children }: FieldShellProps) {
 interface TextFieldProps
   extends Pick<
     ComponentProps<"input">,
-    "autoComplete" | "inputMode" | "placeholder" | "type"
+    "autoComplete" | "disabled" | "inputMode" | "placeholder" | "type"
   > {
   description?: ReactNode;
   label: ReactNode;
