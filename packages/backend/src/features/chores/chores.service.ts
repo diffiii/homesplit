@@ -1,15 +1,18 @@
 import type {
   Chore,
   ChoreListResponse,
+  CompletedChore,
   CreateChoreRequest,
   ListChoresQuery,
+  OpenChore,
   UpdateChoreRequest,
 } from "@homesplit/contracts";
 import { Injectable } from "@nestjs/common";
 import { and, eq, sql } from "drizzle-orm";
+import type { PgUpdateSetSource } from "drizzle-orm/pg-core";
 import type { z } from "zod";
 
-import { db } from "@/db";
+import { db, type Executor } from "@/db";
 import { chores } from "@/db/schema";
 import { assertUsersEligible } from "@/features/households/access/household-access";
 import { notFound } from "@/http/app-error";
@@ -124,8 +127,85 @@ export class ChoresService {
     };
   }
 
-  async getById(householdId: string, choreId: string): Promise<Chore> {
-    const chore = await db.query.chores.findFirst({
+  getById(householdId: string, choreId: string): Promise<Chore> {
+    return this.findById(db, householdId, choreId);
+  }
+
+  /**
+   * Marks the chore completed by `userId` now. Completing a completed chore
+   * keeps its original `completedBy` and `completedAt`.
+   */
+  async complete(
+    householdId: string,
+    choreId: string,
+    userId: string
+  ): Promise<CompletedChore> {
+    const chore = await this.transition(householdId, choreId, true, {
+      completedAt: sql`now()`,
+      completedById: userId,
+    });
+    if (!chore.isCompleted) {
+      throw new Error("Chore not completed after completion");
+    }
+    return chore;
+  }
+
+  /** Marks the chore open again. Reopening an open chore changes nothing. */
+  async reopen(householdId: string, choreId: string): Promise<OpenChore> {
+    const chore = await this.transition(householdId, choreId, false, {
+      completedAt: null,
+      completedById: null,
+    });
+    if (chore.isCompleted) {
+      throw new Error("Chore still completed after reopening");
+    }
+    return chore;
+  }
+
+  /**
+   * Locks the chore and, unless it's already in the target state, sets
+   * `isCompleted` and the completion metadata in one update. Concurrent
+   * transitions on a chore are serialized by the row lock.
+   */
+  private transition(
+    householdId: string,
+    choreId: string,
+    isCompleted: boolean,
+    metadata: PgUpdateSetSource<typeof chores>
+  ): Promise<Chore> {
+    const where = and(
+      eq(chores.id, choreId),
+      eq(chores.householdId, householdId)
+    );
+
+    return db.transaction(async (tx) => {
+      const [current] = await tx
+        .select({ isCompleted: chores.isCompleted })
+        .from(chores)
+        .where(where)
+        .for("update");
+
+      if (!current) {
+        throw notFound();
+      }
+
+      if (current.isCompleted !== isCompleted) {
+        await tx
+          .update(chores)
+          .set({ isCompleted, ...metadata })
+          .where(where);
+      }
+
+      return this.findById(tx, householdId, choreId);
+    });
+  }
+
+  private async findById(
+    executor: Executor,
+    householdId: string,
+    choreId: string
+  ): Promise<Chore> {
+    const chore = await executor.query.chores.findFirst({
       where: and(eq(chores.id, choreId), eq(chores.householdId, householdId)),
       with: {
         addedBy: { columns: userSummaryFields },

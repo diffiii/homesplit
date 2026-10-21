@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   index,
   pgTable,
   text,
@@ -31,7 +32,7 @@ export const chores = pgTable(
       mode: "string",
     }),
     completedById: uuid("completed_by_id").references(() => user.id, {
-      onDelete: "set null",
+      onDelete: "restrict",
     }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
       .defaultNow()
@@ -45,6 +46,11 @@ export const chores = pgTable(
     index("chores_householdId_idx").on(table.householdId),
     index("chores_assignedToId_idx").on(table.assignedToId),
     index("chores_addedById_idx").on(table.addedById),
+    // Open chores have no completion metadata; completed chores have both.
+    check(
+      "chores_completion",
+      sql`(${table.isCompleted} AND ${table.completedAt} IS NOT NULL AND ${table.completedById} IS NOT NULL) OR (NOT ${table.isCompleted} AND ${table.completedAt} IS NULL AND ${table.completedById} IS NULL)`
+    ),
   ]
 );
 

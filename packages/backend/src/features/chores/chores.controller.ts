@@ -1,10 +1,12 @@
 import {
   type Chore,
   type ChoreListResponse,
+  type CompleteChoreResponse,
   CreateChoreRequest,
   endpoints,
   Id,
   ListChoresQuery,
+  type ReopenChoreResponse,
   UpdateChoreRequest,
 } from "@homesplit/contracts";
 import { Body, Controller, Inject, Param, Query } from "@nestjs/common";
@@ -70,5 +72,25 @@ export class ChoresController {
     @Param("choreId", new ZodPipe(Id)) choreId: string
   ): Promise<void> {
     await this.chores.delete(household.householdId, choreId);
+  }
+
+  @HouseholdRoute(endpoints.completeChore, { module: "chores" })
+  complete(
+    @CurrentHousehold() household: HouseholdContext,
+    @Param("choreId", new ZodPipe(Id)) choreId: string
+  ): Promise<CompleteChoreResponse> {
+    return this.chores.complete(
+      household.householdId,
+      choreId,
+      household.userId
+    );
+  }
+
+  @HouseholdRoute(endpoints.reopenChore, { module: "chores" })
+  reopen(
+    @CurrentHousehold() household: HouseholdContext,
+    @Param("choreId", new ZodPipe(Id)) choreId: string
+  ): Promise<ReopenChoreResponse> {
+    return this.chores.reopen(household.householdId, choreId);
   }
 }

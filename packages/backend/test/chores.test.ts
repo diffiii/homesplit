@@ -1,6 +1,13 @@
-import { Chore, ChoreListResponse } from "@homesplit/contracts";
+import { randomUUID } from "node:crypto";
+import {
+  Chore,
+  ChoreListResponse,
+  CompletedChore,
+  OpenChore,
+} from "@homesplit/contracts";
 import type { INestApplication } from "@nestjs/common";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import type { Response } from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { db } from "@/db";
@@ -11,12 +18,27 @@ import {
   createHousehold,
   createTwoHouseholds,
   createUser,
+  inviteAndAccept,
   type TestHousehold,
   type TestUser,
 } from "./helpers/fixtures";
+import { sendDuring } from "./helpers/locks";
 
 const choresPath = (householdId: string) =>
   `/api/households/${householdId}/chores`;
+
+const transitionPath = (
+  householdId: string,
+  choreId: string,
+  action: "complete" | "reopen"
+) => `${choresPath(householdId)}/${choreId}/${action}`;
+
+async function expectViolation(
+  write: Promise<unknown>,
+  constraint: string
+): Promise<void> {
+  await expect(write).rejects.toMatchObject({ cause: { constraint } });
+}
 
 describe("chores API", () => {
   let app: INestApplication;
@@ -162,6 +184,220 @@ describe("chores API", () => {
 
       const allList = ChoreListResponse.parse(listAllRes.body);
       expect(allList.items).toHaveLength(2);
+    });
+  });
+
+  describe("complete and reopen", () => {
+    let alice: TestUser;
+    let bob: TestUser;
+    let household: TestHousehold;
+    let chore: OpenChore;
+
+    const complete = (user: TestUser, choreId = chore.id) =>
+      user.client.post(transitionPath(household.id, choreId, "complete"));
+    const reopen = (user: TestUser, choreId = chore.id) =>
+      user.client.post(transitionPath(household.id, choreId, "reopen"));
+    const stored = async () =>
+      Chore.parse(
+        (
+          await alice.client
+            .get(`${choresPath(household.id)}/${chore.id}`)
+            .expect(200)
+        ).body
+      );
+
+    beforeEach(async () => {
+      alice = await createUser(app, "Alice");
+      bob = await createUser(app, "Bob");
+      household = await createHousehold(alice);
+      await inviteAndAccept(alice, household, bob);
+      const response = await alice.client
+        .post(choresPath(household.id))
+        .send({ name: "Clean bathroom" })
+        .expect(201);
+      chore = OpenChore.parse(response.body);
+    });
+
+    it("creates chores open, completes them as the caller, and reopens them", async () => {
+      expect(chore).toMatchObject({
+        isCompleted: false,
+        completedAt: null,
+        completedBy: null,
+      });
+
+      const before = Date.now();
+      const completed = CompletedChore.parse(
+        (await complete(bob).expect(200)).body
+      );
+      expect(completed.completedBy).toEqual({
+        id: bob.id,
+        name: bob.name,
+        imageUrl: null,
+      });
+      expect(Date.parse(completed.completedAt)).toBeGreaterThanOrEqual(
+        before - 1000
+      );
+      expect(await stored()).toEqual(completed);
+
+      const reopened = OpenChore.parse((await reopen(alice).expect(200)).body);
+      expect(reopened).toEqual({
+        ...chore,
+        updatedAt: reopened.updatedAt,
+      });
+      expect(await stored()).toEqual(reopened);
+    });
+
+    it("answers a repeated complete or reopen with the chore unchanged", async () => {
+      const completed = CompletedChore.parse(
+        (await complete(bob).expect(200)).body
+      );
+
+      const again = await complete(alice).expect(200);
+      expect(CompletedChore.parse(again.body)).toEqual(completed);
+
+      const reopened = OpenChore.parse((await reopen(alice).expect(200)).body);
+      const reopenedAgain = await reopen(bob).expect(200);
+      expect(OpenChore.parse(reopenedAgain.body)).toEqual(reopened);
+    });
+
+    it("hides chores from non-members, unauthenticated callers, and other households", async () => {
+      const { bob: stranger } = await createTwoHouseholds(app);
+      const anonymous = createClient(app);
+
+      await Promise.all(
+        (["complete", "reopen"] as const).flatMap((action) => [
+          stranger.client
+            .post(transitionPath(household.id, chore.id, action))
+            .expect(404),
+          anonymous
+            .post(transitionPath(household.id, chore.id, action))
+            .expect(401),
+          stranger.client
+            .post(transitionPath(stranger.household.id, chore.id, action))
+            .expect(404),
+          alice.client
+            .post(transitionPath(household.id, randomUUID(), action))
+            .expect(404),
+        ])
+      );
+      expect(await stored()).toEqual(chore);
+    });
+
+    it("needs the chores module", async () => {
+      await alice.client
+        .patch(`/api/households/${household.id}/features`)
+        .send({ chores: false })
+        .expect(200);
+
+      const responses = await Promise.all([complete(bob), reopen(bob)]);
+      for (const response of responses) {
+        expect(response.status).toBe(403);
+        expectApiError(response, "MODULE_DISABLED");
+      }
+      expect(await stored()).toEqual(chore);
+    });
+
+    it("completes a chore once when both members complete it at the same time", async () => {
+      const responses = await Promise.all([complete(alice), complete(bob)]);
+
+      const [first, second] = responses.map((response) =>
+        CompletedChore.parse(response.body)
+      );
+      expect(second).toEqual(first);
+      expect(await stored()).toEqual(first);
+    });
+
+    it("keeps the completer a waiting complete finds", async () => {
+      const response = await sendDuring(
+        (tx) =>
+          tx
+            .update(chores)
+            .set({
+              isCompleted: true,
+              completedAt: sql`now()`,
+              completedById: bob.id,
+            })
+            .where(eq(chores.id, chore.id)),
+        () => complete(alice)
+      );
+
+      expect(response.status).toBe(200);
+      expect(CompletedChore.parse(response.body).completedBy.id).toBe(bob.id);
+    });
+
+    it("reopens a chore completed while the reopen waited", async () => {
+      const response = await sendDuring(
+        (tx) =>
+          tx
+            .update(chores)
+            .set({
+              isCompleted: true,
+              completedAt: sql`now()`,
+              completedById: bob.id,
+            })
+            .where(eq(chores.id, chore.id)),
+        () => reopen(alice)
+      );
+
+      expect(response.status).toBe(200);
+      expect(OpenChore.parse(response.body)).toMatchObject({
+        completedAt: null,
+        completedBy: null,
+      });
+      expect((await stored()).isCompleted).toBe(false);
+    });
+
+    it("rolls back a transition that fails", async () => {
+      await db.execute(
+        sql.raw(`
+          CREATE FUNCTION "reject_chore_update"() RETURNS trigger
+          LANGUAGE plpgsql AS $$
+          BEGIN
+            RAISE EXCEPTION 'update failed';
+          END;
+          $$;
+          CREATE TRIGGER "reject_chore_update"
+          AFTER UPDATE ON "chores"
+          FOR EACH ROW WHEN (NEW.id = '${chore.id}')
+          EXECUTE FUNCTION "reject_chore_update"();
+        `)
+      );
+      let response: Response;
+      try {
+        response = await complete(bob);
+      } finally {
+        await db.execute(
+          sql.raw(`
+            DROP TRIGGER "reject_chore_update" ON "chores";
+            DROP FUNCTION "reject_chore_update"();
+          `)
+        );
+      }
+
+      expectApiError(response, "INTERNAL_ERROR");
+      expect(await stored()).toEqual(chore);
+    });
+
+    it("rejects completion metadata that doesn't match the state", async () => {
+      const set = (values: Partial<typeof chores.$inferInsert>) =>
+        db.update(chores).set(values).where(eq(chores.id, chore.id));
+      const completedAt = new Date().toISOString();
+
+      await expectViolation(set({ isCompleted: true }), "chores_completion");
+      await expectViolation(
+        set({ isCompleted: true, completedAt }),
+        "chores_completion"
+      );
+      await expectViolation(
+        set({ isCompleted: true, completedById: bob.id }),
+        "chores_completion"
+      );
+      await expectViolation(set({ completedAt }), "chores_completion");
+      await expectViolation(
+        set({ completedById: bob.id }),
+        "chores_completion"
+      );
+      expect(await stored()).toEqual(chore);
     });
   });
 

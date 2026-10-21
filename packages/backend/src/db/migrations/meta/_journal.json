@@ -78,6 +78,13 @@
       "when": 1792526888482,
       "tag": "0010_expense_list_filters",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792611674557,
+      "tag": "0011_chore_completion",
+      "breakpoints": true
     }
   ]
 }
