@@ -12,7 +12,8 @@ import {
 const BASE_URL = "http://localhost:3000";
 const HOUSEHOLD_ID = "0b6f1f4e-3c1a-4b8e-9a59-1d2f3e4a5b6c";
 const MEMBER_ID = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
-const UUID = /^[0-9a-f-]{36}$/;
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 interface SentRequest {
   body: Record<string, unknown> | undefined;
@@ -77,18 +78,19 @@ describe("households", () => {
     }
   });
 
-  it("creates a household with a random slug and keeps the active organization", async () => {
+  it("creates households with only a name and a fresh UUID slug", async () => {
     const { households, sent } = setup();
     await households.create({ name: "Flat" });
-    expect(sent[0]).toMatchObject({
-      method: "POST",
-      path: "/organization/create",
-      body: {
+    await households.create({ name: "Flat" });
+    for (const request of sent) {
+      expect(request.method).toBe("POST");
+      expect(request.path).toBe("/organization/create");
+      expect(request.body).toEqual({
         name: "Flat",
         slug: expect.stringMatching(UUID),
-        keepCurrentActiveOrganization: true,
-      },
-    });
+      });
+    }
+    expect(sent[0]?.body?.slug).not.toBe(sent[1]?.body?.slug);
   });
 
   it("throws Better Auth errors as ApiRequestError from auth", async () => {

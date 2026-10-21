@@ -1,13 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { cn } from "cn";
-import {
-  CheckIcon,
-  ChevronsUpDownIcon,
-  LayoutGridIcon,
-  LogOutIcon,
-} from "lucide-react";
+import { LogOutIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect } from "react";
@@ -19,7 +13,6 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -38,11 +31,11 @@ import {
 import { UserAvatar } from "@/components/user-avatar";
 import { useHouseholdFeatures } from "@/hooks/use-household-features";
 import { useRequiredSession } from "@/hooks/use-required-session";
-import { householdQueries } from "@/lib/api/household-queries";
-import { HOUSEHOLDS_PATH, rememberHousehold } from "@/lib/last-household";
+import { rememberHousehold } from "@/lib/last-household";
 import { signOutAndReset } from "@/lib/sign-out";
 import { HouseholdContext } from "./household-context";
 import { HOUSEHOLD_NAV, householdPath, isActive } from "./household-nav";
+import { HouseholdSwitcher } from "./household-switcher";
 
 interface HouseholdShellProps {
   children: ReactNode;
@@ -81,10 +74,6 @@ export function HouseholdShell({ householdId, children }: HouseholdShellProps) {
       </SidebarProvider>
     </HouseholdContext>
   );
-}
-
-function useHouseholds() {
-  return useQuery(householdQueries.list());
 }
 
 /** Modules turned off for the household; their sections stay reachable but read-only. */
@@ -194,48 +183,6 @@ function BottomNav({ householdId }: { householdId: string }) {
         })}
       </ul>
     </nav>
-  );
-}
-
-function HouseholdSwitcher({ householdId }: { householdId: string }) {
-  const { data } = useHouseholds();
-  const current = data?.find((household) => household.id === householdId);
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            className="w-full min-w-0 justify-between px-2 font-semibold"
-            size="lg"
-            variant="ghost"
-          />
-        }
-      >
-        <span className="truncate">{current?.name ?? "Household"}</span>
-        <ChevronsUpDownIcon aria-hidden className="text-muted-foreground" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-56">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>Households</DropdownMenuLabel>
-          {data?.map((household) => (
-            <DropdownMenuItem
-              key={household.id}
-              render={<Link href={householdPath(household.id)} />}
-            >
-              <span className="flex-1 truncate">{household.name}</span>
-              {household.id === householdId ? (
-                <CheckIcon aria-label="Current" />
-              ) : null}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem render={<Link href={HOUSEHOLDS_PATH} />}>
-          <LayoutGridIcon aria-hidden />
-          All households
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 
