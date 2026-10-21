@@ -1,3 +1,4 @@
+import { attachmentEndpoints } from "./attachments";
 import { choreEndpoints } from "./chores";
 import type { Endpoint } from "./endpoint";
 import { expenseEndpoints } from "./expenses";
@@ -16,6 +17,7 @@ export * from "./url";
 export const endpoints = {
   ...householdEndpoints,
   ...expenseEndpoints,
+  ...attachmentEndpoints,
   ...choreEndpoints,
   ...shoppingEndpoints,
   ...meEndpoints,

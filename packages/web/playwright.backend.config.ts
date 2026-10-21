@@ -48,6 +48,7 @@ export default defineConfig({
         BETTER_AUTH_SECRET: "e2e-secret-not-for-production-use-0123456789",
         FRONTEND_URL: baseURL,
         FRONTEND_PREVIEW_ORIGINS: "",
+        STORAGE_DRIVER: "memory",
       },
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,

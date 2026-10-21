@@ -85,6 +85,20 @@
       "when": 1792611674557,
       "tag": "0011_chore_completion",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792687080345,
+      "tag": "0012_attachments",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792687080654,
+      "tag": "0013_attachments_deletion_queue",
+      "breakpoints": true
     }
   ]
 }

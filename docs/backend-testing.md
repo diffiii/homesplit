@@ -68,7 +68,7 @@ describe("expenses", () => {
 });
 ```
 
-Create fixtures inside each test or in `beforeEach`, not in `beforeAll`: tables are truncated before every test, so anything made in `beforeAll` is gone by the second test. To check what reached the database, query it with `db` from `src/db`.
+Create fixtures inside each test or in `beforeEach`, not in `beforeAll`: tables are truncated before every test, so anything made in `beforeAll` is gone by the second test. To check what reached the database, query it with `db` from `src/db`. Tests run with `STORAGE_DRIVER=memory`, so `app.get(ObjectStorage)` returns an `InMemoryObjectStorage`, whose `objects` map holds what was uploaded.
 
 ## Migrations
 

@@ -39,6 +39,8 @@ export default defineConfig({
             BETTER_AUTH_SECRET: "test-secret-not-for-production-use-0123456789",
             FRONTEND_URL: "https://homesplit.test",
             FRONTEND_PREVIEW_ORIGINS: "https://homesplit-web-*.vercel.app",
+            STORAGE_DRIVER: "memory",
+            ATTACHMENT_MAX_BYTES: "65536",
           },
           globalSetup: ["test/global-setup.ts"],
           setupFiles: ["test/setup.ts"],

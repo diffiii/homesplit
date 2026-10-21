@@ -11,6 +11,7 @@ export * from "./common/pagination";
 export * from "./common/query";
 export * from "./common/safe-integer";
 export * from "./endpoints";
+export * from "./features/attachments";
 export * from "./features/catalog";
 export * from "./features/chores";
 export * from "./features/expenses";

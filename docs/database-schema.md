@@ -161,6 +161,21 @@ erDiagram
         bigint amount_cents "Calculated; nonnegative"
     }
 
+    attachments {
+        uuid id PK
+        uuid household_id FK "organization.id"
+        text storage_key UK "Server-generated"
+        text mime_type "Detected from content"
+        bigint size_bytes "Strictly positive"
+        uuid uploaded_by_id FK
+        timestamptz created_at "Default now()"
+    }
+
+    storage_object_deletions {
+        text storage_key PK
+        timestamptz queued_at "Default now()"
+    }
+
     organization ||..o| household_features : toggles
     organization ||..o{ household_membership_history : remembers
     user ||..o{ household_membership_history : was_member
@@ -180,9 +195,12 @@ erDiagram
     household_membership_history ||..o{ expense_payers : party_to
     household_membership_history ||..o{ expense_allocation_participants : party_to
     household_membership_history ||..o{ expense_splits : party_to
+    organization ||..o{ attachments : stores
+    user ||..o{ attachments : uploads
+    household_membership_history ||..o{ attachments : party_to
 ```
 
-`household_membership_history` keeps everyone who has ever been a member, after Better Auth deletes their `member` row; an `AFTER INSERT ON member` trigger fills it (see [Households API](api/households.md#storage)). Its `user_id` key is `ON DELETE RESTRICT`. `household_features` holds one row per organization with module toggles; an `AFTER INSERT ON organization` trigger seeds defaults (same doc). `expense_categories` holds each household's categories, unique on (`household_id`, `id`); new households get a default set from a Better Auth hook (see [Expenses API](api/expenses.md#storage)). `settlements` holds payments between household parties: its user keys are `ON DELETE RESTRICT`, and (`household_id`, `payer_id`) and (`household_id`, `payee_id`) also reference `household_membership_history`; an index on (`household_id`, `created_at`, `id`) serves the history, and indexes on (`household_id`, `payer_id`) and (`household_id`, `payee_id`) serve one party's payments (same doc). `expenses` and its child tables `expense_payers`, `expense_allocation_participants`, and `expense_splits` hold the ledger's expenses (same doc): user keys are `ON DELETE RESTRICT`; (`household_id`, `author_id`) and each child's (`household_id`, `user_id`) reference `household_membership_history`; (`household_id`, `category_id`) references `expense_categories` (`household_id`, `id`) with `ON DELETE RESTRICT`; children reference `expenses` by (`expense_id`, `household_id`) and cascade from both the expense and `organization`; participants also reference the expense's `allocation_method` with `ON UPDATE CASCADE`. Every other implemented foreign key uses `ON DELETE CASCADE`. `verification` has no foreign keys; `session.active_organization_id` is nullable text with no enforced organization reference. Timestamp columns are PostgreSQL `timestamp` without time zone. Non-unique indexes cover `session.user_id`, `account.user_id`, `verification.identifier`, both member foreign keys, and invitation organization/email. Membership pairs are not constrained to be unique.
+`household_membership_history` keeps everyone who has ever been a member, after Better Auth deletes their `member` row; an `AFTER INSERT ON member` trigger fills it (see [Households API](api/households.md#storage)). Its `user_id` key is `ON DELETE RESTRICT`. `household_features` holds one row per organization with module toggles; an `AFTER INSERT ON organization` trigger seeds defaults (same doc). `expense_categories` holds each household's categories, unique on (`household_id`, `id`); new households get a default set from a Better Auth hook (see [Expenses API](api/expenses.md#storage)). `settlements` holds payments between household parties: its user keys are `ON DELETE RESTRICT`, and (`household_id`, `payer_id`) and (`household_id`, `payee_id`) also reference `household_membership_history`; an index on (`household_id`, `created_at`, `id`) serves the history, and indexes on (`household_id`, `payer_id`) and (`household_id`, `payee_id`) serve one party's payments (same doc). `expenses` and its child tables `expense_payers`, `expense_allocation_participants`, and `expense_splits` hold the ledger's expenses (same doc): user keys are `ON DELETE RESTRICT`; (`household_id`, `author_id`) and each child's (`household_id`, `user_id`) reference `household_membership_history`; (`household_id`, `category_id`) references `expense_categories` (`household_id`, `id`) with `ON DELETE RESTRICT`; children reference `expenses` by (`expense_id`, `household_id`) and cascade from both the expense and `organization`; participants also reference the expense's `allocation_method` with `ON UPDATE CASCADE`. `attachments` holds files stored for a household in S3-compatible object storage (see [Attachments API](api/attachments.md#storage)): `uploaded_by_id` is `ON DELETE RESTRICT`, and (`household_id`, `uploaded_by_id`) references `household_membership_history`; an `AFTER DELETE ON attachments` trigger queues each deleted row's `storage_key` in `storage_object_deletions`, which has no foreign keys, so cleanup can delete the object even after its household is gone. Every other implemented foreign key uses `ON DELETE CASCADE`. `verification` has no foreign keys; `session.active_organization_id` is nullable text with no enforced organization reference. Timestamp columns are PostgreSQL `timestamp` without time zone. Non-unique indexes cover `session.user_id`, `account.user_id`, `verification.identifier`, both member foreign keys, and invitation organization/email. Membership pairs are not constrained to be unique.
 
 ## Proposed household data
 
@@ -349,18 +367,12 @@ erDiagram
 
 ## Proposed attachments and receipts
 
-These tables support backlog tasks [4.3](backlog/tasks/4-expenses/4.3-attachments/4.3.0-epic.md) and [7](backlog/tasks/7-ai-receipts/7.0-epic.md) and have no contracts yet. `HOUSEHOLDS`, `USERS`, `EXPENSES`, and `SHOPPING_ITEMS` are the entities from the household diagram.
+These tables support backlog tasks [4.3](backlog/tasks/4-expenses/4.3-attachments/4.3.0-epic.md) and [7](backlog/tasks/7-ai-receipts/7.0-epic.md) and have no contracts yet. `HOUSEHOLDS`, `USERS`, `EXPENSES`, and `SHOPPING_ITEMS` are the entities from the household diagram. `ATTACHMENTS` is the implemented `attachments` table (#44).
 
 ```mermaid
 erDiagram
     ATTACHMENTS {
-        uuid id PK
-        uuid household_id FK
-        text storage_key UK "Server-generated"
-        text mime_type
-        bigint size_bytes
-        uuid uploaded_by_id FK
-        timestamptz created_at
+        uuid id PK "Maps to attachments.id"
     }
 
     EXPENSE_ATTACHMENTS {
@@ -401,9 +413,7 @@ erDiagram
         numeric shares "Strictly positive; units or equal shares"
     }
 
-    HOUSEHOLDS ||..o{ ATTACHMENTS : stores
     HOUSEHOLDS ||..o{ RECEIPTS : contains
-    USERS ||..o{ ATTACHMENTS : uploads
     USERS ||..o{ RECEIPTS : creates
     EXPENSES ||..o{ EXPENSE_ATTACHMENTS : has
     ATTACHMENTS ||..o{ EXPENSE_ATTACHMENTS : linked_by
