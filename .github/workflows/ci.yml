@@ -13,6 +13,63 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Lists the workspace packages a change affects: those it touches and those
+  # that depend on them. Shared files, such as the lockfile, affect them all.
+  # Pull requests compare with their base. Pushes to main compare with the last
+  # commit CI passed on, so changes in a run that failed or was replaced run
+  # and deploy again with the next push.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      packages: ${{ steps.filter.outputs.packages }}
+      backend: ${{ steps.filter.outputs.backend }}
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - name: Check out repository history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/setup@v3
+        with:
+          install: false
+
+      - name: Find affected packages
+        id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            base=$PR_BASE
+          else
+            base=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push \
+              --status success --limit 1 --json headSha --jq '.[0].headSha // empty')
+          fi
+          names() {
+            jq -sc --arg dir "$(pwd -P)/packages/" '[(.[0] // [])[].path | select(startswith($dir)) | ltrimstr($dir)]'
+          }
+          if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null ||
+            ! git diff --quiet "$base" HEAD -- package.json pnpm-lock.yaml pnpm-workspace.yaml .github; then
+            packages=$(pnpm ls -r --depth -1 --json | names)
+          else
+            packages=$(pnpm --filter "...[$base]" ls --depth -1 --json | names)
+          fi
+          affected() {
+            jq -e --arg name "$1" 'index($name) != null' <<<"$packages" >/dev/null && echo true || echo false
+          }
+          echo "Affected packages since ${base:-the start}: $packages"
+          {
+            echo "packages=$packages"
+            echo "backend=$(affected backend)"
+            echo "web=$(affected web)"
+          } >> "$GITHUB_OUTPUT"
+
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -31,11 +88,13 @@ jobs:
 
   typecheck:
     name: typecheck (${{ matrix.package }})
+    needs: changes
+    if: needs.changes.outputs.packages != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        package: [backend, contracts, web]
+        package: ${{ fromJSON(needs.changes.outputs.packages) }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -58,12 +117,13 @@ jobs:
 
   build:
     name: build (${{ matrix.package }})
-    needs: typecheck
+    needs: [changes, typecheck]
+    if: needs.changes.outputs.packages != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        package: [backend, contracts, web]
+        package: ${{ fromJSON(needs.changes.outputs.packages) }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -85,11 +145,13 @@ jobs:
 
   test:
     name: test (${{ matrix.package }})
+    needs: changes
+    if: needs.changes.outputs.packages != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        package: [backend, contracts, web]
+        package: ${{ fromJSON(needs.changes.outputs.packages) }}
     services:
       postgres-test:
         image: postgres:18-alpine
@@ -120,35 +182,6 @@ jobs:
 
       - name: Run tests
         run: pnpm --filter ${{ matrix.package }} test
-
-  changes:
-    runs-on: ubuntu-latest
-    outputs:
-      web: ${{ steps.filter.outputs.web }}
-      stack: ${{ steps.filter.outputs.stack }}
-    steps:
-      - name: Check out repository history
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      # Pull requests run the end-to-end tests only when they touch what the
-      # tests exercise; pushes to main always run them.
-      - name: Find changed packages
-        id: filter
-        env:
-          EVENT: ${{ github.event_name }}
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD: ${{ github.event.pull_request.head.sha }}
-        run: |
-          changed() {
-            [ "$EVENT" != pull_request ] || ! git diff --quiet "$BASE...$HEAD" -- "$@"
-          }
-          shared=(packages/contracts package.json pnpm-lock.yaml pnpm-workspace.yaml .github/workflows/ci.yml)
-          if changed packages/web "${shared[@]}"; then web=true; else web=false; fi
-          if changed packages/web packages/backend "${shared[@]}"; then stack=true; else stack=false; fi
-          echo "web=$web" >> "$GITHUB_OUTPUT"
-          echo "stack=$stack" >> "$GITHUB_OUTPUT"
 
   e2e-web:
     name: e2e (web)
@@ -188,7 +221,7 @@ jobs:
   e2e-web-backend:
     name: e2e (web, backend)
     needs: changes
-    if: needs.changes.outputs.stack == 'true'
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     services:
       postgres-test:
@@ -233,6 +266,73 @@ jobs:
             packages/web/playwright-report/
             packages/web/test-results/
           retention-days: 7
+
+  # Production deploys run on pushes to main once the checks pass: migrations
+  # first, then the backend, then the web app. The backend's old version serves
+  # requests until its new one is live, so a migration must work with both.
+  migrate-database:
+    name: migrate (database)
+    needs: [changes, lint, build, test, e2e-web-backend]
+    if: >-
+      !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+      && github.event_name == 'push' && github.ref == 'refs/heads/main'
+      && needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@v3
+        with:
+          cache: true
+          require-lockfile: true
+          runtime: node@lts
+
+      - name: Apply migrations
+        run: pnpm --filter backend db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+
+  deploy-backend:
+    name: deploy (backend)
+    needs: [changes, migrate-database]
+    if: >-
+      !cancelled() && needs.migrate-database.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production-backend
+      url: https://api.homesplit.janmarek.pl
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Deploy to Render
+        run: .github/scripts/render-deploy.sh srv-dbdm8e5g1s2s73bvuar0 "$GITHUB_SHA"
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+
+  deploy-web:
+    name: deploy (web)
+    needs: [changes, lint, build, test, e2e-web, e2e-web-backend, migrate-database, deploy-backend]
+    if: >-
+      !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+      && github.event_name == 'push' && github.ref == 'refs/heads/main'
+      && needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production-web
+      url: https://homesplit.janmarek.pl
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Deploy to Render
+        run: .github/scripts/render-deploy.sh srv-dbdp0kgm7kps73b6uj60 "$GITHUB_SHA"
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
 
   commitlint:
     runs-on: ubuntu-latest
