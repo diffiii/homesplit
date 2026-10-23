@@ -234,6 +234,45 @@ jobs:
             packages/web/test-results/
           retention-days: 7
 
+  # Render's auto-deploy is off, so main reaches production only through this
+  # job, after the checks pass. The environment records it as a GitHub deployment.
+  deploy-backend:
+    name: deploy (backend)
+    needs: [lint, build, test, e2e-web-backend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: deploy-backend
+      cancel-in-progress: false
+    environment:
+      name: backend-production
+      url: https://homesplit-backend-rl0v.onrender.com
+    steps:
+      - name: Deploy to Render and wait until it's live
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          SERVICE_ID: srv-dbdm8e5g1s2s73bvuar0
+          COMMIT: ${{ github.sha }}
+        run: |
+          api() {
+            curl -fsS -H "Authorization: Bearer $RENDER_API_KEY" -H "Content-Type: application/json" "$@"
+          }
+          deploys="https://api.render.com/v1/services/$SERVICE_ID/deploys"
+          deploy=$(api -X POST -d "{\"commitId\":\"$COMMIT\"}" "$deploys" | jq -r .id)
+          echo "Render deploy $deploy for $COMMIT"
+          while :; do
+            status=$(api "$deploys/$deploy" | jq -r .status)
+            case "$status" in
+              live) exit 0 ;;
+              build_failed | update_failed | pre_deploy_failed | canceled | deactivated)
+                echo "::error::Render deploy $deploy ended as $status"
+                exit 1
+                ;;
+            esac
+            sleep 15
+          done
+
   commitlint:
     runs-on: ubuntu-latest
     permissions:
