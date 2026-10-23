@@ -1,5 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
-import { baseConfig, NEXT_E2E_ENV } from "./e2e/base-config";
+import { baseConfig, NEXT_E2E_ENV, WARM_UP_PROJECT } from "./e2e/base-config";
 
 const PORT = 3100;
 const baseURL = `http://localhost:${PORT}`;
@@ -13,12 +13,15 @@ export default defineConfig({
   testDir: "e2e/mocks",
   use: { baseURL, trace: "retain-on-failure" },
   projects: [
+    WARM_UP_PROJECT,
     {
       name: "mobile",
+      dependencies: [WARM_UP_PROJECT.name],
       use: { ...devices["Pixel 7"], viewport: { width: 360, height: 780 } },
     },
     {
       name: "desktop",
+      dependencies: [WARM_UP_PROJECT.name],
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1280, height: 800 },

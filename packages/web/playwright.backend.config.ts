@@ -1,5 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
-import { baseConfig, NEXT_E2E_ENV } from "./e2e/base-config";
+import { baseConfig, NEXT_E2E_ENV, WARM_UP_PROJECT } from "./e2e/base-config";
 
 const WEB_PORT = 3200;
 const API_PORT = 8180;
@@ -28,8 +28,10 @@ export default defineConfig({
   testDir: "e2e/backend",
   use: { baseURL, trace: "retain-on-failure" },
   projects: [
+    WARM_UP_PROJECT,
     {
       name: "backend",
+      dependencies: [WARM_UP_PROJECT.name],
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1280, height: 800 },
