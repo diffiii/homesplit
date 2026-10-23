@@ -3,6 +3,7 @@ import { ThrottlerModule } from "@nestjs/throttler";
 import type { UserSession } from "@thallesp/nestjs-better-auth";
 import { FriendRequestsService } from "./friend-requests.service";
 import { FriendsController } from "./friends.controller";
+import { FriendshipsService } from "./friendships.service";
 
 /** Friend requests a user may send per hour, counting rejected attempts. */
 export const FRIEND_REQUEST_LIMIT = 20;
@@ -17,6 +18,6 @@ export const FRIEND_REQUEST_LIMIT = 20;
     }),
   ],
   controllers: [FriendsController],
-  providers: [FriendRequestsService],
+  providers: [FriendRequestsService, FriendshipsService],
 })
 export class FriendsModule {}

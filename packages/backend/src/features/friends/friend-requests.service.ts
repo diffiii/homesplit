@@ -1,13 +1,15 @@
 import type {
   FriendRequest,
   FriendRequestListResponse,
+  Friendship,
 } from "@homesplit/contracts";
 import { Injectable } from "@nestjs/common";
 import { and, desc, eq, or } from "drizzle-orm";
-import { db } from "@/db";
+import { db, type Transaction } from "@/db";
 import { friendRequests, user } from "@/db/schema";
 import { friendUserColumns } from "@/features/users/user-projections";
-import { AppError } from "@/http/app-error";
+import { AppError, forbidden, notFound } from "@/http/app-error";
+import { assertNotFriends, createFriendship } from "./friendships.service";
 
 type Direction = "incoming" | "sent";
 
@@ -35,8 +37,8 @@ export class FriendRequestsService {
       );
     }
 
-    // The unique index on the unordered pair makes this atomic: a duplicate,
-    // a crossed request, or a concurrent insert all leave nothing inserted.
+    await assertNotFriends(db, requesterId, recipient.id);
+
     const [created] = await db
       .insert(friendRequests)
       .values({ requesterId, recipientId: recipient.id })
@@ -58,6 +60,57 @@ export class FriendRequestsService {
   listSent(userId: string): Promise<FriendRequestListResponse> {
     return list(userId, "sent");
   }
+
+  /** Deletes the request and creates its friendship in one transaction. */
+  accept(userId: string, requestId: string): Promise<Friendship> {
+    return db.transaction(async (tx) => {
+      const { requesterId } = await lockForRecipient(tx, userId, requestId);
+      await tx.delete(friendRequests).where(eq(friendRequests.id, requestId));
+      return createFriendship(tx, userId, requesterId);
+    });
+  }
+
+  async decline(userId: string, requestId: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      await lockForRecipient(tx, userId, requestId);
+      await tx.delete(friendRequests).where(eq(friendRequests.id, requestId));
+    });
+  }
+}
+
+/**
+ * Locks a request the caller is party to, so concurrent accepts and declines
+ * act on it one at a time and the later ones answer 404. Only the recipient
+ * may act: the requester gets 403, and anyone else 404.
+ */
+async function lockForRecipient(
+  tx: Transaction,
+  userId: string,
+  requestId: string
+) {
+  const [request] = await tx
+    .select({
+      requesterId: friendRequests.requesterId,
+      recipientId: friendRequests.recipientId,
+    })
+    .from(friendRequests)
+    .where(
+      and(
+        eq(friendRequests.id, requestId),
+        or(
+          eq(friendRequests.requesterId, userId),
+          eq(friendRequests.recipientId, userId)
+        )
+      )
+    )
+    .for("update");
+  if (!request) {
+    throw notFound();
+  }
+  if (request.recipientId !== userId) {
+    throw forbidden();
+  }
+  return request;
 }
 
 /** Requests where `userId` is on the `direction` side, each with the other user. */

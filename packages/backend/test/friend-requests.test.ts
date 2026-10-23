@@ -144,6 +144,26 @@ describe("friend requests", () => {
       expect(await db.select().from(friendRequests)).toHaveLength(1);
     });
 
+    it("rejects a request between friends, in either direction", async () => {
+      const alice = await createUser(app, "Alice");
+      const bob = await createUser(app, "Bob");
+      const request = await sendRequest(alice, bob);
+      await bob.client.post(`${REQUESTS}/${request.id}/accept`).expect(200);
+
+      const again = await alice.client
+        .post(REQUESTS)
+        .send({ email: bob.email })
+        .expect(409);
+      const reversed = await bob.client
+        .post(REQUESTS)
+        .send({ email: alice.email })
+        .expect(409);
+
+      expectApiError(again, "ALREADY_FRIENDS");
+      expectApiError(reversed, "ALREADY_FRIENDS");
+      expect(await db.select().from(friendRequests)).toEqual([]);
+    });
+
     it("keeps one request when both users send at once", async () => {
       const alice = await createUser(app, "Alice");
       const bob = await createUser(app, "Bob");
