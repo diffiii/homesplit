@@ -128,6 +128,28 @@ describe("HouseholdShell", () => {
     await expectAccessibleShell();
   });
 
+  it("offers category changes only to admins and owners", async () => {
+    const { unmount } = renderShell(
+      household("Flat on Piękna").id,
+      <ExpensesPage />,
+      "expenses"
+    );
+    expect(
+      await screen.findByRole("button", { name: "New category" })
+    ).toBeVisible();
+    unmount();
+
+    // Alice is a plain member of the cabin.
+    renderShell(household("Lake cabin").id, <ExpensesPage />, "expenses");
+    expect(await screen.findByText("Groceries")).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "New category" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Delete Groceries" })
+    ).not.toBeInTheDocument();
+  });
+
   it.each([
     ["a household that doesn't exist", () => crypto.randomUUID()],
     ["a household the user isn't in", () => household("Book club").id],

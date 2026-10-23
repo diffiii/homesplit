@@ -28,6 +28,7 @@ import {
 import {
   useFeatureEnabled,
   useHouseholdId,
+  usePermissions,
 } from "@/components/shell/household-context";
 import { Button } from "@/components/ui/button";
 import { isApiRequestError } from "@/lib/api/api-error";
@@ -45,6 +46,9 @@ import { applyServerErrors } from "@/lib/form";
 export default function ExpensesPage() {
   const householdId = useHouseholdId();
   const enabled = useFeatureEnabled("expenses");
+  const can = usePermissions();
+  // Categories are shared configuration, so only admins and owners change them.
+  const editable = enabled && can.manageCategories;
   const categories = useQuery(
     endpointQuery("listExpenseCategories", { params: { householdId } })
   );
@@ -53,7 +57,7 @@ export default function ExpensesPage() {
     <>
       <PageHeader
         actions={
-          enabled && categories.data?.items.length ? (
+          editable && categories.data?.items.length ? (
             <CreateCategoryDialog />
           ) : undefined
         }
@@ -68,7 +72,7 @@ export default function ExpensesPage() {
         {({ items }) =>
           items.length === 0 ? (
             <EmptyState
-              action={enabled ? <CreateCategoryDialog /> : null}
+              action={editable ? <CreateCategoryDialog /> : null}
               description="Categories group expenses, like groceries or rent."
               icon={TagIcon}
               title="No categories yet"
@@ -78,7 +82,7 @@ export default function ExpensesPage() {
               {items.map((category) => (
                 <CategoryRow
                   category={category}
-                  editable={enabled}
+                  editable={editable}
                   key={category.id}
                 />
               ))}
