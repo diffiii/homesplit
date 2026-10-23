@@ -25,9 +25,11 @@ import {
   ResponsiveDialogTitle,
   ResponsiveDialogTrigger,
 } from "@/components/responsive-dialog";
-import { useHouseholdId } from "@/components/shell/household-context";
+import {
+  useFeatureEnabled,
+  useHouseholdId,
+} from "@/components/shell/household-context";
 import { Button } from "@/components/ui/button";
-import { useFeatureEnabled } from "@/hooks/use-household-features";
 import { isApiRequestError } from "@/lib/api/api-error";
 import { api } from "@/lib/api/client";
 import { errorMessage } from "@/lib/api/error-message";
@@ -42,7 +44,7 @@ import { applyServerErrors } from "@/lib/form";
  */
 export default function ExpensesPage() {
   const householdId = useHouseholdId();
-  const enabled = useFeatureEnabled(householdId, "expenses");
+  const enabled = useFeatureEnabled("expenses");
   const categories = useQuery(
     endpointQuery("listExpenseCategories", { params: { householdId } })
   );
