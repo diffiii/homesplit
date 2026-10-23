@@ -8,6 +8,8 @@ const HOUSEHOLD_URL = /\/households\/[^/]+$/;
 test("switches from every household screen and remembers the last household", async ({
   page,
 }) => {
+  // Six page loads and two axe runs take most of the default 30 s on a CI runner.
+  test.slow();
   const activeOrganizationRequests: string[] = [];
   page.on("request", (request) => {
     if (request.url().includes("/organization/set-active")) {

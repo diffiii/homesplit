@@ -1,4 +1,4 @@
-import type { PlaywrightTestConfig } from "@playwright/test";
+import type { PlaywrightTestConfig, Project } from "@playwright/test";
 
 /** What the mock and the backend configs share. */
 export const baseConfig = {
@@ -15,3 +15,13 @@ export const baseConfig = {
  * locks its directory and yours may be running.
  */
 export const NEXT_E2E_ENV = { NEXT_DIST_DIR: ".next-e2e" };
+
+/**
+ * Compiles every page before the tests start. Each config's projects list it
+ * in `dependencies`.
+ */
+export const WARM_UP_PROJECT = {
+  name: "warm-up",
+  testDir: "e2e",
+  testMatch: "warm-up.setup.ts",
+} satisfies Project;
