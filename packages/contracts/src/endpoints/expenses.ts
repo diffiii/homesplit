@@ -1,14 +1,18 @@
+import { AttachmentSummary } from "../features/attachments";
 import {
   BalanceListResponse,
   ConfirmedSettlement,
   CreateExpenseCategoryRequest,
   CreateExpenseRequest,
   Expense,
+  ExpenseAttachmentIdParams,
+  ExpenseAttachmentListResponse,
   ExpenseCategory,
   ExpenseCategoryIdParams,
   ExpenseCategoryListResponse,
   ExpenseIdParams,
   ExpenseListResponse,
+  LinkExpenseAttachmentRequest,
   ListExpensesQuery,
   ListSettlementHistoryQuery,
   ProcessSettlementRequest,
@@ -25,6 +29,7 @@ import { HOUSEHOLD } from "./paths";
 
 const CATEGORY = `${HOUSEHOLD}/expense-categories/:categoryId`;
 const EXPENSE = `${HOUSEHOLD}/expenses/:expenseId`;
+const EXPENSE_ATTACHMENTS = `${EXPENSE}/attachments`;
 const SETTLEMENT = `${HOUSEHOLD}/settlements/:settlementId`;
 
 export const expenseEndpoints = {
@@ -94,6 +99,28 @@ export const expenseEndpoints = {
     method: "DELETE",
     path: EXPENSE,
     params: ExpenseIdParams,
+    status: 204,
+    response: null,
+  },
+  listExpenseAttachments: {
+    method: "GET",
+    path: EXPENSE_ATTACHMENTS,
+    params: ExpenseIdParams,
+    status: 200,
+    response: ExpenseAttachmentListResponse,
+  },
+  linkExpenseAttachment: {
+    method: "POST",
+    path: EXPENSE_ATTACHMENTS,
+    params: ExpenseIdParams,
+    body: LinkExpenseAttachmentRequest,
+    status: 201,
+    response: AttachmentSummary,
+  },
+  unlinkExpenseAttachment: {
+    method: "DELETE",
+    path: `${EXPENSE_ATTACHMENTS}/:attachmentId`,
+    params: ExpenseAttachmentIdParams,
     status: 204,
     response: null,
   },

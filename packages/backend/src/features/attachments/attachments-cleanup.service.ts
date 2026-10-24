@@ -1,16 +1,37 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { and, asc, eq, gt, lt, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  gt,
+  inArray,
+  lt,
+  notExists,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, storageObjectDeletions } from "@/db/schema";
+import {
+  attachments,
+  expenseAttachments,
+  storageObjectDeletions,
+} from "@/db/schema";
 import { ObjectStorage } from "@/storage/object-storage";
 import { attachmentsConfig } from "./attachments.config";
 
 /**
  * Conditions that keep an attachment alive, each a `NOT EXISTS` over a table
- * that references it. Nothing references attachments yet: #45 adds expense
- * links and #55 receipts, and each adds its condition here.
+ * that references it: expense links, and receipts once #55 adds its condition
+ * here.
  */
-const UNREFERENCED: SQL[] = [];
+const UNREFERENCED: SQL[] = [
+  notExists(
+    db
+      .select({ one: sql`1` })
+      .from(expenseAttachments)
+      .where(eq(expenseAttachments.attachmentId, attachments.id))
+  ),
+];
 
 const BATCH_SIZE = 100;
 
@@ -47,16 +68,54 @@ export class AttachmentsCleanupService {
     };
   }
 
+  /** Works through the expired unreferenced rows one batch at a time. */
   private async deleteUnreferenced(now: Date): Promise<number> {
     const cutoff = new Date(
       now.getTime() - attachmentsConfig.unreferencedTtlHours * 60 * 60 * 1000
     );
-    // The `AFTER DELETE` trigger queues each row's object.
-    const deleted = await db
-      .delete(attachments)
-      .where(and(lt(attachments.createdAt, cutoff), ...UNREFERENCED))
-      .returning({ id: attachments.id });
-    return deleted.length;
+    const { deleted, full } = await this.deleteUnreferencedBatch(cutoff);
+    return full ? deleted + (await this.deleteUnreferenced(now)) : deleted;
+  }
+
+  /**
+   * Locks a batch of candidates `FOR UPDATE`, skipping rows a link holds, and
+   * deletes those still unreferenced on a fresh snapshot. A link committed
+   * after the first read shows up in the second, and none can start on a
+   * locked row, so a linked file is never deleted. `full` says whether more
+   * candidates may be left.
+   */
+  private deleteUnreferencedBatch(
+    cutoff: Date
+  ): Promise<{ deleted: number; full: boolean }> {
+    return db.transaction(async (tx) => {
+      const candidates = await tx
+        .select({ id: attachments.id })
+        .from(attachments)
+        .where(and(lt(attachments.createdAt, cutoff), ...UNREFERENCED))
+        .orderBy(asc(attachments.createdAt))
+        .limit(BATCH_SIZE)
+        .for("update", { skipLocked: true });
+      if (candidates.length === 0) {
+        return { deleted: 0, full: false };
+      }
+      // The `AFTER DELETE` trigger queues each row's object.
+      const deleted = await tx
+        .delete(attachments)
+        .where(
+          and(
+            inArray(
+              attachments.id,
+              candidates.map(({ id }) => id)
+            ),
+            ...UNREFERENCED
+          )
+        )
+        .returning({ id: attachments.id });
+      return {
+        deleted: deleted.length,
+        full: candidates.length === BATCH_SIZE,
+      };
+    });
   }
 
   /** Works through the queue in key order, one batch at a time. */

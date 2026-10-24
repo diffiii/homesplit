@@ -1,6 +1,6 @@
 # Expenses API
 
-Module flag: `expenses` · Tasks: #35, #37, #38, #40, #41, #42, #103 · Contracts: [expenses](../../packages/contracts/src/features/expenses/index.ts), [categories](../../packages/contracts/src/features/expenses/categories.ts), [settlements](../../packages/contracts/src/features/expenses/settlements.ts)
+Module flag: `expenses` · Tasks: #35, #37, #38, #40, #41, #42, #45, #103 · Contracts: [expenses](../../packages/contracts/src/features/expenses/index.ts), [attachments](../../packages/contracts/src/features/attachments/index.ts), [categories](../../packages/contracts/src/features/expenses/categories.ts), [settlements](../../packages/contracts/src/features/expenses/settlements.ts)
 
 ## Routes
 
@@ -15,6 +15,9 @@ Module flag: `expenses` · Tasks: #35, #37, #38, #40, #41, #42, #103 · Contract
 | GET | `/api/households/:householdId/expenses/:expenseId` | `ExpenseIdParams` | `Expense` | 200 | all |
 | PATCH | `/api/households/:householdId/expenses/:expenseId` | `ExpenseIdParams`, `UpdateExpenseRequest` | `Expense` | 200 | author or admin+ |
 | DELETE | `/api/households/:householdId/expenses/:expenseId` | `ExpenseIdParams` | none | 204 | author or admin+ |
+| GET | `/api/households/:householdId/expenses/:expenseId/attachments` | `ExpenseIdParams` | `ExpenseAttachmentListResponse` | 200 | all |
+| POST | `/api/households/:householdId/expenses/:expenseId/attachments` | `ExpenseIdParams`, `LinkExpenseAttachmentRequest` | `AttachmentSummary` | 201 | author or admin+ |
+| DELETE | `/api/households/:householdId/expenses/:expenseId/attachments/:attachmentId` | `ExpenseAttachmentIdParams` | none | 204 | author or admin+ |
 | GET | `/api/households/:householdId/settlements` | `HouseholdIdParams`, `ListSettlementHistoryQuery` | `SettlementListResponse` | 200 | all |
 | POST | `/api/households/:householdId/settlements` | `HouseholdIdParams`, `ProcessSettlementRequest` | `Settlement` | 201 | party or admin+ |
 | POST | `/api/households/:householdId/settlements/:settlementId/confirm` | `SettlementIdParams` | `ConfirmedSettlement` | 200 | payee, or admin+ who isn't the payer |
@@ -50,7 +53,7 @@ The defaults live in `DEFAULT_CATEGORIES` in `default-categories.ts`, so changin
 
 ### Expenses
 
-- Server-set fields: `id`, `householdId`, `author`, `splits`, `createdAt`, and `updatedAt`. The author is the caller. `CreateExpenseRequest` is strict, so sending any of them answers 400 `VALIDATION_ERROR`.
+- Server-set fields: `id`, `householdId`, `author`, `splits`, `attachments`, `createdAt`, and `updatedAt`. The author is the caller. `CreateExpenseRequest` is strict, so sending any of them answers 400 `VALIDATION_ERROR`.
 - Splits: the server calculates them with `allocate` from `@homesplit/contracts`, the same engine clients run. They're non-negative, so a participant can owe 0, and add up to the total, as the payers do.
 - Payers and participants are independent: a payer needn't take part, and a participant needn't pay. A user appears at most once in each list; a duplicate answers 400 `VALIDATION_ERROR` at its path, such as `["payers", 1, "userId"]`.
 - References and eligibility: payers and participants must be [current members](../decisions.md#referenced-users), checked with `assertUsersEligible(tx, householdId, refs, "current")` at the paths `["payers", i, "userId"]` and `["allocation", "participants", i, "userId"]`. A `categoryId` must be one of this household's categories. Either failure answers 400 `INVALID_REFERENCE`.
@@ -67,6 +70,19 @@ The defaults live in `DEFAULT_CATEGORIES` in `default-categories.ts`, so changin
 `create` runs in one transaction: it locks the household with `lockHouseholdForLedgerWrite`, checks the payers, participants, and category, calculates the splits, and writes the expense and its child rows. A failure at any step stores nothing, and a write that waited for a household's deletion answers 404. A category deleted between the check and the write makes `expenses_category_fk` reject the insert, which answers the generic 409 `CONFLICT`.
 
 `packages/backend/src/features/expenses/expenses/expenses.repository.ts` holds the queries. `insertFinancialRows` calculates the splits with `allocate` and writes them with the payers and participants, for both `insertAggregate` and `updateAggregate`. `findExpenses` reads expenses with their author, category, and child rows in one relational query (`db.query.expenses`), using the relations at the end of `packages/backend/src/db/schema/expenses.ts`. A page of the list and its `totalItems` are read in one `readSnapshot`.
+
+#### Attachments
+
+Files are uploaded through the [attachments API](attachments.md) and then linked to an expense. Every expense response, from `GET`, the list, `POST`, and `PATCH`, has `attachments`: one `AttachmentSummary` (`id`, `mimeType`, `sizeBytes`) per linked file, in the order they were linked. Summaries have no download URL, because signed URLs expire; a client gets one from `GET /attachments/:attachmentId/download` when it shows the file.
+
+- References: `attachmentId` must be one of this household's files. A missing file and another household's both answer 400 `INVALID_REFERENCE` with the path `["attachmentId"]`. `expense_attachments_attachment_fk` enforces the same at the database.
+- Duplicates: a file is linked to an expense at most once; linking it again answers 409 `ATTACHMENT_ALREADY_LINKED`. The same file may be linked to several expenses of its household.
+- Rights: linking and unlinking change the expense, so only its author or an admin+ may, as for `PATCH`. Another household's or a missing expense answers 404 before any 403. Neither changes the expense's `updatedAt`.
+- Unlinking: `DELETE` removes the link and keeps the file, which [cleanup](attachments.md#cleanup) deletes once nothing references it. A file that isn't linked to the expense answers 404, so a repeated `DELETE` does too.
+- Disabled module: `GET /attachments` and the expense reads keep working, and so do downloads. `POST` and `DELETE` answer 403 `MODULE_DISABLED`.
+- Concurrency: linking and unlinking lock the expense row `FOR UPDATE`, like edits, so they wait for an edit or a deletion of the same expense; one that waited for a deletion answers 404. Linking also locks the file's row `FOR KEY SHARE`, which cleanup skips, so cleanup can't delete a file while it's being linked. If cleanup got there first, the link answers 400 `INVALID_REFERENCE`.
+
+`packages/backend/src/features/expenses/expense-attachments/` holds the routes. `findExpenses` reads the links with the rest of the expense through the `attachments` relation, using `linkedAttachments` from `expenses.repository.ts`, which the list route shares.
 
 #### Filtering the list
 
@@ -110,7 +126,9 @@ With 2,000 households of 5 members and 100 expenses each, a filtered page and it
 
 #### Deleting
 
-`DELETE` removes the expense; its payers, participants, and splits cascade through `<table>_expense_fk` in the same statement and transaction, so a failure leaves all of them in place. Payments reference no expense, so deleting one never changes recorded payments; #41 recalculates balances from what remains. There's no soft delete or undo.
+`DELETE` removes the expense; its payers, participants, splits, and attachment links cascade through `<table>_expense_fk` in the same statement and transaction, so a failure leaves all of them in place. Payments reference no expense, so deleting one never changes recorded payments; #41 recalculates balances from what remains. There's no soft delete or undo.
+
+Linked files aren't deleted with the expense: they're kept unlinked, and [cleanup](attachments.md#cleanup) deletes each one, with its object, once no other expense or receipt references it. A file is usually older than `ATTACHMENT_UNREFERENCED_TTL_HOURS` by then, so the next cleanup run deletes it. Deleting files inside the expense's transaction would need the object storage in that transaction, and a file linked to another expense must stay anyway, so the expense routes leave storage to cleanup.
 
 #### Concurrent edits
 
@@ -225,8 +243,10 @@ Shared errors from [the decision record](../decisions.md#errors) apply. Feature 
 | 400 | `INVALID_REFERENCE` | A `categoryId` in a request body isn't a category of this household. |
 | 400 | `INVALID_REFERENCE` | An expense payer or participant isn't a current member of this household and, in a financial replacement, isn't already on the expense. `details.issues` has one entry per failing user. |
 | 400 | `INVALID_REFERENCE` | `payerId` or `payeeId` has never been a member of this household. `details.issues` has one entry per failing field. |
-| 403 | `FORBIDDEN` | Editing or deleting an expense as a `member` who isn't its author. |
+| 400 | `INVALID_REFERENCE` | An `attachmentId` to link isn't a file of this household. |
+| 403 | `FORBIDDEN` | Editing or deleting an expense, or linking or unlinking its files, as a `member` who isn't its author. |
 | 403 | `FORBIDDEN` | Recording a payment between two other users, or deleting one, without being admin+. Confirming a payment as its payer, or as a member who isn't its payee. |
+| 409 | `ATTACHMENT_ALREADY_LINKED` | Linking a file that's already linked to the expense. |
 | 409 | `CATEGORY_IN_USE` | Deleting a category that an expense uses. |
 | 409 | `SETTLEMENT_CONFIRMED` | Deleting a confirmed payment. |
 
@@ -293,6 +313,20 @@ Each table adds:
 - Participants repeat the expense's `allocation_method` so the check can see it. `expense_allocation_participants_method_fk` references `expenses` (`id`, `household_id`, `allocation_method`) with `ON UPDATE CASCADE`, so changing an expense's method without replacing its participants fails their check. Reads map `value` to the contract field for the method: `basisPoints`, `shares`, `amountCents`, or `adjustmentCents`.
 - `expense_payers_member_idx` and `expense_splits_member_idx` on (`household_id`, `user_id`) serve per-member accounting.
 - Splits are calculated by the server and never accepted from clients.
+
+`expense_attachments`:
+
+| Column | Definition |
+| --- | --- |
+| `expense_id` | `uuid`, not null |
+| `attachment_id` | `uuid`, not null |
+| `household_id` | `uuid`, not null |
+| `created_at` | `timestamptz`, not null, default `now()`; when the file was linked |
+
+- PK (`expense_id`, `attachment_id`), so a file is linked to an expense once. Reads order links by `created_at`, then `attachment_id`.
+- `expense_attachments_expense_fk` references `expenses` (`id`, `household_id`) and `expense_attachments_attachment_fk` references `attachments` (`id`, `household_id`), both from the row's own `household_id` and `ON DELETE CASCADE`. Sharing the column keeps the file in the expense's household.
+- Deleting the expense deletes its links. The attachment key's cascade runs only when the household goes, since cleanup deletes only files without links.
+- `expense_attachments_attachment_idx` on `attachment_id` serves cleanup's check for links to a file and the cascade from `attachments`.
 
 `settlements`:
 

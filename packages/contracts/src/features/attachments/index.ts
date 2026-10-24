@@ -30,6 +30,17 @@ export const Attachment = z.object({
 });
 export type Attachment = z.infer<typeof Attachment>;
 
+/**
+ * What an expense shows of each file linked to it. It has no download URL;
+ * `getAttachmentDownload` issues one.
+ */
+export const AttachmentSummary = Attachment.pick({
+  id: true,
+  mimeType: true,
+  sizeBytes: true,
+});
+export type AttachmentSummary = z.infer<typeof AttachmentSummary>;
+
 /** A short-lived signed link to an attachment's content. */
 export const AttachmentDownload = z.object({
   url: z.url(),

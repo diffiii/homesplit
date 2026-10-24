@@ -7,6 +7,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 import { organization, user } from "./auth";
@@ -44,6 +45,8 @@ export const attachments = pgTable(
         householdMembershipHistory.userId,
       ],
     }),
+    // Target of the composite keys that keep a link in its file's household.
+    unique("attachments_id_household_id_key").on(table.id, table.householdId),
     check("attachments_size_positive", sql`${table.sizeBytes} > 0`),
     // Serves lookups by household, and the cleanup by age.
     index("attachments_household_idx").on(table.householdId),
