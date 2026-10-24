@@ -41,6 +41,7 @@ export default defineConfig({
             FRONTEND_PREVIEW_ORIGINS: "https://homesplit-web-*.vercel.app",
             STORAGE_DRIVER: "memory",
             ATTACHMENT_MAX_BYTES: "65536",
+            ATTACHMENT_MAX_PER_EXPENSE: "2",
           },
           globalSetup: ["test/global-setup.ts"],
           setupFiles: ["test/setup.ts"],

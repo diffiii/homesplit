@@ -34,6 +34,9 @@ const PDF = Buffer.from("%PDF-1.7\n%âãÏÓ\n");
 
 const UNKNOWN_ID = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
 
+/** Matches `ATTACHMENT_MAX_PER_EXPENSE` in vitest.config.mts. */
+const MAX_PER_EXPENSE = 2;
+
 /** Past `ATTACHMENT_UNREFERENCED_TTL_HOURS`, the default 24. */
 const AFTER_TTL_MS = 25 * 60 * 60 * 1000;
 
@@ -206,6 +209,28 @@ describe("expense attachments", () => {
       ).rejects.toMatchObject({
         cause: { constraint: "expense_attachments_attachment_fk" },
       });
+    });
+
+    it("caps the files linked to one expense", async () => {
+      const { alice, household, expenseId, carolsExpenseId } = await setup();
+      const files = [
+        await upload(alice, household),
+        await upload(alice, household),
+        await upload(alice, household),
+      ];
+      await link(alice, household, expenseId, files[0].id).expect(201);
+      await link(alice, household, expenseId, files[1].id).expect(201);
+
+      const over = await link(alice, household, expenseId, files[2].id).expect(
+        409
+      );
+
+      expectApiError(over, "EXPENSE_ATTACHMENT_LIMIT_REACHED");
+      expect(over.body.details).toEqual({ limit: MAX_PER_EXPENSE });
+      // Another expense has its own cap, and unlinking frees a place.
+      await link(alice, household, carolsExpenseId, files[2].id).expect(201);
+      await unlink(alice, household, expenseId, files[0].id).expect(204);
+      await link(alice, household, expenseId, files[2].id).expect(201);
     });
 
     it("hides another household's expense", async () => {

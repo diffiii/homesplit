@@ -77,6 +77,7 @@ Files are uploaded through the [attachments API](attachments.md) and then linked
 
 - References: `attachmentId` must be one of this household's files. A missing file and another household's both answer 400 `INVALID_REFERENCE` with the path `["attachmentId"]`. `expense_attachments_attachment_fk` enforces the same at the database.
 - Duplicates: a file is linked to an expense at most once; linking it again answers 409 `ATTACHMENT_ALREADY_LINKED`. The same file may be linked to several expenses of its household.
+- Limit: an expense has at most `ATTACHMENT_MAX_PER_EXPENSE` files linked (default 10; see [configuration](attachments.md#configuration)). Linking one more answers 409 `EXPENSE_ATTACHMENT_LIMIT_REACHED` with the limit in `details.limit`; unlinking a file frees its place. The links are counted under the expense's row lock, so concurrent links can't pass the limit together. Lowering the limit keeps the links an expense already has and only rejects new ones. A duplicate answers `ATTACHMENT_ALREADY_LINKED` even at the limit.
 - Rights: linking and unlinking change the expense, so only its author or an admin+ may, as for `PATCH`. Another household's or a missing expense answers 404 before any 403. Neither changes the expense's `updatedAt`.
 - Unlinking: `DELETE` removes the link and keeps the file, which [cleanup](attachments.md#cleanup) deletes once nothing references it. A file that isn't linked to the expense answers 404, so a repeated `DELETE` does too.
 - Disabled module: `GET /attachments` and the expense reads keep working, and so do downloads. `POST` and `DELETE` answer 403 `MODULE_DISABLED`.
@@ -248,6 +249,7 @@ Shared errors from [the decision record](../decisions.md#errors) apply. Feature 
 | 403 | `FORBIDDEN` | Recording a payment between two other users, or deleting one, without being admin+. Confirming a payment as its payer, or as a member who isn't its payee. |
 | 409 | `ATTACHMENT_ALREADY_LINKED` | Linking a file that's already linked to the expense. |
 | 409 | `CATEGORY_IN_USE` | Deleting a category that an expense uses. |
+| 409 | `EXPENSE_ATTACHMENT_LIMIT_REACHED` | Linking a file to an expense that already has `ATTACHMENT_MAX_PER_EXPENSE` files. `details.limit` holds the limit. |
 | 409 | `SETTLEMENT_CONFIRMED` | Deleting a confirmed payment. |
 
 ## Storage
