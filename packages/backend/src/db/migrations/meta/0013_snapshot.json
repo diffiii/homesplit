@@ -1,178 +1,9 @@
 {
-  "id": "bb07e70c-37a7-4b4d-8c46-e12cf4f3dead",
-  "prevId": "55e2f2fd-c541-4676-8252-104bcab6fa7e",
+  "id": "0187eb62-483c-4ae1-a9fd-a5cb0ba96e95",
+  "prevId": "93bc36cd-cf85-420c-bc85-90f5d4e17ac7",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.attachments": {
-      "name": "attachments",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "household_id": {
-          "name": "household_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "storage_key": {
-          "name": "storage_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "mime_type": {
-          "name": "mime_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "size_bytes": {
-          "name": "size_bytes",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "uploaded_by_id": {
-          "name": "uploaded_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "attachments_household_idx": {
-          "name": "attachments_household_idx",
-          "columns": [
-            {
-              "expression": "household_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        },
-        "attachments_created_at_idx": {
-          "name": "attachments_created_at_idx",
-          "columns": [
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "with": {},
-          "method": "btree",
-          "concurrently": false
-        }
-      },
-      "foreignKeys": {
-        "attachments_household_id_organization_id_fk": {
-          "name": "attachments_household_id_organization_id_fk",
-          "tableFrom": "attachments",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "tableTo": "organization",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
-        },
-        "attachments_uploaded_by_id_user_id_fk": {
-          "name": "attachments_uploaded_by_id_user_id_fk",
-          "tableFrom": "attachments",
-          "columnsFrom": [
-            "uploaded_by_id"
-          ],
-          "tableTo": "user",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
-        },
-        "attachments_uploader_party_fk": {
-          "name": "attachments_uploader_party_fk",
-          "tableFrom": "attachments",
-          "columnsFrom": [
-            "household_id",
-            "uploaded_by_id"
-          ],
-          "tableTo": "household_membership_history",
-          "columnsTo": [
-            "organization_id",
-            "user_id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "attachments_storage_key_unique": {
-          "name": "attachments_storage_key_unique",
-          "columns": [
-            "storage_key"
-          ],
-          "nullsNotDistinct": false
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "attachments_size_positive": {
-          "name": "attachments_size_positive",
-          "value": "\"attachments\".\"size_bytes\" > 0"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.storage_object_deletions": {
-      "name": "storage_object_deletions",
-      "schema": "",
-      "columns": {
-        "storage_key": {
-          "name": "storage_key",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "queued_at": {
-          "name": "queued_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.account": {
       "name": "account",
       "schema": "",
@@ -270,24 +101,24 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "account_user_id_user_id_fk": {
           "name": "account_user_id_user_id_fk",
           "tableFrom": "account",
+          "tableTo": "user",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -364,9 +195,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "invitation_email_idx": {
           "name": "invitation_email_idx",
@@ -379,37 +210,37 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "invitation_organization_id_organization_id_fk": {
           "name": "invitation_organization_id_organization_id_fk",
           "tableFrom": "invitation",
+          "tableTo": "organization",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organization",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "invitation_inviter_id_user_id_fk": {
           "name": "invitation_inviter_id_user_id_fk",
           "tableFrom": "invitation",
+          "tableTo": "user",
           "columnsFrom": [
             "inviter_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -467,9 +298,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "member_userId_idx": {
           "name": "member_userId_idx",
@@ -482,37 +313,37 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "member_organization_id_organization_id_fk": {
           "name": "member_organization_id_organization_id_fk",
           "tableFrom": "member",
+          "tableTo": "organization",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organization",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "member_user_id_user_id_fk": {
           "name": "member_user_id_user_id_fk",
           "tableFrom": "member",
+          "tableTo": "user",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -569,10 +400,10 @@
       "uniqueConstraints": {
         "organization_slug_unique": {
           "name": "organization_slug_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "slug"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -652,34 +483,34 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "session_user_id_user_id_fk": {
           "name": "session_user_id_user_id_fk",
           "tableFrom": "session",
+          "tableTo": "user",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "session_token_unique": {
           "name": "session_token_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "token"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -743,10 +574,10 @@
       "uniqueConstraints": {
         "user_email_unique": {
           "name": "user_email_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "email"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -809,9 +640,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -914,9 +745,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "chores_assignedToId_idx": {
           "name": "chores_assignedToId_idx",
@@ -929,9 +760,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "chores_addedById_idx": {
           "name": "chores_addedById_idx",
@@ -944,63 +775,63 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "chores_household_id_organization_id_fk": {
           "name": "chores_household_id_organization_id_fk",
           "tableFrom": "chores",
+          "tableTo": "organization",
           "columnsFrom": [
             "household_id"
           ],
-          "tableTo": "organization",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "chores_assigned_to_id_user_id_fk": {
           "name": "chores_assigned_to_id_user_id_fk",
           "tableFrom": "chores",
+          "tableTo": "user",
           "columnsFrom": [
             "assigned_to_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         },
         "chores_added_by_id_user_id_fk": {
           "name": "chores_added_by_id_user_id_fk",
           "tableFrom": "chores",
+          "tableTo": "user",
           "columnsFrom": [
             "added_by_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         },
         "chores_completed_by_id_user_id_fk": {
           "name": "chores_completed_by_id_user_id_fk",
           "tableFrom": "chores",
+          "tableTo": "user",
           "columnsFrom": [
             "completed_by_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1054,75 +885,75 @@
         "expense_allocation_participants_household_id_organization_id_fk": {
           "name": "expense_allocation_participants_household_id_organization_id_fk",
           "tableFrom": "expense_allocation_participants",
+          "tableTo": "organization",
           "columnsFrom": [
             "household_id"
           ],
-          "tableTo": "organization",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "expense_allocation_participants_user_id_user_id_fk": {
           "name": "expense_allocation_participants_user_id_user_id_fk",
           "tableFrom": "expense_allocation_participants",
+          "tableTo": "user",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         },
         "expense_allocation_participants_expense_fk": {
           "name": "expense_allocation_participants_expense_fk",
           "tableFrom": "expense_allocation_participants",
+          "tableTo": "expenses",
           "columnsFrom": [
             "expense_id",
             "household_id"
           ],
-          "tableTo": "expenses",
           "columnsTo": [
             "id",
             "household_id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "expense_allocation_participants_party_fk": {
           "name": "expense_allocation_participants_party_fk",
           "tableFrom": "expense_allocation_participants",
+          "tableTo": "household_membership_history",
           "columnsFrom": [
             "household_id",
             "user_id"
           ],
-          "tableTo": "household_membership_history",
           "columnsTo": [
             "organization_id",
             "user_id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "expense_allocation_participants_method_fk": {
           "name": "expense_allocation_participants_method_fk",
           "tableFrom": "expense_allocation_participants",
+          "tableTo": "expenses",
           "columnsFrom": [
             "expense_id",
             "household_id",
             "allocation_method"
           ],
-          "tableTo": "expenses",
           "columnsTo": [
             "id",
             "household_id",
             "allocation_method"
           ],
-          "onUpdate": "cascade",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {
@@ -1179,26 +1010,26 @@
         "expense_categories_household_id_organization_id_fk": {
           "name": "expense_categories_household_id_organization_id_fk",
           "tableFrom": "expense_categories",
+          "tableTo": "organization",
           "columnsFrom": [
             "household_id"
           ],
-          "tableTo": "organization",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "expense_categories_household_id_id_key": {
           "name": "expense_categories_household_id_id_key",
+          "nullsNotDistinct": false,
           "columns": [
             "household_id",
             "id"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -1252,67 +1083,67 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "expense_payers_household_id_organization_id_fk": {
           "name": "expense_payers_household_id_organization_id_fk",
           "tableFrom": "expense_payers",
+          "tableTo": "organization",
           "columnsFrom": [
             "household_id"
           ],
-          "tableTo": "organization",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "expense_payers_user_id_user_id_fk": {
           "name": "expense_payers_user_id_user_id_fk",
           "tableFrom": "expense_payers",
+          "tableTo": "user",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         },
         "expense_payers_expense_fk": {
           "name": "expense_payers_expense_fk",
           "tableFrom": "expense_payers",
+          "tableTo": "expenses",
           "columnsFrom": [
             "expense_id",
             "household_id"
           ],
-          "tableTo": "expenses",
           "columnsTo": [
             "id",
             "household_id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "expense_payers_party_fk": {
           "name": "expense_payers_party_fk",
           "tableFrom": "expense_payers",
+          "tableTo": "household_membership_history",
           "columnsFrom": [
             "household_id",
             "user_id"
           ],
-          "tableTo": "household_membership_history",
           "columnsTo": [
             "organization_id",
             "user_id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -1381,67 +1212,67 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "expense_splits_household_id_organization_id_fk": {
           "name": "expense_splits_household_id_organization_id_fk",
           "tableFrom": "expense_splits",
+          "tableTo": "organization",
           "columnsFrom": [
             "household_id"
           ],
-          "tableTo": "organization",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "expense_splits_user_id_user_id_fk": {
           "name": "expense_splits_user_id_user_id_fk",
           "tableFrom": "expense_splits",
+          "tableTo": "user",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         },
         "expense_splits_expense_fk": {
           "name": "expense_splits_expense_fk",
           "tableFrom": "expense_splits",
+          "tableTo": "expenses",
           "columnsFrom": [
             "expense_id",
             "household_id"
           ],
-          "tableTo": "expenses",
           "columnsTo": [
             "id",
             "household_id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "expense_splits_party_fk": {
           "name": "expense_splits_party_fk",
           "tableFrom": "expense_splits",
+          "tableTo": "household_membership_history",
           "columnsFrom": [
             "household_id",
             "user_id"
           ],
-          "tableTo": "household_membership_history",
           "columnsTo": [
             "organization_id",
             "user_id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -1573,9 +1404,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "expenses_category_idx": {
           "name": "expenses_category_idx",
@@ -1612,9 +1443,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "expenses_currency_idx": {
           "name": "expenses_currency_idx",
@@ -1633,87 +1464,87 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "expenses_household_id_organization_id_fk": {
           "name": "expenses_household_id_organization_id_fk",
           "tableFrom": "expenses",
+          "tableTo": "organization",
           "columnsFrom": [
             "household_id"
           ],
-          "tableTo": "organization",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "expenses_author_id_user_id_fk": {
           "name": "expenses_author_id_user_id_fk",
           "tableFrom": "expenses",
+          "tableTo": "user",
           "columnsFrom": [
             "author_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         },
         "expenses_category_fk": {
           "name": "expenses_category_fk",
           "tableFrom": "expenses",
+          "tableTo": "expense_categories",
           "columnsFrom": [
             "household_id",
             "category_id"
           ],
-          "tableTo": "expense_categories",
           "columnsTo": [
             "household_id",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         },
         "expenses_author_party_fk": {
           "name": "expenses_author_party_fk",
           "tableFrom": "expenses",
+          "tableTo": "household_membership_history",
           "columnsFrom": [
             "household_id",
             "author_id"
           ],
-          "tableTo": "household_membership_history",
           "columnsTo": [
             "organization_id",
             "user_id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "expenses_id_household_id_key": {
           "name": "expenses_id_household_id_key",
+          "nullsNotDistinct": false,
           "columns": [
             "id",
             "household_id"
-          ],
-          "nullsNotDistinct": false
+          ]
         },
         "expenses_id_household_id_allocation_method_key": {
           "name": "expenses_id_household_id_allocation_method_key",
+          "nullsNotDistinct": false,
           "columns": [
             "id",
             "household_id",
             "allocation_method"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -1838,9 +1669,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "settlements_payer_idx": {
           "name": "settlements_payer_idx",
@@ -1859,9 +1690,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "settlements_payee_idx": {
           "name": "settlements_payee_idx",
@@ -1880,106 +1711,106 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "settlements_household_id_organization_id_fk": {
           "name": "settlements_household_id_organization_id_fk",
           "tableFrom": "settlements",
+          "tableTo": "organization",
           "columnsFrom": [
             "household_id"
           ],
-          "tableTo": "organization",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "settlements_payer_id_user_id_fk": {
           "name": "settlements_payer_id_user_id_fk",
           "tableFrom": "settlements",
+          "tableTo": "user",
           "columnsFrom": [
             "payer_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         },
         "settlements_payee_id_user_id_fk": {
           "name": "settlements_payee_id_user_id_fk",
           "tableFrom": "settlements",
+          "tableTo": "user",
           "columnsFrom": [
             "payee_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         },
         "settlements_created_by_id_user_id_fk": {
           "name": "settlements_created_by_id_user_id_fk",
           "tableFrom": "settlements",
+          "tableTo": "user",
           "columnsFrom": [
             "created_by_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         },
         "settlements_confirmed_by_id_user_id_fk": {
           "name": "settlements_confirmed_by_id_user_id_fk",
           "tableFrom": "settlements",
+          "tableTo": "user",
           "columnsFrom": [
             "confirmed_by_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         },
         "settlements_payer_party_fk": {
           "name": "settlements_payer_party_fk",
           "tableFrom": "settlements",
+          "tableTo": "household_membership_history",
           "columnsFrom": [
             "household_id",
             "payer_id"
           ],
-          "tableTo": "household_membership_history",
           "columnsTo": [
             "organization_id",
             "user_id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "settlements_payee_party_fk": {
           "name": "settlements_payee_party_fk",
           "tableFrom": "settlements",
+          "tableTo": "household_membership_history",
           "columnsFrom": [
             "household_id",
             "payee_id"
           ],
-          "tableTo": "household_membership_history",
           "columnsTo": [
             "organization_id",
             "user_id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2005,6 +1836,225 @@
         "settlements_confirmation": {
           "name": "settlements_confirmation",
           "value": "(\"settlements\".\"confirmed_by_id\" IS NULL) = (\"settlements\".\"confirmed_at\" IS NULL)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.friend_requests": {
+      "name": "friend_requests",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "requester_id": {
+          "name": "requester_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recipient_id": {
+          "name": "recipient_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "friend_requests_pair_key": {
+          "name": "friend_requests_pair_key",
+          "columns": [
+            {
+              "expression": "least(\"requester_id\", \"recipient_id\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "greatest(\"requester_id\", \"recipient_id\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "friend_requests_requester_id_idx": {
+          "name": "friend_requests_requester_id_idx",
+          "columns": [
+            {
+              "expression": "requester_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "friend_requests_recipient_id_idx": {
+          "name": "friend_requests_recipient_id_idx",
+          "columns": [
+            {
+              "expression": "recipient_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "friend_requests_requester_id_user_id_fk": {
+          "name": "friend_requests_requester_id_user_id_fk",
+          "tableFrom": "friend_requests",
+          "tableTo": "user",
+          "columnsFrom": [
+            "requester_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "friend_requests_recipient_id_user_id_fk": {
+          "name": "friend_requests_recipient_id_user_id_fk",
+          "tableFrom": "friend_requests",
+          "tableTo": "user",
+          "columnsFrom": [
+            "recipient_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "friend_requests_not_self": {
+          "name": "friend_requests_not_self",
+          "value": "\"friend_requests\".\"requester_id\" <> \"friend_requests\".\"recipient_id\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.friendships": {
+      "name": "friendships",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_a_id": {
+          "name": "user_a_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_b_id": {
+          "name": "user_b_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "friendships_user_b_id_idx": {
+          "name": "friendships_user_b_id_idx",
+          "columns": [
+            {
+              "expression": "user_b_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "friendships_user_a_id_user_id_fk": {
+          "name": "friendships_user_a_id_user_id_fk",
+          "tableFrom": "friendships",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_a_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "friendships_user_b_id_user_id_fk": {
+          "name": "friendships_user_b_id_user_id_fk",
+          "tableFrom": "friendships",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_b_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "friendships_pair_key": {
+          "name": "friendships_pair_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "user_a_id",
+            "user_b_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "friendships_ordered_pair": {
+          "name": "friendships_ordered_pair",
+          "value": "\"friendships\".\"user_a_id\" < \"friendships\".\"user_b_id\""
         }
       },
       "isRLSEnabled": false
@@ -2046,15 +2096,15 @@
         "household_features_organization_id_organization_id_fk": {
           "name": "household_features_organization_id_organization_id_fk",
           "tableFrom": "household_features",
+          "tableTo": "organization",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organization",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2091,28 +2141,28 @@
         "household_membership_history_organization_id_organization_id_fk": {
           "name": "household_membership_history_organization_id_organization_id_fk",
           "tableFrom": "household_membership_history",
+          "tableTo": "organization",
           "columnsFrom": [
             "organization_id"
           ],
-          "tableTo": "organization",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "household_membership_history_user_id_user_id_fk": {
           "name": "household_membership_history_user_id_user_id_fk",
           "tableFrom": "household_membership_history",
+          "tableTo": "user",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "restrict"
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -2132,10 +2182,10 @@
   },
   "enums": {},
   "schemas": {},
-  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
+  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},

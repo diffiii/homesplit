@@ -9,7 +9,7 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
 import { fileTypeFromBuffer } from "file-type";
 import { db } from "@/db";
-import { attachments } from "@/db/schema";
+import { attachments, storageObjectDeletions } from "@/db/schema";
 import { AppError, notFound } from "@/http/app-error";
 import { ObjectStorage } from "@/storage/object-storage";
 import { attachmentsConfig } from "./attachments.config";
@@ -43,7 +43,10 @@ export class AttachmentsService {
     file: FileUpload
   ): Promise<Attachment> {
     // Detected from the content; the type the client declared is ignored.
-    const detected = await fileTypeFromBuffer(file.buffer);
+    // Malformed content can make the detector throw, which is a bad file too.
+    const detected = await fileTypeFromBuffer(file.buffer).catch(
+      () => undefined
+    );
     const parsed = AttachmentMimeType.safeParse(detected?.mime);
     if (!parsed.success) {
       throw unsupportedType();
@@ -64,15 +67,31 @@ export class AttachmentsService {
         uploadedById: uploaderId,
       });
     } catch (error) {
-      await this.storage.delete(storageKey).catch((deleteError: unknown) => {
-        this.logger.warn(
-          `Left object ${storageKey} without a row: ${String(deleteError)}`
-        );
-      });
+      await this.discardObject(storageKey);
       throw error;
     }
 
     return this.getById(householdId, id);
+  }
+
+  /**
+   * Deletes an object whose row couldn't be inserted. If that fails too, the
+   * key goes to the cleanup queue, so the object isn't left behind for good.
+   */
+  private async discardObject(storageKey: string): Promise<void> {
+    try {
+      await this.storage.delete(storageKey);
+    } catch {
+      await db
+        .insert(storageObjectDeletions)
+        .values({ storageKey })
+        .onConflictDoNothing()
+        .catch((error: unknown) => {
+          this.logger.warn(
+            `Left object ${storageKey} without a row: ${String(error)}`
+          );
+        });
+    }
   }
 
   async getById(

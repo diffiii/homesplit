@@ -208,6 +208,7 @@ Household paths in this table are relative to `/api/households/:householdId`. Ta
 - Clients pass `organizationId` explicitly wherever an endpoint accepts it. Without it, Better Auth falls back to the session's active organization, which `create` and `accept-invitation` still set.
 - These endpoints keep Better Auth's status codes and error codes, not the ones in [Errors](#errors). In 1.7.7, for example, a caller who isn't a member gets 400 or 403 rather than 404, and `remove-member` without the right answers 401 `YOU_ARE_NOT_ALLOWED_TO_DELETE_THIS_MEMBER`, so a 401 from `/api/auth/*` doesn't always mean the session is gone. Their error bodies are usually `{ code, message }`, which parses as an `ApiError` without `details`.
 - #30 adds `/update-user` to Better Auth's `disabledPaths`, so profile changes go only through `PATCH /api/me` and its `imageUrl` validation.
+- #30 checks sign-up the same way: `databaseHooks.user.create.before` validates `name` against `DisplayName` and `image` against `AvatarUrl`, and stores the trimmed name. A bad value makes `/api/auth/sign-up/email` answer 400 `VALIDATION_ERROR` with `details.issues` instead of a Better Auth error code.
 
 ### Responses
 
