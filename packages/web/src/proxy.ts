@@ -1,6 +1,11 @@
 import { getSessionCookie } from "better-auth/cookies";
 import { type NextRequest, NextResponse } from "next/server";
-import { isSignedOutPath, signInUrl } from "@/lib/api/session";
+import {
+  HOME_PATH,
+  isSignedOutPath,
+  SIGNED_IN_HOME_PATH,
+  signInUrl,
+} from "@/lib/api/session";
 
 /**
  * Send visitors without a session cookie to sign-in before a signed-in page
@@ -8,10 +13,21 @@ import { isSignedOutPath, signInUrl } from "@/lib/api/session";
  * through, and the first API call's 401 redirects instead. Signed-in users
  * aren't sent away from signed-out pages, because a stale cookie would then
  * bounce between sign-in and the app.
+ *
+ * `/` is the landing page without a cookie and the signed-in home with one,
+ * so the installed app, which starts at `/`, opens straight into a household.
  */
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
-  if (isSignedOutPath(pathname) || getSessionCookie(request)) {
+  const hasSession = Boolean(getSessionCookie(request));
+  if (pathname === HOME_PATH) {
+    return hasSession
+      ? NextResponse.rewrite(
+          new URL(`${SIGNED_IN_HOME_PATH}${search}`, request.url)
+        )
+      : NextResponse.next();
+  }
+  if (isSignedOutPath(pathname) || hasSession) {
     return NextResponse.next();
   }
   return NextResponse.redirect(
@@ -21,7 +37,9 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   // Pages only: not the `/api/*` rewrite, Next.js assets, files like the
-  // manifest, the iOS home screen icon, which has no extension, or the
-  // development-only `/dev/*` pages, which need no backend.
-  matcher: ["/((?!api/|_next/|dev/|apple-icon$|.*\\.[^/]*$).*)"],
+  // manifest, the iOS home screen icon and the shared link image, which have
+  // no extension, or the development-only `/dev/*` pages, which need no backend.
+  matcher: [
+    "/((?!api/|_next/|dev/|apple-icon$|opengraph-image$|.*\\.[^/]*$).*)",
+  ],
 };

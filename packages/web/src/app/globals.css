@@ -136,3 +136,16 @@
     @apply font-sans;
   }
 }
+
+/* The landing page draws each payment as the logo's line between two dots. */
+@keyframes even-line {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes even-dot {
+  from {
+    transform: scale(0);
+  }
+}

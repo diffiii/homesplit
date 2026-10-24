@@ -7,9 +7,22 @@ import { test } from "./fixtures";
 test.describe("signed out", () => {
   test.use({ scenario: "signed-out" });
 
-  test("signs in, lands on a household, and signs out", async ({ page }) => {
+  test("opens sign-in from the landing page, lands on a household, and signs out", async ({
+    page,
+  }) => {
     await page.goto("/");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Keep the house even." })
+    ).toBeVisible();
+    await expectNoAxeViolations(page);
+
+    await page
+      .getByRole("banner")
+      .getByRole("link", { name: "Sign in" })
+      .click();
     await expect(page).toHaveURL("/sign-in");
+    // Client navigation updates the title after the URL.
+    await expect(page).toHaveTitle("Sign in · HomeSplit");
     await expectNoAxeViolations(page);
 
     await page.getByLabel("Email").fill("alice@example.com");

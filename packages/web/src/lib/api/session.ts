@@ -5,6 +5,12 @@ export const SIGN_UP_PATH = "/sign-up";
 export const HOME_PATH = "/";
 
 /**
+ * The page `/` shows with a session cookie, sending the user on to a
+ * household. Without one, `/` is the landing page.
+ */
+export const SIGNED_IN_HOME_PATH = "/home";
+
+/**
  * Pages for signed-out visitors. Every other page needs a session, and the
  * proxy sends visitors without one to sign-in before the page renders.
  */

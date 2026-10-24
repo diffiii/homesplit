@@ -14,3 +14,11 @@ export interface SavedMocks {
   state: MockState;
   version: number;
 }
+
+/** The cookie the proxy looks for; Better Auth's real one is HTTP-only. */
+export const MOCK_SESSION_COOKIE = "better-auth.session_token";
+
+/** The session cookie's value while `userId` is signed in to the mocks. */
+export function mockSessionToken(userId: string): string {
+  return `mock-session-${userId}`;
+}

@@ -5,8 +5,10 @@ import {
   type ScenarioName,
 } from "../../src/mocks/scenarios";
 import {
+  MOCK_SESSION_COOKIE,
   MOCK_STORAGE_KEY,
   MOCK_STORAGE_VERSION,
+  mockSessionToken,
   type SavedMocks,
 } from "../../src/mocks/storage";
 
@@ -21,7 +23,7 @@ export interface MockOptions {
  */
 export const test = base.extend<MockOptions>({
   scenario: [DEFAULT_SCENARIO, { option: true }],
-  page: async ({ page, scenario }, use) => {
+  page: async ({ page, scenario, baseURL }, use) => {
     const saved: SavedMocks = {
       version: MOCK_STORAGE_VERSION,
       scenario,
@@ -38,6 +40,19 @@ export const test = base.extend<MockOptions>({
       },
       [MOCK_STORAGE_KEY, JSON.stringify(saved)] as const
     );
+    // A signed-in user has the session cookie before the first request, as
+    // with the real backend, rather than once the mocks start. Without it,
+    // the proxy would show the landing page at `/`.
+    const { sessionUserId } = saved.state;
+    if (sessionUserId) {
+      await page.context().addCookies([
+        {
+          name: MOCK_SESSION_COOKIE,
+          value: mockSessionToken(sessionUserId),
+          url: baseURL,
+        },
+      ]);
+    }
     await use(page);
   },
 });

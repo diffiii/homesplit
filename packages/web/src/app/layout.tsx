@@ -7,9 +7,25 @@ import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
+const DESCRIPTION = "Share expenses, chores, and shopping with your household.";
+
+// Pages that set only a title still share the site's name, description, and
+// `opengraph-image` in link previews.
 export const metadata: Metadata = {
+  // Link previews and the canonical URL need absolute URLs. Render, unlike
+  // Vercel, gives Next.js no origin to fall back on.
+  metadataBase: new URL(
+    process.env.SITE_URL || "https://homesplit.janmarek.pl"
+  ),
   title: "HomeSplit",
-  description: "Share expenses, chores, and shopping with your household.",
+  description: DESCRIPTION,
+  openGraph: {
+    type: "website",
+    siteName: "HomeSplit",
+    title: "HomeSplit",
+    description: DESCRIPTION,
+  },
+  twitter: { card: "summary_large_image" },
   appleWebApp: {
     capable: true,
     title: "HomeSplit",
