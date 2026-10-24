@@ -1,5 +1,6 @@
 // biome-ignore-all lint/performance/noAwaitInLoops: navigations use the same browser page and must run in order.
 import { expect } from "@playwright/test";
+import { DEFAULT_SCENARIO, SCENARIOS } from "../../src/mocks/scenarios";
 import { expectNoAxeViolations } from "../axe";
 import { test } from "./fixtures";
 
@@ -88,4 +89,25 @@ test("creates from the switcher and can reopen a cleared dialog", async ({
   const studioUrl = page.url();
   await page.goto("/");
   await expect(page).toHaveURL(studioUrl);
+});
+
+test("shows not found for a household the user isn't in and for broken links", async ({
+  page,
+}) => {
+  const { households } = SCENARIOS[DEFAULT_SCENARIO].build();
+  const id = (name: string) =>
+    households.find((household) => household.name === name)?.id;
+  for (const [path, heading] of [
+    [`/households/${id("Book club")}`, "Household not found"],
+    ["/households/not-an-id", "Household not found"],
+    [`/households/${id("Flat on Piękna")}/nowhere`, "Page not found"],
+  ] as const) {
+    await page.goto(path);
+    await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+  }
+  await expectNoAxeViolations(page);
+  await page.getByRole("link", { name: "Your households" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Your households" })
+  ).toBeVisible();
 });
