@@ -4,12 +4,10 @@ import { ShoppingCartIcon } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { ModuleDisabledAlert } from "@/components/module-disabled-alert";
 import { PageHeader } from "@/components/page-header";
-import { useHouseholdId } from "@/components/shell/household-context";
-import { useFeatureEnabled } from "@/hooks/use-household-features";
+import { useFeatureEnabled } from "@/components/shell/household-context";
 
 export default function ShoppingPage() {
-  const householdId = useHouseholdId();
-  const enabled = useFeatureEnabled(householdId, "shopping");
+  const enabled = useFeatureEnabled("shopping");
   return (
     <>
       <PageHeader title="Shopping" />

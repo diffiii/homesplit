@@ -25,9 +25,12 @@ import {
   ResponsiveDialogTitle,
   ResponsiveDialogTrigger,
 } from "@/components/responsive-dialog";
-import { useHouseholdId } from "@/components/shell/household-context";
+import {
+  useFeatureEnabled,
+  useHouseholdId,
+  usePermissions,
+} from "@/components/shell/household-context";
 import { Button } from "@/components/ui/button";
-import { useFeatureEnabled } from "@/hooks/use-household-features";
 import { isApiRequestError } from "@/lib/api/api-error";
 import { api } from "@/lib/api/client";
 import { errorMessage } from "@/lib/api/error-message";
@@ -42,7 +45,10 @@ import { applyServerErrors } from "@/lib/form";
  */
 export default function ExpensesPage() {
   const householdId = useHouseholdId();
-  const enabled = useFeatureEnabled(householdId, "expenses");
+  const enabled = useFeatureEnabled("expenses");
+  const can = usePermissions();
+  // Categories are shared configuration, so only admins and owners change them.
+  const editable = enabled && can.manageCategories;
   const categories = useQuery(
     endpointQuery("listExpenseCategories", { params: { householdId } })
   );
@@ -51,7 +57,7 @@ export default function ExpensesPage() {
     <>
       <PageHeader
         actions={
-          enabled && categories.data?.items.length ? (
+          editable && categories.data?.items.length ? (
             <CreateCategoryDialog />
           ) : undefined
         }
@@ -66,7 +72,7 @@ export default function ExpensesPage() {
         {({ items }) =>
           items.length === 0 ? (
             <EmptyState
-              action={enabled ? <CreateCategoryDialog /> : null}
+              action={editable ? <CreateCategoryDialog /> : null}
               description="Categories group expenses, like groceries or rent."
               icon={TagIcon}
               title="No categories yet"
@@ -76,7 +82,7 @@ export default function ExpensesPage() {
               {items.map((category) => (
                 <CategoryRow
                   category={category}
-                  editable={enabled}
+                  editable={editable}
                   key={category.id}
                 />
               ))}

@@ -1,10 +1,13 @@
 "use client";
 
+import { matchQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "cn";
 import { LogOutIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useMemo } from "react";
+import { ErrorState } from "@/components/error-state";
+import { ListSkeleton } from "@/components/list-skeleton";
 import { ThemeMenu } from "@/components/theme-menu";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,12 +32,20 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar";
 import { UserAvatar } from "@/components/user-avatar";
-import { useHouseholdFeatures } from "@/hooks/use-household-features";
 import { useRequiredSession } from "@/hooks/use-required-session";
+import { isApiRequestError } from "@/lib/api/api-error";
+import {
+  householdQueries,
+  isHouseholdNotFound,
+} from "@/lib/api/household-queries";
+import { endpointQuery } from "@/lib/api/queries";
+import { queryKeys } from "@/lib/api/query-keys";
 import { rememberHousehold } from "@/lib/last-household";
+import { strongestRole } from "@/lib/permissions";
 import { signOutAndReset } from "@/lib/sign-out";
-import { HouseholdContext } from "./household-context";
+import { HouseholdContext, type HouseholdData } from "./household-context";
 import { HOUSEHOLD_NAV, householdPath, isActive } from "./household-nav";
+import { HouseholdNotFound } from "./household-not-found";
 import { HouseholdSwitcher } from "./household-switcher";
 
 interface HouseholdShellProps {
@@ -42,43 +53,179 @@ interface HouseholdShellProps {
   householdId: string;
 }
 
+const featuresQuery = (householdId: string) =>
+  endpointQuery("getHouseholdFeatures", { params: { householdId } });
+
+type HouseholdState =
+  | { status: "ready"; data: HouseholdData }
+  | { status: "pending" }
+  | { status: "not-found" }
+  | {
+      status: "error";
+      error: unknown;
+      retry: () => unknown;
+      retrying: boolean;
+    };
+
+/**
+ * The household, its members, its module flags, and the caller's role,
+ * loaded once for every page under it. A refetch that fails keeps the data
+ * shown, unless it says the caller isn't a member anymore.
+ */
+function useHouseholdState(householdId: string): HouseholdState {
+  const session = useRequiredSession();
+  const household = useQuery(householdQueries.get(householdId));
+  const features = useQuery(featuresQuery(householdId));
+  const userId = session.data?.user.id;
+  const member = household.data?.members.find(
+    (candidate) => candidate.userId === userId
+  );
+  const role = member ? strongestRole(member.role) : null;
+
+  const data = useMemo<HouseholdData | null>(
+    () =>
+      household.data && features.data && userId && role
+        ? {
+            household: household.data,
+            members: household.data.members,
+            features: features.data,
+            userId,
+            role,
+          }
+        : null,
+    [household.data, features.data, userId, role]
+  );
+
+  if (
+    isHouseholdNotFound(household.error) ||
+    isHouseholdNotFound(features.error) ||
+    (household.data && userId && !role)
+  ) {
+    return { status: "not-found" };
+  }
+  if (data) {
+    return { status: "ready", data };
+  }
+  if (session.error) {
+    return {
+      status: "error",
+      error: session.error,
+      retry: session.refetch,
+      retrying: session.isRefetching,
+    };
+  }
+  const failed = [household, features].find(
+    (query) => query.isError && query.data === undefined
+  );
+  if (failed) {
+    return {
+      status: "error",
+      error: failed.error,
+      retry: failed.refetch,
+      retrying: failed.isRefetching,
+    };
+  }
+  return { status: "pending" };
+}
+
+/**
+ * Check the membership again whenever a request for this household answers
+ * 404, as every household route does once the caller has left or been
+ * removed, so the not-found page replaces the shell.
+ */
+function useRecheckMembershipOn404(householdId: string): void {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    const scope = { queryKey: queryKeys.household(householdId) };
+    const recheck = (error: unknown) => {
+      if (isApiRequestError(error) && error.status === 404) {
+        queryClient.invalidateQueries({
+          queryKey: householdQueries.get(householdId).queryKey,
+        });
+      }
+    };
+    const stopQueries = queryClient.getQueryCache().subscribe((event) => {
+      if (
+        event.type === "updated" &&
+        event.action.type === "error" &&
+        matchQuery(scope, event.query)
+      ) {
+        recheck(event.action.error);
+      }
+    });
+    const stopMutations = queryClient.getMutationCache().subscribe((event) => {
+      if (event.type === "updated" && event.action.type === "error") {
+        recheck(event.action.error);
+      }
+    });
+    return () => {
+      stopQueries();
+      stopMutations();
+    };
+  }, [householdId, queryClient]);
+}
+
 /**
  * Frame of every `/households/:householdId/...` page: a sidebar from `md` up,
- * and a top bar with bottom navigation on phones.
+ * and a top bar with bottom navigation on phones. Pages render once the
+ * household has loaded, and read it from `useHousehold`.
  */
 export function HouseholdShell({ householdId, children }: HouseholdShellProps) {
+  const state = useHouseholdState(householdId);
+  useRecheckMembershipOn404(householdId);
+  const ready = state.status === "ready";
+
   // Signing in opens this household again next time.
-  useEffect(() => rememberHousehold(householdId), [householdId]);
+  useEffect(() => {
+    if (ready) {
+      rememberHousehold(householdId);
+    }
+  }, [householdId, ready]);
+
+  if (state.status === "not-found") {
+    return <HouseholdNotFound />;
+  }
 
   return (
-    <HouseholdContext value={householdId}>
-      <SidebarProvider>
-        <a
-          className="sr-only z-50 rounded-md bg-background px-3 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:ring-3 focus:ring-ring/50"
-          href="#main"
+    <SidebarProvider>
+      <a
+        className="sr-only z-50 rounded-md bg-background px-3 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:ring-3 focus:ring-ring/50"
+        href="#main"
+      >
+        Skip to content
+      </a>
+      <DesktopSidebar householdId={householdId} />
+      <div className="flex min-h-svh min-w-0 flex-1 flex-col">
+        <MobileTopBar householdId={householdId} />
+        <main
+          className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 pt-6 pb-[calc(5rem+env(safe-area-inset-bottom))] md:px-8 md:pb-10"
+          id="main"
+          tabIndex={-1}
         >
-          Skip to content
-        </a>
-        <DesktopSidebar householdId={householdId} />
-        <div className="flex min-h-svh min-w-0 flex-1 flex-col">
-          <MobileTopBar householdId={householdId} />
-          <main
-            className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 px-4 pt-6 pb-[calc(5rem+env(safe-area-inset-bottom))] md:px-8 md:pb-10"
-            id="main"
-            tabIndex={-1}
-          >
-            {children}
-          </main>
-        </div>
-        <BottomNav householdId={householdId} />
-      </SidebarProvider>
-    </HouseholdContext>
+          {state.status === "ready" ? (
+            <HouseholdContext value={state.data}>{children}</HouseholdContext>
+          ) : null}
+          {state.status === "pending" ? (
+            <ListSkeleton label="Loading household" rows={3} />
+          ) : null}
+          {state.status === "error" ? (
+            <ErrorState
+              error={state.error}
+              onRetry={state.retry}
+              retrying={state.retrying}
+              title="Couldn't load this household"
+            />
+          ) : null}
+        </main>
+      </div>
+      <BottomNav householdId={householdId} />
+    </SidebarProvider>
   );
 }
 
 /** Modules turned off for the household; their sections stay reachable but read-only. */
 function useDisabledFeatures(householdId: string): ReadonlySet<string> {
-  const { data } = useHouseholdFeatures(householdId);
+  const { data } = useQuery(featuresQuery(householdId));
   return new Set(
     Object.entries(data ?? {})
       .filter(([, enabled]) => !enabled)
