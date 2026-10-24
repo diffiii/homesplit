@@ -3,6 +3,7 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
+    "attachments:clean-up": "node --env-file-if-exists=.env dist/scripts/clean-up-attachments.js",
     "auth:generate": "auth generate --config src/auth.ts --output src/db/schema/auth.ts --yes",
     "build": "nest build",
     "db:generate": "drizzle-kit generate",
@@ -15,6 +16,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1153.0",
+    "@aws-sdk/s3-request-presigner": "^3.1153.0",
     "@better-auth/drizzle-adapter": "^1.7.11",
     "@homesplit/contracts": "workspace:*",
     "@nestjs/common": "^12.2.0",
@@ -24,6 +27,7 @@
     "@thallesp/nestjs-better-auth": "^2.8.0",
     "better-auth": "^1.7.11",
     "drizzle-orm": "^0.45.4",
+    "file-type": "^22.2.0",
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",

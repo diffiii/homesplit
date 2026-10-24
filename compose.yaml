@@ -16,6 +16,25 @@ services:
       timeout: 5s
       retries: 10
 
+  # S3-compatible object storage for attachments. Buckets are created on the
+  # first upload.
+  object-storage:
+    image: chrislusf/seaweedfs:4.48
+    restart: unless-stopped
+    command: server -s3 -dir=/data
+    environment:
+      AWS_ACCESS_KEY_ID: homesplit
+      AWS_SECRET_ACCESS_KEY: homesplit-dev-secret
+    ports:
+      - "8333:8333"
+    volumes:
+      - object-storage-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8333/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   # Throwaway database for backend tests: separate port, data in memory only.
   postgres-test:
     image: postgres:18-alpine
@@ -36,3 +55,4 @@ services:
 
 volumes:
   postgres-data:
+  object-storage-data:

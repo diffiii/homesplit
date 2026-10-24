@@ -28,6 +28,10 @@
       "types": "./dist/features/expenses/index.d.ts",
       "default": "./dist/features/expenses/index.js"
     },
+    "./features/attachments": {
+      "types": "./dist/features/attachments/index.d.ts",
+      "default": "./dist/features/attachments/index.js"
+    },
     "./features/chores": {
       "types": "./dist/features/chores/index.d.ts",
       "default": "./dist/features/chores/index.js"
