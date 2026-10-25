@@ -207,6 +207,16 @@ export function createAuth({ baseURL, fetch }: AuthClientOptions = {}) {
       unwrap(client.signIn.email(body)),
 
     signOut: () => unwrap(client.signOut()),
+
+    /**
+     * Needs the current password. With `revokeOtherSessions`, Better Auth
+     * deletes every session and signs this device in again with a new one.
+     */
+    changePassword: (body: {
+      currentPassword: string;
+      newPassword: string;
+      revokeOtherSessions: boolean;
+    }) => unwrap(client.changePassword(body)),
   };
 
   return {

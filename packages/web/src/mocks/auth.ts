@@ -282,6 +282,31 @@ export function createAuthHandlers(
       return { success: true };
     }),
 
+    // The mocks keep one session, so revoking the others changes nothing.
+    route("post", "/change-password", ({ input }) => {
+      const user = sessionUser();
+      const newPassword = text(input, "newPassword");
+      if (newPassword.length < MIN_PASSWORD_LENGTH) {
+        throw authError(
+          BAD_REQUEST,
+          "PASSWORD_TOO_SHORT",
+          "Password too short"
+        );
+      }
+      if (newPassword.length > MAX_PASSWORD_LENGTH) {
+        throw authError(BAD_REQUEST, "PASSWORD_TOO_LONG", "Password too long");
+      }
+      if (user.password !== text(input, "currentPassword")) {
+        throw authError(BAD_REQUEST, "INVALID_PASSWORD", "Invalid password");
+      }
+      user.password = newPassword;
+      return {
+        token:
+          input.revokeOtherSessions === true ? sessionToken(user.id) : null,
+        user: renderUser(user),
+      };
+    }),
+
     route("get", "/organization/list", () => {
       const userId = sessionUser().id;
       return db.state.households

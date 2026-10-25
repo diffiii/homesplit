@@ -10,8 +10,10 @@ import type { ComponentProps, ReactNode } from "react";
 import { CurrencyPicker } from "@/components/currency-picker";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldError,
   FieldLabel,
@@ -206,6 +208,39 @@ function DateField({
   );
 }
 
+/** A yes-or-no choice, with its label and description beside the box. */
+function CheckboxField({
+  label,
+  description,
+}: {
+  description?: ReactNode;
+  label: ReactNode;
+}) {
+  const field = useFieldContext<boolean>();
+  const value = useStore(field.store, (state) => state.value);
+  const id = `${field.form.formId}-${field.name}`;
+  return (
+    <Field orientation="horizontal">
+      <Checkbox
+        aria-describedby={description ? `${id}-description` : undefined}
+        checked={value}
+        id={id}
+        name={field.name}
+        onBlur={field.handleBlur}
+        onCheckedChange={(checked) => field.handleChange(checked)}
+      />
+      <FieldContent>
+        <FieldLabel htmlFor={id}>{label}</FieldLabel>
+        {description ? (
+          <FieldDescription id={`${id}-description`}>
+            {description}
+          </FieldDescription>
+        ) : null}
+      </FieldContent>
+    </Field>
+  );
+}
+
 /** The `<form>` element: submits through TanStack Form and leaves validation to it. */
 function FormRoot({
   children,
@@ -268,6 +303,12 @@ function SubmitButton({
 export const { useAppForm, withForm } = createFormHook({
   fieldContext,
   formContext,
-  fieldComponents: { TextField, MoneyField, CurrencyField, DateField },
+  fieldComponents: {
+    TextField,
+    MoneyField,
+    CurrencyField,
+    DateField,
+    CheckboxField,
+  },
   formComponents: { Form: FormRoot, FormError, SubmitButton },
 });

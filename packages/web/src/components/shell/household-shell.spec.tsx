@@ -192,6 +192,21 @@ describe("HouseholdShell", () => {
     ).toBeVisible();
   });
 
+  it("links to the account settings from the account menu", async () => {
+    const { user: actor } = renderShell(
+      household("Flat on Piękna").id,
+      <OverviewPage />
+    );
+
+    await actor.click(
+      await screen.findByRole("button", { name: "Alice Nowak" })
+    );
+
+    expect(
+      await screen.findByRole("menuitem", { name: "Account settings" })
+    ).toHaveAttribute("href", "/account");
+  });
+
   it("shows an error with a retry when the household fails to load", async () => {
     server.use(
       http.get("*/api/auth/organization/get-full-organization", () =>

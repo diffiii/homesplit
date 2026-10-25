@@ -68,7 +68,8 @@ The database isn't emptied between runs, so tests never rely on what's in it. Im
 | Helper | Gives you |
 | --- | --- |
 | `expectNoAxeViolations(page)` in `e2e/axe.ts` | Fails on WCAG 2.2 A and AA or best-practice violations, checking the page in dark and then light mode, so contrast is checked in both. |
-| `signOut(page, name)` in `e2e/account.ts` | Signs out through the account menu, from the mobile top bar or the desktop sidebar. |
+| `openAccountMenu(page, name)` in `e2e/account.ts` | Opens the account menu, from the mobile top bar or the desktop sidebar. |
+| `signOut(page, name)` in `e2e/account.ts` | Signs out through the account menu. |
 
 On failure, Playwright keeps a trace in `packages/web/test-results`. Open it with `pnpm --filter web exec playwright show-trace <path>`.
 
