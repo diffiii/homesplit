@@ -17,6 +17,8 @@ export interface Scenario {
  * - Lake cabin: Ewa is the owner and Alice a member, with chores turned off
  *   but still holding chores, and expenses in EUR and PLN.
  * - Book club: Filip's household, where Alice has a pending invitation.
+ *
+ * Alice is also signed in on a phone and on a Windows laptop.
  */
 function households(): MockState {
   const f = new MockFactory();
@@ -257,6 +259,25 @@ function households(): MockState {
   f.friendship(alice, ewa);
   f.friendRequest(filip, alice);
   f.friendRequest(alice, celina);
+
+  f.session(
+    alice,
+    {
+      userAgent:
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+      ipAddress: "203.0.113.7",
+    },
+    { signedIn: { daysAgo: 5 }, lastActive: { hoursAgo: 3 } }
+  );
+  f.session(
+    alice,
+    {
+      userAgent:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:131.0) Gecko/20100101 Firefox/131.0",
+      ipAddress: "198.51.100.24",
+    },
+    { signedIn: { daysAgo: 6 }, lastActive: { daysAgo: 4 } }
+  );
 
   f.signIn(alice);
   return f.state;

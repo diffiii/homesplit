@@ -1,9 +1,11 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
 import { useAppForm } from "@/components/form";
 import { account } from "@/lib/api/auth-client";
+import { queryKeys } from "@/lib/api/query-keys";
 import {
   applyAuthErrors,
   CHANGE_PASSWORD_ERRORS,
@@ -27,6 +29,7 @@ interface PasswordSectionProps {
 
 /** Change the password, optionally signing out every other device. */
 export function PasswordSection({ onChanged }: PasswordSectionProps) {
+  const queryClient = useQueryClient();
   const form = useAppForm({
     defaultValues: {
       currentPassword: "",
@@ -48,7 +51,11 @@ export function PasswordSection({ onChanged }: PasswordSectionProps) {
           : "Password changed."
       );
       if (value.revokeOtherSessions) {
+        // The current session comes back with a new ID, and the others are gone.
         await onChanged();
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.sessions(),
+        });
       }
     },
   });

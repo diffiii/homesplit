@@ -10,16 +10,18 @@ import { buttonVariants } from "@/components/ui/button";
 import { useRequiredSession } from "@/hooks/use-required-session";
 import { HOME_PATH } from "@/lib/api/session";
 import { AppearanceSection } from "./appearance-section";
+import { DevicesSection } from "./devices-section";
 import { PasswordSection } from "./password-section";
 import { ProfileSection } from "./profile-section";
 
-/** The user's own profile, password, and theme, the same in every household. */
+/** The user's own profile, password, devices, and theme, the same in every household. */
 export default function AccountPage() {
   const session = useRequiredSession();
-  const user = session.data?.user;
+  const { data } = session;
 
   let content = <ListSkeleton label="Loading your account" rows={2} />;
-  if (user) {
+  if (data) {
+    const { user } = data;
     content = (
       <>
         <ProfileSection
@@ -31,6 +33,7 @@ export default function AccountPage() {
           }}
         />
         <PasswordSection onChanged={() => session.refetch()} />
+        <DevicesSection currentSessionId={data.session.id} />
       </>
     );
   } else if (session.error) {

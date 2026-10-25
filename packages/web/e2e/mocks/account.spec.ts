@@ -32,3 +32,30 @@ test("renames the user everywhere and remembers the theme", async ({
   await page.reload();
   await expect(page.locator("html")).toHaveClass(DARK);
 });
+
+test("signs out the other devices", async ({ page }) => {
+  await page.goto("/account");
+  const devices = page.getByRole("region", { name: "Signed-in devices" });
+  await expect(devices.getByRole("listitem")).toHaveCount(3);
+  await expect(devices.getByRole("listitem").first()).toContainText(
+    "This device"
+  );
+  await expectNoAxeViolations(page);
+
+  await page
+    .getByRole("button", { name: "Sign out Firefox on Windows" })
+    .click();
+  await expect(devices.getByRole("listitem")).toHaveCount(2);
+
+  await page
+    .getByRole("button", { name: "Sign out of all other devices" })
+    .click();
+  const dialog = page.getByRole("alertdialog", {
+    name: "Sign out of the other device?",
+  });
+  await expectNoAxeViolations(page);
+  await dialog.getByRole("button", { name: "Sign out" }).click();
+  await expect(devices.getByRole("listitem")).toHaveCount(1);
+  await page.reload();
+  await expect(devices.getByRole("listitem")).toHaveCount(1);
+});
