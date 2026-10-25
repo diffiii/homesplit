@@ -7,6 +7,7 @@ import { Injectable } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
 import { db, type Transaction } from "@/db";
 import { attachments, expenseAttachments } from "@/db/schema";
+import { attachmentsConfig } from "@/features/attachments/attachments.config";
 import type { HouseholdContext } from "@/features/households/access/household.guard";
 import { AppError, notFound } from "@/http/app-error";
 import {
@@ -69,8 +70,9 @@ export class ExpenseAttachmentsService {
   }
 
   /**
-   * Links one of the household's files to the expense. Only the expense's
-   * author or an admin+ may, as for editing it.
+   * Links one of the household's files to the expense, up to
+   * `ATTACHMENT_MAX_PER_EXPENSE` files. Only the expense's author or an admin+
+   * may, as for editing it.
    */
   link(
     household: HouseholdContext,
@@ -85,18 +87,30 @@ export class ExpenseAttachmentsService {
         householdId,
         attachmentId
       );
-      const inserted = await tx
-        .insert(expenseAttachments)
-        .values({ expenseId, attachmentId, householdId })
-        .onConflictDoNothing()
-        .returning({ attachmentId: expenseAttachments.attachmentId });
-      if (inserted.length === 0) {
+      // Read under the expense's lock, so links to it can't change meanwhile.
+      const linked = await tx
+        .select({ attachmentId: expenseAttachments.attachmentId })
+        .from(expenseAttachments)
+        .where(eq(expenseAttachments.expenseId, expenseId));
+      if (linked.some((link) => link.attachmentId === attachmentId)) {
         throw new AppError(
           409,
           "ATTACHMENT_ALREADY_LINKED",
           "The attachment is already linked to this expense"
         );
       }
+      const limit = attachmentsConfig.maxPerExpense;
+      if (linked.length >= limit) {
+        throw new AppError(
+          409,
+          "EXPENSE_ATTACHMENT_LIMIT_REACHED",
+          "The expense already has the most attachments allowed",
+          { limit }
+        );
+      }
+      await tx
+        .insert(expenseAttachments)
+        .values({ expenseId, attachmentId, householdId });
       return attachment;
     });
   }

@@ -58,6 +58,7 @@ The backend reads these from its environment; see [`.env.example`](../../package
 | `ATTACHMENT_MAX_BYTES` | `10485760` (10 MiB) | Largest upload. |
 | `ATTACHMENT_DOWNLOAD_URL_TTL_SECONDS` | `300` | Lifetime of a download URL, at most 7 days. |
 | `ATTACHMENT_UNREFERENCED_TTL_HOURS` | `24` | Age after which cleanup deletes an unreferenced attachment. |
+| `ATTACHMENT_MAX_PER_EXPENSE` | `10` | Most files linked to one expense; see [expense attachments](expenses.md#attachments). |
 
 The S3 client sends checksums only where the API requires them, because not every S3-compatible service accepts the ones newer AWS SDKs add by default. The bucket stays private: nothing is read without a signed URL.
 
