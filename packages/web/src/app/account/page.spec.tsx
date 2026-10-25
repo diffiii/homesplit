@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { queryKeys } from "@/lib/api/query-keys";
@@ -22,6 +22,10 @@ function renderPage() {
 }
 
 const section = (name: string) => screen.getByRole("region", { name });
+
+/** The devices section, once the session has loaded and the page shows it. */
+const devicesSection = () =>
+  screen.findByRole("region", { name: "Signed-in devices" });
 
 describe("AccountPage", () => {
   it("shows the profile from the session, with initials without an avatar", async () => {
@@ -195,7 +199,7 @@ describe("AccountPage", () => {
   it("lists this device first, then the others by last activity", async () => {
     renderPage();
 
-    const devices = section("Signed-in devices");
+    const devices = await devicesSection();
     const rows = await within(devices).findAllByRole("listitem");
 
     expect(rows).toHaveLength(3);
@@ -228,6 +232,7 @@ describe("AccountPage", () => {
 
   it("signs out every other device after asking", async () => {
     const { user } = renderPage();
+    const devices = await devicesSection();
 
     await user.click(
       await screen.findByRole("button", {
@@ -239,7 +244,10 @@ describe("AccountPage", () => {
     });
     await user.click(within(dialog).getByRole("button", { name: "Sign out" }));
 
-    const devices = section("Signed-in devices");
+    // The open dialog hides the rest of the page from queries until it closes.
+    await waitFor(() =>
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument()
+    );
     await expect
       .poll(() => within(devices).queryAllByRole("listitem").length)
       .toBe(1);
@@ -251,7 +259,7 @@ describe("AccountPage", () => {
 
   it("drops the other devices after a password change that signs them out", async () => {
     const { user } = renderPage();
-    const devices = section("Signed-in devices");
+    const devices = await devicesSection();
     await within(devices).findByText("Safari on iOS");
 
     await user.type(screen.getByLabelText("Current password"), MOCK_PASSWORD);

@@ -109,11 +109,11 @@ test("lists another device and signs it out", async ({
     userAgent:
       "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
   });
-  const signIn = await phone.post("/api/auth/sign-in/email", {
+  const phoneSignIn = await phone.post("/api/auth/sign-in/email", {
     data: { email: user.email, password: user.password },
     headers: { Origin: baseURL ?? "" },
   });
-  expect(signIn.ok(), await signIn.text()).toBe(true);
+  expect(phoneSignIn.ok(), await phoneSignIn.text()).toBe(true);
 
   await page.goto("/account");
   const devices = page.getByRole("region", { name: "Signed-in devices" });
