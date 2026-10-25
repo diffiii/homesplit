@@ -13,6 +13,7 @@ import {
   unique,
   uuid,
 } from "drizzle-orm/pg-core";
+import { attachments } from "./attachments";
 import { organization, user } from "./auth";
 import { householdMembershipHistory } from "./households";
 
@@ -310,6 +311,41 @@ export const expenseSplits = pgTable(
   ]
 );
 
+/**
+ * Files linked to an expense, at most once each. A file may be linked to
+ * several expenses of its household. Deleting the expense deletes its links
+ * but not the files, which cleanup deletes once nothing references them.
+ */
+export const expenseAttachments = pgTable(
+  "expense_attachments",
+  {
+    expenseId: uuid("expense_id").notNull(),
+    attachmentId: uuid("attachment_id").notNull(),
+    householdId: uuid("household_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.expenseId, table.attachmentId] }),
+    // Both keys share `household_id`, so the file is in the expense's household.
+    foreignKey({
+      name: "expense_attachments_expense_fk",
+      columns: [table.expenseId, table.householdId],
+      foreignColumns: [expenses.id, expenses.householdId],
+    }).onDelete("cascade"),
+    // Cleanup deletes only files without links, so this cascade runs only
+    // when the household goes.
+    foreignKey({
+      name: "expense_attachments_attachment_fk",
+      columns: [table.attachmentId, table.householdId],
+      foreignColumns: [attachments.id, attachments.householdId],
+    }).onDelete("cascade"),
+    // Serves cleanup's check for links to a file, and the cascade above.
+    index("expense_attachments_attachment_idx").on(table.attachmentId),
+  ]
+);
+
 // Relations for `db.query`, which reads an expense with its child rows in one
 // query. They don't change the database.
 
@@ -322,6 +358,7 @@ export const expensesRelations = relations(expenses, ({ one, many }) => ({
   payers: many(expensePayers),
   participants: many(expenseAllocationParticipants),
   splits: many(expenseSplits),
+  attachments: many(expenseAttachments),
 }));
 
 export const expensePayersRelations = relations(expensePayers, ({ one }) => ({
@@ -349,3 +386,17 @@ export const expenseSplitsRelations = relations(expenseSplits, ({ one }) => ({
   }),
   user: one(user, { fields: [expenseSplits.userId], references: [user.id] }),
 }));
+
+export const expenseAttachmentsRelations = relations(
+  expenseAttachments,
+  ({ one }) => ({
+    expense: one(expenses, {
+      fields: [expenseAttachments.expenseId],
+      references: [expenses.id],
+    }),
+    attachment: one(attachments, {
+      fields: [expenseAttachments.attachmentId],
+      references: [attachments.id],
+    }),
+  })
+);

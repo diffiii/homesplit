@@ -49,6 +49,8 @@ export function renderExpense(db: MockDb, expense: MockExpense): Expense {
     splits: sortBy(allocate(expense.total.amountCents, allocation), byUser).map(
       ({ userId, amountCents }) => ({ user: db.summary(userId), amountCents })
     ),
+    // The mocks don't store files yet.
+    attachments: [],
     createdAt: expense.createdAt,
     updatedAt: expense.updatedAt,
   };

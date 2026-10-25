@@ -61,7 +61,7 @@ const userRefs = (
  * Locks the expense `FOR UPDATE`, so writes to it run one after another, each
  * on what the previous one committed. Only its author or an admin+ may write.
  */
-async function lockExpenseForWrite(
+export async function lockExpenseForWrite(
   tx: Transaction,
   { householdId, role, userId }: HouseholdContext,
   expenseId: string

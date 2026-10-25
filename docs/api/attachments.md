@@ -1,6 +1,6 @@
 # Attachments API
 
-Module flag: none · Tasks: #44 · Contracts: [attachments](../../packages/contracts/src/features/attachments/index.ts)
+Module flag: none · Tasks: #44, #45 · Contracts: [attachments](../../packages/contracts/src/features/attachments/index.ts)
 
 ## Routes
 
@@ -15,15 +15,16 @@ Module flag: none · Tasks: #44 · Contracts: [attachments](../../packages/contr
 - Uploads: the body holds exactly one file, in the `file` field (`ATTACHMENT_UPLOAD_FIELD`), and no other fields. It's read only after the household guard has admitted the caller, so non-members never get to send one.
 - Allowed types: JPEG, PNG, WebP, HEIC, and PDF (`ATTACHMENT_MIME_TYPES`). The type is detected from the file's content with [`file-type`](https://github.com/sindresorhus/file-type), and the `Content-Type` the client declares is ignored, so a PDF sent as `image/png` is stored as a PDF. Content the detector can't parse counts as an unsupported type. HEIC means a file whose major brand is `heic` or `heix`, as iPhones save them; AVIF and other HEIF files are rejected.
 - Size: at most `ATTACHMENT_MAX_BYTES`. The default is 10 MiB.
-- Module flags: uploading and downloading belong to no module, because expenses (#45) and receipts (#55) share this storage. Linking a file to an expense or a receipt checks that module's flag.
+- Module flags: uploading and downloading belong to no module, because expenses and receipts (#55) share this storage. Linking a file to an expense or a receipt checks that module's flag; see [expense attachments](expenses.md#attachments).
 - Downloads: the response holds a signed `GET` URL to the object storage, valid for `ATTACHMENT_DOWNLOAD_URL_TTL_SECONDS`. Membership is checked when the URL is issued; after that, the URL works for anyone who has it until `expiresAt`, so the TTL stays short. The URL is valid at least until `expiresAt`. The storage answers with the stored type and `Content-Disposition: inline`.
 - Write order: the object is stored first, and the row is inserted only after that succeeds, so a failed storage write leaves no row and answers 500. If the insert fails, the object is deleted again, or queued in `storage_object_deletions` when that fails too. A crash between the two leaves an object with no row, which nothing can reach and cleanup doesn't find.
 - Repeated and concurrent requests: every upload creates a new attachment, even for identical content.
 
 ## Cleanup
 
-- An attachment is referenced while a row in another table points at it. Nothing does yet: #45 (expense links) and #55 (receipts) each add their table to `UNREFERENCED` in [`attachments-cleanup.service.ts`](../../packages/backend/src/features/attachments/attachments-cleanup.service.ts). Until then, every attachment counts as unreferenced.
-- An unreferenced attachment older than `ATTACHMENT_UNREFERENCED_TTL_HOURS` (default 24) is an abandoned upload, and cleanup deletes its row. Clients link a file right after uploading it, so the TTL only has to cover a slow form.
+- An attachment is referenced while a row in another table points at it: a link in `expense_attachments`, and a receipt once #55 adds its table to `UNREFERENCED` in [`attachments-cleanup.service.ts`](../../packages/backend/src/features/attachments/attachments-cleanup.service.ts).
+- An unreferenced attachment older than `ATTACHMENT_UNREFERENCED_TTL_HOURS` (default 24) is an abandoned upload, and cleanup deletes its row. Clients link a file right after uploading it, so the TTL only has to cover a slow form. The age counts from the upload, so a file that loses its last link, by unlinking or by deleting its expense, is deleted by the next run once it's that old.
+- Cleanup works in batches of 100. Each transaction locks its candidates `FOR UPDATE SKIP LOCKED`, skipping files a link in progress holds `FOR KEY SHARE`, and deletes only those still unreferenced in a second statement, on a fresh snapshot. A link committed after the first read shows up in the second, and none can start on a row cleanup has locked, so a linked file is never deleted.
 - Every deleted attachment row queues its storage key in `storage_object_deletions`, whether cleanup, a deleted household's cascade, or a later route deleted it. Cleanup then deletes each queued object and its queue row. A failed deletion stays queued for the next run, which then exits with code 1.
 - Cleanup is safe to run concurrently and to repeat. The app doesn't schedule it; run it from a scheduler with the backend's environment, for example daily:
 
@@ -76,6 +77,7 @@ The S3 client sends checksums only where the API requires them, because not ever
 
 - `attachments_uploader_party_fk` references `household_membership_history` from (`household_id`, `uploaded_by_id`).
 - Check: `attachments_size_positive` (`size_bytes > 0`). The allowed types and the size limit are enforced by the upload route only.
+- `attachments_id_household_id_key`, unique on (`id`, `household_id`), is the target of `expense_attachments_attachment_fk`, which keeps a link in its file's household.
 - Indexes: `attachments_household_idx` on `household_id`, and `attachments_created_at_idx` on `created_at` for cleanup.
 
 `storage_object_deletions`:

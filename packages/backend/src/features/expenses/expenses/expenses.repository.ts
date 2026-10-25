@@ -1,4 +1,6 @@
 import {
+  AttachmentMimeType,
+  type AttachmentSummary,
   allocate,
   type CreateExpenseRequest,
   type Expense,
@@ -27,6 +29,7 @@ import {
 import type { Executor, Transaction } from "@/db";
 import {
   expenseAllocationParticipants,
+  expenseAttachments,
   expensePayers,
   expenseSplits,
   expenses,
@@ -226,6 +229,38 @@ export async function updateAggregate(
 
 const userColumns = { columns: { id: true, name: true, image: true } } as const;
 
+/**
+ * An expense's links, for `with` in `db.query.expenses`, in the order they
+ * were made; the primary key breaks ties.
+ */
+export const linkedAttachments = {
+  columns: {},
+  with: {
+    attachment: { columns: { id: true, mimeType: true, sizeBytes: true } },
+  },
+  // Typed as mutable, which `orderBy` takes, unlike the rest of the object.
+  orderBy: [
+    asc(expenseAttachments.createdAt),
+    asc(expenseAttachments.attachmentId),
+  ] as SQL[],
+} as const;
+
+export const toAttachmentSummary = (row: {
+  id: string;
+  mimeType: string;
+  sizeBytes: number;
+}): AttachmentSummary => ({
+  id: row.id,
+  // Parsed, so a stored type the contract can't describe fails loudly.
+  mimeType: AttachmentMimeType.parse(row.mimeType),
+  sizeBytes: row.sizeBytes,
+});
+
+export const toAttachmentSummaries = (
+  links: { attachment: Parameters<typeof toAttachmentSummary>[0] }[]
+): AttachmentSummary[] =>
+  links.map(({ attachment }) => toAttachmentSummary(attachment));
+
 const toUserSummary = (row: {
   id: string;
   image: string | null;
@@ -243,8 +278,9 @@ const toShare = (row: {
 
 /**
  * Reads the expenses matching `where` in the list order: `expense_date`,
- * `created_at`, and `id`, all descending. Child rows are sorted by `user_id`.
- * Everything comes back in one query.
+ * `created_at`, and `id`, all descending. Child rows are sorted by `user_id`,
+ * and linked files by when they were linked. Everything comes back in one
+ * query.
  */
 export async function findExpenses(
   executor: Executor,
@@ -276,6 +312,7 @@ export async function findExpenses(
         with: { user: userColumns },
         orderBy: [asc(expenseSplits.userId)],
       },
+      attachments: linkedAttachments,
     },
   });
 
@@ -304,6 +341,7 @@ export async function findExpenses(
         ),
       }),
       splits: row.splits.map(toShare),
+      attachments: toAttachmentSummaries(row.attachments),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
