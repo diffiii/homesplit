@@ -1,4 +1,4 @@
-import { expect } from "@playwright/test";
+import { expect, type Locator } from "@playwright/test";
 import { expectNoAxeViolations } from "../axe";
 import { test } from "./fixtures";
 
@@ -148,4 +148,113 @@ test("adds an expense paid by two people and split by percentage", async ({
   await expect(page.getByRole("link", { name: GROCERIES_RUN })).toContainText(
     "You owe PLN 30.00"
   );
+});
+
+/** Text must have room to render and stay clear of the row's input. */
+async function expectReadableDepartedRow(row: Locator) {
+  const name = row.getByText("Bartek Kowalski", { exact: true });
+  const badge = row.getByText("Left the household", { exact: true });
+  const input = row.getByRole("textbox");
+  await expect(name).toBeVisible();
+  await expect(badge).toBeVisible();
+  await expect(input).toBeVisible();
+  expect(
+    await name.evaluate((element) => element.clientWidth >= element.scrollWidth)
+  ).toBe(true);
+  const [inputBox, ...textBoxes] = await Promise.all(
+    [input, name, badge].map((element) => element.boundingBox())
+  );
+  expect(inputBox).not.toBeNull();
+  for (const box of textBoxes) {
+    expect(box).not.toBeNull();
+    if (box && inputBox) {
+      expect(
+        box.x + box.width <= inputBox.x ||
+          box.x >= inputBox.x + inputBox.width ||
+          box.y + box.height <= inputBox.y ||
+          box.y >= inputBox.y + inputBox.height
+      ).toBe(true);
+    }
+  }
+}
+
+// Better Auth captures fetch when it starts; other API calls use the current fetch.
+function mockDepartedMember() {
+  const originalFetch = window.fetch;
+  window.fetch = async (input, init) => {
+    if (sessionStorage.getItem("departed-member") !== "true") {
+      return originalFetch(input, init);
+    }
+    const request = new Request(input, init);
+    const url = new URL(request.url);
+    if (url.pathname.endsWith("/expenses") && request.method === "POST") {
+      return Response.json(
+        {
+          code: "INVALID_REFERENCE",
+          message: "Invalid reference",
+          details: {
+            issues: [
+              {
+                path: ["payers", 1, "userId"],
+                message: "Not a current member",
+              },
+              {
+                path: ["allocation", "participants", 1, "userId"],
+                message: "Not a current member",
+              },
+            ],
+          },
+        },
+        { status: 400 }
+      );
+    }
+    const response = await originalFetch(input, init);
+    if (url.pathname.endsWith("/organization/get-full-organization")) {
+      const household = await response.json();
+      return Response.json({
+        ...household,
+        members: household.members.filter(
+          (member: { user: { name: string } }) =>
+            member.user.name !== "Bartek Kowalski"
+        ),
+      });
+    }
+    return response;
+  };
+}
+
+test("keeps departed payers and weighted participants readable", async ({
+  page,
+}) => {
+  await page.addInitScript(mockDepartedMember);
+  await page.goto("/households");
+  await page.getByRole("link", { name: "Flat on Piękna" }).click();
+  await expect(page).toHaveURL(HOUSEHOLD_URL);
+  await page.goto(`${new URL(page.url()).pathname}/expenses/new`);
+  await page.getByLabel("Name").fill("Pizza");
+  await page.getByLabel("Amount").fill("100");
+  await page.getByRole("button", { name: "Split another way" }).click();
+  await page
+    .getByRole("group", { name: "Paid by" })
+    .getByRole("checkbox", { name: BARTEK })
+    .click();
+  await page.getByRole("combobox", { name: "Split" }).click();
+  await page.getByRole("option", { name: "By percentage" }).click();
+
+  // Simulate a departure while the form is open. The failed save refetches members.
+  await page.evaluate(() => sessionStorage.setItem("departed-member", "true"));
+  await page.evaluate(mockDepartedMember);
+  await page.getByRole("button", { name: "Add expense" }).click();
+
+  await Promise.all(
+    ["Paid by", "Split between"].map((label) =>
+      expectReadableDepartedRow(
+        page
+          .getByRole("group", { name: label })
+          .getByRole("listitem")
+          .filter({ has: page.getByRole("checkbox", { name: BARTEK }) })
+      )
+    )
+  );
+  await expectNoAxeViolations(page);
 });

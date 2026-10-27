@@ -373,8 +373,8 @@ function ChecklistField({
                   value={option.value}
                 />
                 <FieldLabel
-                  // Starting from no width, so the detail stays beside it.
-                  className="min-w-0 flex-1 basis-0! font-normal"
+                  // Keep names readable; details can wrap onto the next line.
+                  className="min-w-40 flex-1 basis-0! font-normal"
                   htmlFor={optionId}
                 >
                   {option.label}
@@ -426,7 +426,7 @@ function RowInputField({
   const invalid = errors.length > 0;
   return (
     <>
-      <InputGroup className="w-32 shrink-0">
+      <InputGroup className="ml-auto w-32 shrink-0">
         <InputGroupInput
           aria-describedby={invalid ? `${id}-error` : undefined}
           aria-invalid={invalid || undefined}

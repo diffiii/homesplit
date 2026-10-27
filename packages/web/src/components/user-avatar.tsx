@@ -62,7 +62,7 @@ interface UserLabelProps {
 /** Avatar and name, as payers, assignees, and members are listed. */
 export function UserLabel({ user, departed = false, size }: UserLabelProps) {
   return (
-    <span className="inline-flex min-w-0 items-center gap-2">
+    <span className="inline-flex min-w-0 flex-wrap items-center gap-2">
       <UserAvatar decorative departed={departed} size={size} user={user} />
       <span className={cn("truncate", departed && "text-muted-foreground")}>
         {user.name}

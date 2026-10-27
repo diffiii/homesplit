@@ -426,7 +426,7 @@ const sumOf = (numbers: readonly number[]) =>
 /** What's left of the amount once the payers' amounts are taken, or `null` without an amount. */
 export function payersCheck(values: ExpenseFormValues): RunningCheck | null {
   const total = totalCents(values);
-  if (total === null || values.payerIds.length === 0) {
+  if (total === null) {
     return null;
   }
   const inputs = payerAmountInputs(values);

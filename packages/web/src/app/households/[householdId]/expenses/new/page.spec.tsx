@@ -298,6 +298,14 @@ describe("NewExpensePage", () => {
     expect(checkOf("Paid by")).toBe("Adds up to the amount.");
   });
 
+  it("shows the whole amount unassigned after clearing every payer", async () => {
+    const { user } = await openAdvanced("100");
+    await user.click(
+      within(group("Paid by")).getByRole("checkbox", { name: ALICE })
+    );
+    expect(checkOf("Paid by")).toBe("PLN 100.00 unassigned.");
+  });
+
   it("keeps the people checked across methods and previews each one", async () => {
     const { user } = await openAdvanced();
     const split = () => group("Split between");

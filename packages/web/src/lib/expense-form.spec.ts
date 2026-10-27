@@ -384,6 +384,19 @@ describe("running checks", () => {
     expect(payersCheck(advanced({ amount: "" }))).toBeNull();
   });
 
+  it.each([null, { [A]: "100" }])(
+    "leaves the full amount unassigned when no payers are selected",
+    (payerAmounts) => {
+      const check = payersCheck(advanced({ payerIds: [], payerAmounts }));
+      expect(check?.ok).toBe(false);
+      expect(check?.text.replace(/\s/g, " ")).toBe("PLN 100.00 unassigned.");
+    }
+  );
+
+  it("hides the check without a valid amount even when no payers are selected", () => {
+    expect(payersCheck(advanced({ amount: "", payerIds: [] }))).toBeNull();
+  });
+
   it("say what's left to 100% or the total", () => {
     expect(
       splitCheck(
