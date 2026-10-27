@@ -35,4 +35,7 @@ test("compiles every page", async ({ request }) => {
     // A redirect would mean the page never rendered, so never compiled.
     expect(response.status(), path).toBe(200);
   }
+  // With the cookie, `/` renders the signed-in home rather than the landing page.
+  const landing = await request.get("/", { maxRedirects: 0 });
+  expect(landing.status(), "/ without a session").toBe(200);
 });

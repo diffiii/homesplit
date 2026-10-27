@@ -11,9 +11,11 @@ import { landingPath, readLastHousehold } from "@/lib/last-household";
 
 /**
  * Where signing in leads unless a page asked for another: the household last
- * opened on this device, or the first-run screen without households.
+ * opened on this device, or the first-run screen without households. The
+ * proxy shows it at `/` to visitors with a session cookie, in place of the
+ * landing page.
  */
-export default function LandingPage() {
+export default function SignedInHomePage() {
   // Better Auth answers a stale session cookie with 401, which isn't an `/api` 401.
   useRequiredSession();
   const router = useRouter();

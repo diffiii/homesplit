@@ -10,13 +10,12 @@ import {
   type ScenarioName,
 } from "./scenarios";
 import {
+  MOCK_SESSION_COOKIE,
   MOCK_STORAGE_KEY,
   MOCK_STORAGE_VERSION,
+  mockSessionToken,
   type SavedMocks,
 } from "./storage";
-
-/** The cookie the proxy looks for; Better Auth's real one is HTTP-only. */
-const SESSION_COOKIE = "better-auth.session_token";
 
 function load(): Partial<SavedMocks> {
   try {
@@ -37,8 +36,8 @@ function load(): Partial<SavedMocks> {
 function syncSessionCookie(userId: string | null) {
   // biome-ignore lint/suspicious/noDocumentCookie: the mocks stand in for Better Auth's Set-Cookie
   document.cookie = userId
-    ? `${SESSION_COOKIE}=mock-session-${userId}; path=/; SameSite=Lax`
-    : `${SESSION_COOKIE}=; path=/; max-age=0`;
+    ? `${MOCK_SESSION_COOKIE}=${mockSessionToken(userId)}; path=/; SameSite=Lax`
+    : `${MOCK_SESSION_COOKIE}=; path=/; max-age=0`;
 }
 
 /** A mock user and where they belong, for picking whom to sign in as. */
