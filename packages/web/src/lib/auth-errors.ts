@@ -29,24 +29,42 @@ const AUTH_FORM_ERRORS: Partial<Record<string, ServerErrors>> = {
   },
 };
 
+/** Better Auth codes the change-password form explains itself. */
+export const CHANGE_PASSWORD_ERRORS: Partial<Record<string, ServerErrors>> = {
+  INVALID_PASSWORD: {
+    fields: { currentPassword: "That's not your current password." },
+  },
+  PASSWORD_TOO_SHORT: {
+    fields: { newPassword: `Use at least ${MIN_PASSWORD_LENGTH} characters.` },
+  },
+  PASSWORD_TOO_LONG: {
+    fields: { newPassword: `Use at most ${MAX_PASSWORD_LENGTH} characters.` },
+  },
+};
+
 /**
  * A failed sign-in or sign-up in plain English, placed on the field it's
  * about, or `undefined` when the generic handling in `applyServerErrors`
- * covers it, as with validation issues and rate limits.
+ * covers it, as with validation issues and rate limits. Another form passes
+ * the codes it explains, such as `CHANGE_PASSWORD_ERRORS`.
  */
-export function authFormErrors(error: unknown): ServerErrors | undefined {
+export function authFormErrors(
+  error: unknown,
+  known = AUTH_FORM_ERRORS
+): ServerErrors | undefined {
   if (!isApiRequestError(error) || error.source !== "auth") {
     return;
   }
-  return AUTH_FORM_ERRORS[error.code];
+  return known[error.code];
 }
 
-/** Show a failed sign-in or sign-up on the form, like `applyServerErrors`. */
+/** Show a failed Better Auth call on the form, like `applyServerErrors`. */
 export function applyAuthErrors(
   form: Pick<AnyFormApi, "fieldInfo" | "setErrorMap">,
-  error: unknown
+  error: unknown,
+  codes = AUTH_FORM_ERRORS
 ): void {
-  const known = authFormErrors(error);
+  const known = authFormErrors(error, codes);
   if (known) {
     showServerErrors(form, known);
   } else {

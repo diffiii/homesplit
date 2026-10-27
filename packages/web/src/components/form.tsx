@@ -12,8 +12,10 @@ import { CurrencyPicker } from "@/components/currency-picker";
 import { EmojiInput } from "@/components/emoji-input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldError,
   FieldLabel,
@@ -208,6 +210,39 @@ function DateField({
   );
 }
 
+/** A yes-or-no choice, with its label and description beside the box. */
+function CheckboxField({
+  label,
+  description,
+}: {
+  description?: ReactNode;
+  label: ReactNode;
+}) {
+  const field = useFieldContext<boolean>();
+  const value = useStore(field.store, (state) => state.value);
+  const id = `${field.form.formId}-${field.name}`;
+  return (
+    <Field orientation="horizontal">
+      <Checkbox
+        aria-describedby={description ? `${id}-description` : undefined}
+        checked={value}
+        id={id}
+        name={field.name}
+        onBlur={field.handleBlur}
+        onCheckedChange={(checked) => field.handleChange(checked)}
+      />
+      <FieldContent>
+        <FieldLabel htmlFor={id}>{label}</FieldLabel>
+        {description ? (
+          <FieldDescription id={`${id}-description`}>
+            {description}
+          </FieldDescription>
+        ) : null}
+      </FieldContent>
+    </Field>
+  );
+}
+
 /** An optional emoji, such as a category's icon; clearing it stores `null`. */
 function EmojiField({
   label,
@@ -325,6 +360,7 @@ export const { useAppForm, withForm } = createFormHook({
     MoneyField,
     CurrencyField,
     DateField,
+    CheckboxField,
     EmojiField,
     CategoryField,
   },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiRequestError } from "./api/api-error";
-import { authFormErrors } from "./auth-errors";
+import { authFormErrors, CHANGE_PASSWORD_ERRORS } from "./auth-errors";
 
 function authError(status: number, code: string) {
   return ApiRequestError.fromBody("auth", status, { code, message: code });
@@ -21,6 +21,20 @@ describe("authFormErrors", () => {
     expect(authFormErrors(authError(400, "PASSWORD_TOO_SHORT"))).toEqual({
       fields: { password: "Use at least 8 characters." },
     });
+  });
+
+  it("puts change-password errors on that form's fields", () => {
+    expect(
+      authFormErrors(authError(400, "INVALID_PASSWORD"), CHANGE_PASSWORD_ERRORS)
+    ).toEqual({
+      fields: { currentPassword: "That's not your current password." },
+    });
+    expect(
+      authFormErrors(
+        authError(400, "PASSWORD_TOO_SHORT"),
+        CHANGE_PASSWORD_ERRORS
+      )
+    ).toEqual({ fields: { newPassword: "Use at least 8 characters." } });
   });
 
   it("leaves other errors to the generic handling", () => {

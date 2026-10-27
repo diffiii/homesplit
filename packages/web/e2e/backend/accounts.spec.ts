@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { signOut } from "../account";
+import { signIn, signOut } from "../account";
 import { expectNoAxeViolations } from "../axe";
 import { newUser, test } from "./fixtures";
 
@@ -60,9 +60,40 @@ test("creates households, switches, and signs back in to the last opened one", a
   await expect(page).toHaveURL(flatUrl);
 
   await signOut(page, user.name);
-  await page.getByLabel("Email").fill(user.email);
-  await page.getByLabel("Password").fill(user.password);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await signIn(page, user);
   await expect(page).toHaveURL(flatUrl);
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+});
+
+test("renames the user and changes the password", async ({ page, user }) => {
+  await page.goto("/account");
+  await expect(page.getByLabel("Name")).toHaveValue(user.name);
+  await expectNoAxeViolations(page);
+
+  await page.getByLabel("Name").fill("  Erin Renamed ");
+  await page.getByRole("button", { name: "Save name" }).click();
+  await expect(page.getByText("Name saved.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Name")).toHaveValue("Erin Renamed");
+
+  const current = page.getByLabel("Current password");
+  await current.fill("not the password");
+  await page.getByLabel("New password").fill("a brand new password");
+  await page.getByRole("button", { name: "Change password" }).click();
+  await expect(
+    page.getByText("That's not your current password.")
+  ).toBeVisible();
+
+  await current.fill(user.password);
+  await page.getByRole("button", { name: "Change password" }).click();
+  await expect(
+    page.getByText("Password changed. Your other devices are signed out.")
+  ).toBeVisible();
+  // This device got a new session, so it stays signed in.
+  await page.reload();
+  await expect(page.getByLabel("Name")).toHaveValue("Erin Renamed");
+
+  await signOut(page, "Erin Renamed");
+  await signIn(page, { email: user.email, password: "a brand new password" });
+  await expect(page.getByText("No households yet")).toBeVisible();
 });
