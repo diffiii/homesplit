@@ -6,7 +6,7 @@ import { cn } from "cn";
 import { ReceiptIcon, SearchXIcon } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef } from "react";
+import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import { CategoryIcon } from "@/components/category-icon";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
@@ -31,6 +31,8 @@ import { useSetExpenseFilters } from "./expense-filters";
 const PRELOAD_MARGIN = "400px";
 
 interface ExpenseListProps {
+  /** Shown in the empty state, such as a link to add the first expense. */
+  emptyAction?: ReactNode;
   filters: ExpenseFilters;
   /** Called with every expense loaded so far, so the filters can offer their people. */
   onLoaded?: (expenses: Expense[]) => void;
@@ -41,7 +43,11 @@ interface ExpenseListProps {
  * the list scrolls into view. A button does the same for keyboard and screen
  * reader users, and wherever the observer isn't available.
  */
-export function ExpenseList({ filters, onLoaded }: ExpenseListProps) {
+export function ExpenseList({
+  emptyAction,
+  filters,
+  onLoaded,
+}: ExpenseListProps) {
   const { household } = useHousehold();
   const list = useInfiniteQuery(expenseListQuery(household.id, filters));
   const pages = list.data ? list.data.pages : null;
@@ -95,6 +101,7 @@ export function ExpenseList({ filters, onLoaded }: ExpenseListProps) {
       <NoMatches />
     ) : (
       <EmptyState
+        action={emptyAction}
         description="Expenses everyone adds show up here, newest first."
         icon={ReceiptIcon}
         title="No expenses yet"

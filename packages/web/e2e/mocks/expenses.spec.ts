@@ -10,6 +10,8 @@ const INTERNET = /^Internet/;
 const DATES_IN_URL = /from=\d{4}-\d{2}-\d{2}&to=\d{4}-\d{2}-\d{2}/;
 const PREVIOUS = /previous/i;
 const NEXT = /next/i;
+const BARTEK = /^Bartek/;
+const SUSHI = /^Sushi/;
 
 test("scrolls, filters, and opens an expense", async ({ page }) => {
   test.slow();
@@ -81,4 +83,25 @@ test("filters by a date range from the calendar", async ({ page }) => {
   await expect(calendar).toBeHidden();
   await expect(page.getByText("Showing 2 of 2 expenses")).toBeVisible();
   await expect(page).toHaveURL(DATES_IN_URL);
+});
+
+test("adds an expense split equally", async ({ page }) => {
+  await page.goto("/households");
+  await page.getByRole("link", { name: "Flat on Piękna" }).click();
+  await expect(page).toHaveURL(HOUSEHOLD_URL);
+  await page.goto(`${new URL(page.url()).pathname}/expenses`);
+
+  await page.getByRole("link", { name: "Add expense" }).click();
+  await page.getByLabel("Name").fill("Sushi");
+  await page.getByLabel("Amount").fill("90");
+  await page.getByRole("checkbox", { name: BARTEK }).click();
+  await expect(page.getByText("PLN 45.00")).toHaveCount(2);
+  await expectNoAxeViolations(page);
+
+  await page.getByRole("button", { name: "Add expense" }).click();
+  await expect(page.getByRole("heading", { name: "Sushi" })).toBeVisible();
+  await page.getByRole("link", { name: "All expenses" }).click();
+  await expect(page.getByRole("link", { name: SUSHI })).toContainText(
+    "You lent PLN 45.00"
+  );
 });

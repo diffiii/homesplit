@@ -26,6 +26,8 @@ import {
   FieldDescription,
   FieldError,
   FieldLabel,
+  FieldLegend,
+  FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -290,6 +292,90 @@ function CheckboxField({
   );
 }
 
+export interface ChecklistOption {
+  /** Shown at the end of the row, such as a person's share. */
+  detail?: ReactNode;
+  label: ReactNode;
+  value: string;
+}
+
+/**
+ * Pick any number of `options`, such as the people splitting an expense. The
+ * value lists the picked ones in the order of `options`.
+ */
+function ChecklistField({
+  label,
+  description,
+  options,
+}: {
+  description?: ReactNode;
+  label: ReactNode;
+  options: readonly ChecklistOption[];
+}) {
+  const field = useFieldContext<string[]>();
+  const value = useStore(field.store, (state) => state.value);
+  const errors = useVisibleErrors(field);
+  const id = `${field.form.formId}-${field.name}`;
+  const invalid = errors.length > 0;
+  const describedBy =
+    [description && `${id}-description`, invalid && `${id}-error`]
+      .filter(Boolean)
+      .join(" ") || undefined;
+  const toggle = (option: string, checked: boolean) => {
+    const picked = new Set(value);
+    if (checked) {
+      picked.add(option);
+    } else {
+      picked.delete(option);
+    }
+    field.handleChange(
+      options.map((o) => o.value).filter((v) => picked.has(v))
+    );
+  };
+
+  return (
+    <FieldSet
+      aria-describedby={describedBy}
+      className="gap-2"
+      data-invalid={invalid || undefined}
+    >
+      <FieldLegend variant="label">{label}</FieldLegend>
+      {description ? (
+        <FieldDescription id={`${id}-description`}>
+          {description}
+        </FieldDescription>
+      ) : null}
+      <ul className="flex flex-col divide-y rounded-xl border">
+        {options.map((option) => {
+          const optionId = `${id}-${option.value}`;
+          return (
+            <li key={option.value}>
+              <Field className="px-4 py-2" orientation="horizontal">
+                <Checkbox
+                  checked={value.includes(option.value)}
+                  id={optionId}
+                  name={field.name}
+                  onBlur={field.handleBlur}
+                  onCheckedChange={(checked) => toggle(option.value, checked)}
+                  value={option.value}
+                />
+                <FieldLabel
+                  className="min-w-0 flex-1 font-normal"
+                  htmlFor={optionId}
+                >
+                  {option.label}
+                </FieldLabel>
+                {option.detail}
+              </Field>
+            </li>
+          );
+        })}
+      </ul>
+      <FieldError errors={errors} id={`${id}-error`} />
+    </FieldSet>
+  );
+}
+
 /** An optional emoji, such as a category's icon; clearing it stores `null`. */
 function EmojiField({
   label,
@@ -419,6 +505,7 @@ export const { useAppForm, withForm } = createFormHook({
     CurrencyField,
     DateField,
     CheckboxField,
+    ChecklistField,
     EmojiField,
     CategoryField,
   },
