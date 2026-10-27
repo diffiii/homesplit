@@ -6,6 +6,7 @@ import { buildPath, encodeQuery } from "./url";
 
 const HOUSEHOLD_ID = "0b6f1f4e-3c1a-4b8e-9a59-1d2f3e4a5b6c";
 const EXPENSE_ID = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
+const USER_ID = "3f2b8c1d-5e6a-4f7b-8c9d-0e1f2a3b4c5d";
 
 const AUTH_PATH = /^\/api\/auth(\/|$)/;
 const PARAM_SEGMENT = /:(\w+)/g;
@@ -79,6 +80,9 @@ describe("encodeQuery", () => {
     expect(
       encodeQuery(endpoints.listChores, { page: 2, includeCompleted: true })
     ).toEqual({ page: "2", includeCompleted: "true" });
+    expect(
+      encodeQuery(endpoints.listChores, { assignedToId: USER_ID })
+    ).toEqual({ assignedToId: USER_ID });
     expect(encodeQuery(endpoints.listExpenses, {})).toEqual({});
     expect(
       encodeQuery(endpoints.listExpenses, {

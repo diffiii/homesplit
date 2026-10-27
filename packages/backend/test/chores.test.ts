@@ -19,6 +19,7 @@ import {
   createTwoHouseholds,
   createUser,
   inviteAndAccept,
+  removeMember,
   type TestHousehold,
   type TestUser,
 } from "./helpers/fixtures";
@@ -398,6 +399,152 @@ describe("chores API", () => {
         "chores_completion"
       );
       expect(await stored()).toEqual(chore);
+    });
+  });
+
+  describe("assignee filter", () => {
+    let alice: TestUser;
+    let bob: TestUser;
+    let carol: TestUser;
+    let household: TestHousehold;
+
+    const create = async (
+      body: { name: string; assignedToId?: string; dueAt?: string },
+      as = alice
+    ) =>
+      Chore.parse(
+        (await as.client.post(choresPath(household.id)).send(body).expect(201))
+          .body
+      );
+
+    const list = async (query: string) =>
+      ChoreListResponse.parse(
+        (
+          await alice.client
+            .get(`${choresPath(household.id)}${query}`)
+            .expect(200)
+        ).body
+      );
+
+    const ids = (response: ChoreListResponse) =>
+      response.items.map((item) => item.id);
+
+    beforeEach(async () => {
+      alice = await createUser(app, "Alice");
+      bob = await createUser(app, "Bob");
+      carol = await createUser(app, "Carol");
+      household = await createHousehold(alice);
+      await inviteAndAccept(alice, household, bob);
+      await inviteAndAccept(alice, household, carol);
+    });
+
+    it("lists only the assignee's chores, open by default or with completed ones", async () => {
+      const later = await create({
+        name: "Mop floors",
+        assignedToId: bob.id,
+        dueAt: "2026-10-05T12:00:00.000Z",
+      });
+      const sooner = await create({
+        name: "Take out trash",
+        assignedToId: bob.id,
+        dueAt: "2026-10-01T12:00:00.000Z",
+      });
+      const done = await create({ name: "Dust shelves", assignedToId: bob.id });
+      await bob.client
+        .post(transitionPath(household.id, done.id, "complete"))
+        .expect(200);
+      await create({ name: "Water plants", assignedToId: alice.id });
+      await create({ name: "Clean windows" });
+
+      const open = await list(`?assignedToId=${bob.id}`);
+      const all = await list(`?assignedToId=${bob.id}&includeCompleted=true`);
+
+      expect(open).toMatchObject({ totalItems: 2 });
+      expect(ids(open)).toEqual([sooner.id, later.id]);
+      expect(all).toMatchObject({ totalItems: 3 });
+      expect(ids(all)).toEqual([sooner.id, later.id, done.id]);
+    });
+
+    it("keeps the order and pagination", async () => {
+      const due = (day: string) =>
+        create({
+          name: `Chore due ${day}`,
+          assignedToId: bob.id,
+          dueAt: `2026-10-${day}T12:00:00.000Z`,
+        });
+      const first = await due("03");
+      const second = await due("07");
+      const undated = await create({ name: "Someday", assignedToId: bob.id });
+      await create({
+        name: "Not Bob's",
+        assignedToId: carol.id,
+        dueAt: "2026-10-05T12:00:00.000Z",
+      });
+
+      const page1 = await list(`?assignedToId=${bob.id}&pageSize=2`);
+      const page2 = await list(`?assignedToId=${bob.id}&pageSize=2&page=2`);
+
+      expect(page1).toMatchObject({ page: 1, pageSize: 2, totalItems: 3 });
+      expect(ids(page1)).toEqual([first.id, second.id]);
+      expect(page2).toMatchObject({ page: 2, pageSize: 2, totalItems: 3 });
+      expect(ids(page2)).toEqual([undated.id]);
+    });
+
+    it("finds a departed member's open chores so they can be reassigned", async () => {
+      const chore = await create({
+        name: "Fix the wardrobe door",
+        assignedToId: carol.id,
+      });
+      await removeMember(alice, household, carol);
+
+      const before = await list(`?assignedToId=${carol.id}`);
+      expect(ids(before)).toEqual([chore.id]);
+
+      await alice.client
+        .patch(`${choresPath(household.id)}/${chore.id}`)
+        .send({ assignedToId: bob.id })
+        .expect(200);
+
+      expect(await list(`?assignedToId=${carol.id}`)).toMatchObject({
+        items: [],
+        totalItems: 0,
+      });
+      expect(ids(await list(`?assignedToId=${bob.id}`))).toEqual([chore.id]);
+    });
+
+    it("matches nothing for another household's or unknown user IDs", async () => {
+      await create({ name: "Mop floors", assignedToId: bob.id });
+      const dave = await createUser(app, "Dave");
+      const theirs = await createHousehold(dave);
+      await dave.client
+        .post(choresPath(theirs.id))
+        .send({ name: "Their chore", assignedToId: dave.id })
+        .expect(201);
+
+      const queries = [
+        `?assignedToId=${dave.id}`,
+        `?assignedToId=${dave.id}&includeCompleted=true`,
+        `?assignedToId=${randomUUID()}`,
+      ];
+
+      const responses = await Promise.all(queries.map(list));
+
+      for (const response of responses) {
+        expect(response).toEqual({
+          items: [],
+          page: 1,
+          pageSize: 20,
+          totalItems: 0,
+        });
+      }
+    });
+
+    it("rejects a malformed assignedToId with VALIDATION_ERROR", async () => {
+      const response = await alice.client
+        .get(`${choresPath(household.id)}?assignedToId=bob`)
+        .expect(400);
+
+      expectApiError(response, "VALIDATION_ERROR");
     });
   });
 

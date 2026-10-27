@@ -56,7 +56,9 @@ export const choreRoutes: MockRoutes = {
           db.state.chores.filter(
             (chore) =>
               chore.householdId === household.id &&
-              (query.includeCompleted || !chore.completedAt)
+              (query.includeCompleted || !chore.completedAt) &&
+              (query.assignedToId === undefined ||
+                chore.assignedToId === query.assignedToId)
           ),
           asc((chore) => chore.completedAt !== null),
           // Chores without a deadline go last.

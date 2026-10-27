@@ -333,6 +333,26 @@ describe("application routes", () => {
     ).resolves.toMatchObject({ status: 400, code: "VALIDATION_ERROR" });
   });
 
+  it("filter chores by assignee like the backend", async () => {
+    const list = async (query: object) =>
+      (await api("listChores", { ...flat(), query })).items.map(
+        ({ name }) => name
+      );
+    const userId = (name: string) =>
+      db.state.users.find((user) => user.name.startsWith(name))?.id;
+    const [celina, dawid] = [userId("Celina"), userId("Dawid")];
+
+    expect(await list({ assignedToId: celina })).toEqual([]);
+    expect(
+      await list({ assignedToId: celina, includeCompleted: true })
+    ).toEqual(["Defrost the freezer"]);
+    // Dawid has left, but his open chore can still be found and reassigned.
+    expect(await list({ assignedToId: dawid })).toEqual([
+      "Fix the wardrobe door",
+    ]);
+    expect(await list({ assignedToId: OTHER_ID })).toEqual([]);
+  });
+
   it("repeat idempotent actions without changing the result", async () => {
     const { householdId: id } = flat().params;
     const [chore] = (await api("listChores", flat())).items;
