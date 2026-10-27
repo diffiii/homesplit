@@ -1,10 +1,13 @@
 import {
+  type ClearPurchasedShoppingItemsResponse,
   CreateShoppingItemRequest,
   endpoints,
   Id,
   ListShoppingItemsQuery,
+  type PurchasedShoppingItem,
   type ShoppingItem,
   type ShoppingItemListResponse,
+  type UnpurchasedShoppingItem,
   UpdateShoppingItemRequest,
 } from "@homesplit/contracts";
 import { Body, Controller, Inject, Param, Query } from "@nestjs/common";
@@ -66,5 +69,28 @@ export class ShoppingItemsController {
     @Param("itemId", new ZodPipe(Id)) itemId: Id
   ): Promise<void> {
     await this.items.delete(household.householdId, itemId);
+  }
+
+  @HouseholdRoute(endpoints.purchaseShoppingItem, { module: "shopping" })
+  purchaseShoppingItem(
+    @CurrentHousehold() household: HouseholdContext,
+    @Param("itemId", new ZodPipe(Id)) itemId: Id
+  ): Promise<PurchasedShoppingItem> {
+    return this.items.purchase(household, itemId);
+  }
+
+  @HouseholdRoute(endpoints.unpurchaseShoppingItem, { module: "shopping" })
+  unpurchaseShoppingItem(
+    @CurrentHousehold() household: HouseholdContext,
+    @Param("itemId", new ZodPipe(Id)) itemId: Id
+  ): Promise<UnpurchasedShoppingItem> {
+    return this.items.unpurchase(household.householdId, itemId);
+  }
+
+  @HouseholdRoute(endpoints.clearPurchasedShoppingItems, { module: "shopping" })
+  clearPurchasedShoppingItems(
+    @CurrentHousehold() household: HouseholdContext
+  ): Promise<ClearPurchasedShoppingItemsResponse> {
+    return this.items.clearPurchased(household.householdId);
   }
 }

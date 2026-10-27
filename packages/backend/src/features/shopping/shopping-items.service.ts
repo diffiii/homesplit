@@ -1,12 +1,16 @@
 import type {
+  ClearPurchasedShoppingItemsResponse,
   CreateShoppingItemRequest,
   ListShoppingItemsQuery,
+  PurchasedShoppingItem,
   ShoppingItem,
   ShoppingItemListResponse,
+  UnpurchasedShoppingItem,
   UpdateShoppingItemRequest,
 } from "@homesplit/contracts";
 import { Injectable } from "@nestjs/common";
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import type { PgUpdateSetSource } from "drizzle-orm/pg-core";
 import { db, type Executor, readSnapshot } from "@/db";
 import { shoppingItems } from "@/db/schema";
 import type { HouseholdContext } from "@/features/households/access/household.guard";
@@ -154,5 +158,75 @@ export class ShoppingItemsService {
     if (deleted.length === 0) {
       throw notFound();
     }
+  }
+
+  async purchase(
+    { householdId, userId }: HouseholdContext,
+    itemId: string
+  ): Promise<PurchasedShoppingItem> {
+    const item = await this.transition(householdId, itemId, true, {
+      purchasedAt: sql`now()`,
+      purchasedById: userId,
+    });
+    if (!item.isPurchased) {
+      throw new Error("Shopping item not purchased after purchase");
+    }
+    return item;
+  }
+
+  async unpurchase(
+    householdId: string,
+    itemId: string
+  ): Promise<UnpurchasedShoppingItem> {
+    const item = await this.transition(householdId, itemId, false, {
+      purchasedAt: null,
+      purchasedById: null,
+    });
+    if (item.isPurchased) {
+      throw new Error("Shopping item still purchased after unpurchase");
+    }
+    return item;
+  }
+
+  async clearPurchased(
+    householdId: string
+  ): Promise<ClearPurchasedShoppingItemsResponse> {
+    const deleted = await db
+      .delete(shoppingItems)
+      .where(
+        and(
+          eq(shoppingItems.householdId, householdId),
+          isNotNull(shoppingItems.purchasedAt)
+        )
+      )
+      .returning({ id: shoppingItems.id });
+    return { deletedCount: deleted.length };
+  }
+
+  private transition(
+    householdId: string,
+    itemId: string,
+    isPurchased: boolean,
+    metadata: PgUpdateSetSource<typeof shoppingItems>
+  ): Promise<ShoppingItem> {
+    return db.transaction(async (tx) => {
+      const [current] = await tx
+        .select({ purchasedAt: shoppingItems.purchasedAt })
+        .from(shoppingItems)
+        .where(inHousehold(householdId, itemId))
+        .for("update");
+      if (!current) {
+        throw notFound();
+      }
+
+      if ((current.purchasedAt !== null) !== isPurchased) {
+        await tx
+          .update(shoppingItems)
+          .set(metadata)
+          .where(inHousehold(householdId, itemId));
+      }
+
+      return findItem(tx, householdId, itemId);
+    });
   }
 }
