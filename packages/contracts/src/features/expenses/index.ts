@@ -10,6 +10,7 @@ import {
   PositiveMoney,
 } from "../../common/money";
 import { Pagination, paginatedResponse } from "../../common/pagination";
+import { AttachmentSummary } from "../attachments";
 import { UserSummary } from "../users";
 import {
   ExpenseAllocationInput,
@@ -148,7 +149,10 @@ export const ExpenseSplit = z.object({
 });
 export type ExpenseSplit = z.infer<typeof ExpenseSplit>;
 
-/** Household expense with payers, author, allocation strategy, and splits. */
+/**
+ * Household expense with payers, author, allocation strategy, splits, and the
+ * files linked to it, oldest link first.
+ */
 export const Expense = z.object({
   id: Id,
   householdId: Id,
@@ -161,6 +165,7 @@ export const Expense = z.object({
   expenseDate: IsoDate,
   allocation: ExpenseAllocationInput,
   splits: z.array(ExpenseSplit),
+  attachments: z.array(AttachmentSummary),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });
@@ -212,6 +217,30 @@ export const ExpenseIdParams = z.object({
   expenseId: Id,
 });
 export type ExpenseIdParams = z.infer<typeof ExpenseIdParams>;
+
+/** Link an uploaded file of the expense's household to the expense. */
+export const LinkExpenseAttachmentRequest = z.strictObject({
+  attachmentId: Id,
+});
+export type LinkExpenseAttachmentRequest = z.infer<
+  typeof LinkExpenseAttachmentRequest
+>;
+
+/** Files linked to one expense, oldest link first; unpaginated. */
+export const ExpenseAttachmentListResponse = z.object({
+  items: z.array(AttachmentSummary),
+});
+export type ExpenseAttachmentListResponse = z.infer<
+  typeof ExpenseAttachmentListResponse
+>;
+
+/** Path params for one file linked to an expense. */
+export const ExpenseAttachmentIdParams = ExpenseIdParams.extend({
+  attachmentId: Id,
+});
+export type ExpenseAttachmentIdParams = z.infer<
+  typeof ExpenseAttachmentIdParams
+>;
 
 /** Response for fetching a single expense by id. */
 export type GetExpenseResponse = Expense;

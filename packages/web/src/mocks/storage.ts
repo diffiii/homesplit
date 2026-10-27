@@ -6,7 +6,7 @@ import type { ScenarioName } from "./scenarios";
 export const MOCK_STORAGE_KEY = "homesplit:mocks";
 
 /** Bump when `MockState` changes shape, so saved data is rebuilt instead of misread. */
-export const MOCK_STORAGE_VERSION = 1;
+export const MOCK_STORAGE_VERSION = 2;
 
 export interface SavedMocks {
   network: MockNetwork;

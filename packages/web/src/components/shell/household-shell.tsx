@@ -2,7 +2,7 @@
 
 import { matchQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "cn";
-import { LogOutIcon } from "lucide-react";
+import { LogOutIcon, UserIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useMemo } from "react";
@@ -40,6 +40,7 @@ import {
 } from "@/lib/api/household-queries";
 import { endpointQuery } from "@/lib/api/queries";
 import { queryKeys } from "@/lib/api/query-keys";
+import { ACCOUNT_PATH } from "@/lib/api/session";
 import { rememberHousehold } from "@/lib/last-household";
 import { strongestRole } from "@/lib/permissions";
 import { signOutAndReset } from "@/lib/sign-out";
@@ -364,6 +365,10 @@ export function UserMenu({ showName = false }: { showName?: boolean }) {
           <DropdownMenuLabel className="truncate">
             {user.email}
           </DropdownMenuLabel>
+          <DropdownMenuItem render={<Link href={ACCOUNT_PATH} />}>
+            <UserIcon aria-hidden />
+            Account settings
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={signOutAndReset}>
             <LogOutIcon aria-hidden />
             Sign out

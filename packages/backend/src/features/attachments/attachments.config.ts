@@ -17,6 +17,7 @@ const AttachmentsEnv = z.object({
     MAX_SIGNED_URL_TTL_SECONDS
   ),
   ATTACHMENT_UNREFERENCED_TTL_HOURS: positiveInt(24),
+  ATTACHMENT_MAX_PER_EXPENSE: positiveInt(10),
 });
 
 const env = AttachmentsEnv.safeParse(process.env);
@@ -32,4 +33,6 @@ export const attachmentsConfig = {
   downloadUrlTtlSeconds: env.data.ATTACHMENT_DOWNLOAD_URL_TTL_SECONDS,
   /** How old an attachment that nothing references gets before cleanup deletes it. */
   unreferencedTtlHours: env.data.ATTACHMENT_UNREFERENCED_TTL_HOURS,
+  /** Most files one expense may have linked. */
+  maxPerExpense: env.data.ATTACHMENT_MAX_PER_EXPENSE,
 } as const;

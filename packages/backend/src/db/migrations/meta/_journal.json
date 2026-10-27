@@ -113,6 +113,13 @@
       "when": 1792824206376,
       "tag": "0015_attachments_deletion_queue",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792841009132,
+      "tag": "0016_expense_attachments",
+      "breakpoints": true
     }
   ]
 }

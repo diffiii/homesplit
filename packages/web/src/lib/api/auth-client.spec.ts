@@ -170,6 +170,42 @@ describe("account", () => {
     });
   });
 
+  it("changes the password with the current one", async () => {
+    const { account, sent } = setup(() =>
+      Response.json({ token: null, user: {} })
+    );
+    await account.changePassword({
+      currentPassword: "old password",
+      newPassword: "new password",
+      revokeOtherSessions: true,
+    });
+    expect(sent).toEqual([
+      {
+        method: "POST",
+        path: "/change-password",
+        query: {},
+        body: {
+          currentPassword: "old password",
+          newPassword: "new password",
+          revokeOtherSessions: true,
+        },
+      },
+    ]);
+  });
+
+  it("lists and signs out sessions", async () => {
+    const { account, sent } = setup(() => Response.json([]));
+    expect(await account.listSessions()).toEqual([]);
+    await account.revokeSession({ token: "other-token" });
+    await account.revokeOtherSessions();
+    expect(sent.map(({ method, path }) => `${method} ${path}`)).toEqual([
+      "GET /list-sessions",
+      "POST /revoke-session",
+      "POST /revoke-other-sessions",
+    ]);
+    expect(sent[1]?.body).toEqual({ token: "other-token" });
+  });
+
   it("throws a rejected sign-in as ApiRequestError from auth", async () => {
     const { account } = setup(() =>
       Response.json(

@@ -36,6 +36,9 @@ export const queryKeys = {
 
   me: () => ["me"] as const,
 
+  /** The user's signed-in devices, from Better Auth. */
+  sessions: () => [...queryKeys.me(), "auth", "sessions"] as const,
+
   /**
    * `[scope, name, params?, query?]` for an endpoint from the contracts map.
    * `params` holds the path params other than `householdId` and appears only

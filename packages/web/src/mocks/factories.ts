@@ -46,6 +46,7 @@ export function defaultCategories(
 export function emptyState(): MockState {
   return {
     sessionUserId: null,
+    otherSessions: [],
     users: [],
     households: [],
     members: [],
@@ -343,6 +344,22 @@ export class MockFactory {
       fromId: from.id,
       toId: to.id,
       createdAt: this.time(ago),
+    });
+  }
+
+  /** `user` signed in on another device. */
+  session(
+    user: MockUser,
+    device: { ipAddress: string; userAgent: string },
+    { signedIn, lastActive }: { lastActive: Ago; signedIn: Ago }
+  ): void {
+    this.state.otherSessions.push({
+      id: this.id(),
+      token: `mock-session-${this.id()}`,
+      userId: user.id,
+      createdAt: this.time(signedIn),
+      updatedAt: this.time(lastActive),
+      ...device,
     });
   }
 

@@ -6,12 +6,23 @@ import {
   createFormHookContexts,
   useStore,
 } from "@tanstack/react-form";
-import type { ComponentProps, ReactNode } from "react";
+import {
+  type ComponentProps,
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+} from "react";
+import { CategoryPicker } from "@/components/category-picker";
 import { CurrencyPicker } from "@/components/currency-picker";
+import { EmojiInput } from "@/components/emoji-input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldError,
   FieldLabel,
@@ -49,6 +60,37 @@ function useVisibleErrors(field: AnyFieldApi): FieldErrorItem[] {
     (state) => state.submissionAttempts > 0
   );
   return touched || submitted ? toErrorItems(errors) : [];
+}
+
+const subscribeToNothing = () => () => undefined;
+
+/**
+ * False while React hydrates the server's HTML, and true once it handles
+ * events. Before then a submit is the browser's own.
+ */
+function useHydrated(): boolean {
+  return useSyncExternalStore(
+    subscribeToNothing,
+    () => true,
+    () => false
+  );
+}
+
+/**
+ * Keeps what the user typed or a password manager filled in before React
+ * hydrated. Hydration leaves the input's text alone but not the field's value,
+ * so the next render would empty the input. Run once the input mounts.
+ */
+function useValueFromBeforeHydration(
+  field: AnyFieldApi,
+  input: RefObject<HTMLInputElement | null>
+): void {
+  useEffect(() => {
+    const typed = input.current?.value;
+    if (typed && typed !== field.state.value) {
+      field.handleChange(typed);
+    }
+  }, [field, input]);
 }
 
 interface FieldShellProps {
@@ -102,6 +144,8 @@ interface TextFieldProps
 function TextField({ label, description, ...input }: TextFieldProps) {
   const field = useFieldContext<string>();
   const value = useStore(field.store, (state) => state.value);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useValueFromBeforeHydration(field, inputRef);
   return (
     <FieldShell description={description} label={label}>
       {(control) => (
@@ -111,6 +155,7 @@ function TextField({ label, description, ...input }: TextFieldProps) {
           name={field.name}
           onBlur={field.handleBlur}
           onChange={(event) => field.handleChange(event.target.value)}
+          ref={inputRef}
           value={value}
         />
       )}
@@ -132,6 +177,8 @@ interface MoneyFieldProps {
 function MoneyField({ label, description, currency }: MoneyFieldProps) {
   const field = useFieldContext<string>();
   const value = useStore(field.store, (state) => state.value);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useValueFromBeforeHydration(field, inputRef);
   return (
     <FieldShell description={description} label={label}>
       {(control) => (
@@ -145,6 +192,7 @@ function MoneyField({ label, description, currency }: MoneyFieldProps) {
             onBlur={field.handleBlur}
             onChange={(event) => field.handleChange(event.target.value)}
             placeholder="0.00"
+            ref={inputRef}
             value={value}
           />
           <InputGroupAddon align="inline-end">
@@ -190,6 +238,8 @@ function DateField({
 }) {
   const field = useFieldContext<string>();
   const value = useStore(field.store, (state) => state.value);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useValueFromBeforeHydration(field, inputRef);
   return (
     <FieldShell description={description} label={label}>
       {(control) => (
@@ -198,6 +248,7 @@ function DateField({
           name={field.name}
           onBlur={field.handleBlur}
           onChange={(event) => field.handleChange(event.target.value)}
+          ref={inputRef}
           type="date"
           value={value}
         />
@@ -206,7 +257,94 @@ function DateField({
   );
 }
 
-/** The `<form>` element: submits through TanStack Form and leaves validation to it. */
+/** A yes-or-no choice, with its label and description beside the box. */
+function CheckboxField({
+  label,
+  description,
+}: {
+  description?: ReactNode;
+  label: ReactNode;
+}) {
+  const field = useFieldContext<boolean>();
+  const value = useStore(field.store, (state) => state.value);
+  const id = `${field.form.formId}-${field.name}`;
+  return (
+    <Field orientation="horizontal">
+      <Checkbox
+        aria-describedby={description ? `${id}-description` : undefined}
+        checked={value}
+        id={id}
+        name={field.name}
+        onBlur={field.handleBlur}
+        onCheckedChange={(checked) => field.handleChange(checked)}
+      />
+      <FieldContent>
+        <FieldLabel htmlFor={id}>{label}</FieldLabel>
+        {description ? (
+          <FieldDescription id={`${id}-description`}>
+            {description}
+          </FieldDescription>
+        ) : null}
+      </FieldContent>
+    </Field>
+  );
+}
+
+/** An optional emoji, such as a category's icon; clearing it stores `null`. */
+function EmojiField({
+  label,
+  description,
+}: {
+  description?: ReactNode;
+  label: ReactNode;
+}) {
+  const field = useFieldContext<string | null | undefined>();
+  const value = useStore(field.store, (state) => state.value);
+  return (
+    <FieldShell description={description} label={label}>
+      {(control) => (
+        <EmojiInput
+          {...control}
+          onValueChange={(emoji) => {
+            field.handleChange(emoji);
+            field.handleBlur();
+          }}
+          value={value ?? null}
+        />
+      )}
+    </FieldShell>
+  );
+}
+
+/** One of the household's categories, or `null` for none. */
+function CategoryField({
+  label,
+  description,
+}: {
+  description?: ReactNode;
+  label: ReactNode;
+}) {
+  const field = useFieldContext<string | null | undefined>();
+  const value = useStore(field.store, (state) => state.value);
+  return (
+    <FieldShell description={description} label={label}>
+      {(control) => (
+        <CategoryPicker
+          {...control}
+          onBlur={field.handleBlur}
+          onValueChange={field.handleChange}
+          value={value ?? null}
+        />
+      )}
+    </FieldShell>
+  );
+}
+
+/**
+ * The `<form>` element: submits through TanStack Form and leaves validation to
+ * it. Should the browser submit it before React hydrates, it posts, so what
+ * was typed, such as a password, stays out of the URL.
+ */
 function FormRoot({
   children,
   className,
@@ -218,6 +356,7 @@ function FormRoot({
   return (
     <form
       className={className}
+      method="post"
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
@@ -246,14 +385,20 @@ function FormError() {
   );
 }
 
+/** Disabled until React hydrates, so an early click or Enter doesn't submit natively. */
 function SubmitButton({
   children,
   ...props
 }: Omit<ComponentProps<typeof Button>, "type">) {
   const form = useFormContext();
   const submitting = useStore(form.store, (state) => state.isSubmitting);
+  const hydrated = useHydrated();
   return (
-    <Button {...props} disabled={submitting || props.disabled} type="submit">
+    <Button
+      {...props}
+      disabled={!hydrated || submitting || props.disabled}
+      type="submit"
+    >
       {submitting ? <Spinner data-icon="inline-start" /> : null}
       {children}
     </Button>
@@ -268,6 +413,14 @@ function SubmitButton({
 export const { useAppForm, withForm } = createFormHook({
   fieldContext,
   formContext,
-  fieldComponents: { TextField, MoneyField, CurrencyField, DateField },
+  fieldComponents: {
+    TextField,
+    MoneyField,
+    CurrencyField,
+    DateField,
+    CheckboxField,
+    EmojiField,
+    CategoryField,
+  },
   formComponents: { Form: FormRoot, FormError, SubmitButton },
 });

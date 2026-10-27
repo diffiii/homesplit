@@ -4,6 +4,9 @@ export const SIGN_UP_PATH = "/sign-up";
 /** Where a signed-in user goes when nothing asked for another page. */
 export const HOME_PATH = "/";
 
+/** The user's profile, password, and theme. */
+export const ACCOUNT_PATH = "/account";
+
 /**
  * The page `/` shows with a session cookie, sending the user on to a
  * household. Without one, `/` is the landing page.

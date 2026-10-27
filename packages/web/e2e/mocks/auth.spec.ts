@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test";
 import { MOCK_PASSWORD } from "../../src/mocks/factories";
-import { signOut } from "../account";
+import { signIn, signOut } from "../account";
 import { expectNoAxeViolations } from "../axe";
 import { test } from "./fixtures";
 
@@ -25,9 +25,7 @@ test.describe("signed out", () => {
     await expect(page).toHaveTitle("Sign in · HomeSplit");
     await expectNoAxeViolations(page);
 
-    await page.getByLabel("Email").fill("alice@example.com");
-    await page.getByLabel("Password").fill(MOCK_PASSWORD);
-    await page.getByRole("button", { name: "Sign in" }).click();
+    await signIn(page, { email: "alice@example.com", password: MOCK_PASSWORD });
 
     await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
     await expect(
