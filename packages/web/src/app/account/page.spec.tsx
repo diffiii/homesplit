@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { queryKeys } from "@/lib/api/query-keys";
@@ -22,6 +22,10 @@ function renderPage() {
 }
 
 const section = (name: string) => screen.getByRole("region", { name });
+
+/** The devices section, once the session has loaded and the page shows it. */
+const devicesSection = () =>
+  screen.findByRole("region", { name: "Signed-in devices" });
 
 describe("AccountPage", () => {
   it("shows the profile from the session, with initials without an avatar", async () => {
@@ -190,5 +194,99 @@ describe("AccountPage", () => {
 
     await user.click(screen.getByRole("button", { name: "System" }));
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
+  });
+
+  it("lists this device first, then the others by last activity", async () => {
+    renderPage();
+
+    const devices = await devicesSection();
+    const rows = await within(devices).findAllByRole("listitem");
+
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toHaveTextContent("This device");
+    expect(rows[1]).toHaveTextContent("Safari on iOS");
+    expect(rows[1]).toHaveTextContent("203.0.113.7");
+    expect(rows[2]).toHaveTextContent("Firefox on Windows");
+    expect(
+      within(rows[0] as HTMLElement).queryByRole("button")
+    ).not.toBeInTheDocument();
+    await expectNoAxeViolations();
+  });
+
+  it("signs out one other device", async () => {
+    const { user } = renderPage();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Sign out Firefox on Windows" })
+    );
+
+    const devices = section("Signed-in devices");
+    await expect
+      .poll(() => within(devices).queryByText("Firefox on Windows"))
+      .toBeNull();
+    expect(within(devices).getAllByRole("listitem")).toHaveLength(2);
+    expect(db.state.otherSessions.map(({ userAgent }) => userAgent)).toEqual([
+      expect.stringContaining("iPhone"),
+    ]);
+  });
+
+  it("signs out every other device after asking", async () => {
+    const { user } = renderPage();
+    const devices = await devicesSection();
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Sign out of all other devices",
+      })
+    );
+    const dialog = await screen.findByRole("alertdialog", {
+      name: "Sign out of 2 other devices?",
+    });
+    await user.click(within(dialog).getByRole("button", { name: "Sign out" }));
+
+    // The open dialog hides the rest of the page from queries until it closes.
+    await waitFor(() =>
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument()
+    );
+    await expect
+      .poll(() => within(devices).queryAllByRole("listitem").length)
+      .toBe(1);
+    expect(
+      screen.queryByRole("button", { name: "Sign out of all other devices" })
+    ).not.toBeInTheDocument();
+    expect(alice().id).toBe(db.state.sessionUserId);
+  });
+
+  it("drops the other devices after a password change that signs them out", async () => {
+    const { user } = renderPage();
+    const devices = await devicesSection();
+    await within(devices).findByText("Safari on iOS");
+
+    await user.type(screen.getByLabelText("Current password"), MOCK_PASSWORD);
+    await user.type(screen.getByLabelText("New password"), "a new password");
+    await user.click(screen.getByRole("button", { name: "Change password" }));
+
+    await expect
+      .poll(() => within(devices).queryAllByRole("listitem").length)
+      .toBe(1);
+  });
+
+  it("shows an error with a retry when the devices fail to load", async () => {
+    server.use(
+      http.get("*/api/auth/list-sessions", () =>
+        HttpResponse.json(
+          { code: "INTERNAL_SERVER_ERROR", message: "Boom" },
+          { status: 500 }
+        )
+      )
+    );
+    renderPage();
+
+    expect(await screen.findByText("Couldn't load your devices")).toBeVisible();
+    expect(
+      within(section("Signed-in devices")).getByRole("button", {
+        name: "Try again",
+      })
+    ).toBeVisible();
   });
 });

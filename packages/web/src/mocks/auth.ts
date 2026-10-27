@@ -9,6 +9,7 @@ import {
   type MockHousehold,
   type MockInvitation,
   type MockMember,
+  type MockSession,
   type MockUser,
   now,
 } from "./db";
@@ -70,18 +71,30 @@ function renderSession(db: MockDb, userId: string) {
       id: `session-${userId}`,
       token: sessionToken(userId),
       userId,
-      expiresAt: new Date(
-        Date.now() + SESSION_DAYS * 24 * HOUR_MS
-      ).toISOString(),
-      createdAt: user.createdAt,
-      updatedAt: user.createdAt,
+      expiresAt: sessionExpiry(),
+      // Sessions last a week, so this one began recently.
+      createdAt: sessionStart(),
+      updatedAt: sessionStart(),
       ipAddress: null,
-      userAgent: null,
+      userAgent: currentUserAgent(),
       activeOrganizationId: null,
     },
     user: renderUser(user),
   };
 }
+
+/** The current session belongs to the browser running the mocks. */
+const currentUserAgent = () =>
+  typeof navigator === "undefined" ? null : navigator.userAgent;
+
+function renderOtherSession(session: MockSession) {
+  return { ...session, expiresAt: sessionExpiry(), activeOrganizationId: null };
+}
+
+const sessionStart = () => new Date(Date.now() - HOUR_MS).toISOString();
+
+const sessionExpiry = () =>
+  new Date(Date.now() + SESSION_DAYS * 24 * HOUR_MS).toISOString();
 
 const sessionToken = (userId: string) => `mock-session-${userId}`;
 
@@ -191,6 +204,12 @@ export function createAuthHandlers(
     return member;
   };
 
+  const revokeOtherSessions = (userId: string) => {
+    db.state.otherSessions = db.state.otherSessions.filter(
+      (session) => session.userId !== userId
+    );
+  };
+
   const ownerCount = (householdId: string) =>
     db.members(householdId).filter(({ role }) => role === "owner").length;
 
@@ -282,7 +301,6 @@ export function createAuthHandlers(
       return { success: true };
     }),
 
-    // The mocks keep one session, so revoking the others changes nothing.
     route("post", "/change-password", ({ input }) => {
       const user = sessionUser();
       const newPassword = text(input, "newPassword");
@@ -300,11 +318,42 @@ export function createAuthHandlers(
         throw authError(BAD_REQUEST, "INVALID_PASSWORD", "Invalid password");
       }
       user.password = newPassword;
+      if (input.revokeOtherSessions === true) {
+        revokeOtherSessions(user.id);
+      }
       return {
         token:
           input.revokeOtherSessions === true ? sessionToken(user.id) : null,
         user: renderUser(user),
       };
+    }),
+
+    route("get", "/list-sessions", () => {
+      const userId = sessionUser().id;
+      return [
+        renderSession(db, userId).session,
+        ...db.state.otherSessions
+          .filter((session) => session.userId === userId)
+          .map(renderOtherSession),
+      ];
+    }),
+
+    // Better Auth ignores a token that isn't one of the caller's sessions.
+    route("post", "/revoke-session", ({ input }) => {
+      const userId = sessionUser().id;
+      const token = text(input, "token");
+      if (token === sessionToken(userId)) {
+        db.state.sessionUserId = null;
+      }
+      db.state.otherSessions = db.state.otherSessions.filter(
+        (session) => !(session.token === token && session.userId === userId)
+      );
+      return { status: true };
+    }),
+
+    route("post", "/revoke-other-sessions", () => {
+      revokeOtherSessions(sessionUser().id);
+      return { status: true };
     }),
 
     route("get", "/organization/list", () => {

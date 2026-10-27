@@ -59,6 +59,11 @@ export function formatIsoDate(date: IsoDate): string {
   return dateFormat.format(parseIsoDate(date));
 }
 
+/** `Mar 1, 2026`: the date of a moment, in the user's time zone. */
+export function formatLocalDate(value: Date | IsoDateTime): string {
+  return dateFormat.format(new Date(value));
+}
+
 /** `Mar 1, 2026, 6:30 PM` in the user's time zone. */
 export function formatIsoDateTime(value: IsoDateTime): string {
   return dateTimeFormat.format(new Date(value));
