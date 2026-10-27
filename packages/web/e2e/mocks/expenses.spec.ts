@@ -12,6 +12,9 @@ const PREVIOUS = /previous/i;
 const NEXT = /next/i;
 const BARTEK = /^Bartek/;
 const SUSHI = /^Sushi/;
+const ALICE = /^Alice/;
+const CELINA = /^Celina/;
+const GROCERIES_RUN = /^Groceries run/;
 
 test("scrolls, filters, and opens an expense", async ({ page }) => {
   test.slow();
@@ -103,5 +106,46 @@ test("adds an expense split equally", async ({ page }) => {
   await page.getByRole("link", { name: "All expenses" }).click();
   await expect(page.getByRole("link", { name: SUSHI })).toContainText(
     "You lent PLN 45.00"
+  );
+});
+
+test("adds an expense paid by two people and split by percentage", async ({
+  page,
+}) => {
+  await page.goto("/households");
+  await page.getByRole("link", { name: "Flat on Piękna" }).click();
+  await expect(page).toHaveURL(HOUSEHOLD_URL);
+  await page.goto(`${new URL(page.url()).pathname}/expenses/new`);
+
+  await page.getByLabel("Name").fill("Groceries run");
+  await page.getByLabel("Amount").fill("120");
+  await page.getByRole("button", { name: "Split another way" }).click();
+  const payers = page.getByRole("group", { name: "Paid by" });
+  await expect(payers.getByRole("checkbox", { name: ALICE })).toBeFocused();
+  await payers.getByRole("checkbox", { name: BARTEK }).click();
+  await expect(
+    page.getByRole("textbox", { name: "Amount you paid" })
+  ).toHaveValue("60.00");
+
+  await page.getByRole("combobox", { name: "Split" }).click();
+  await page.getByRole("option", { name: "By percentage" }).click();
+  const split = page.getByRole("group", { name: "Split between" });
+  await split.getByRole("checkbox", { name: CELINA }).click();
+  await page.getByRole("textbox", { name: "Your percentage" }).fill("75");
+  await expect(split.getByText("25% over 100%.")).toBeVisible();
+  await page
+    .getByRole("textbox", { name: "Bartek Kowalski's percentage" })
+    .fill("25");
+  await expect(split.getByText("Adds up to 100%.")).toBeVisible();
+  await expect(split.getByText("PLN 90.00")).toBeVisible();
+  await expectNoAxeViolations(page);
+
+  await page.getByRole("button", { name: "Add expense" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Groceries run" })
+  ).toBeVisible();
+  await page.getByRole("link", { name: "All expenses" }).click();
+  await expect(page.getByRole("link", { name: GROCERIES_RUN })).toContainText(
+    "You owe PLN 30.00"
   );
 });

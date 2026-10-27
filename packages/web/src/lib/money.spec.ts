@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   currencyExponent,
+  decimalString,
   formatMoney,
   orderCurrencies,
   parseAmount,
+  parseDecimal,
   supportedCurrencies,
   toDecimalString,
 } from "./money";
@@ -67,16 +69,40 @@ describe("parseAmount", () => {
     });
   });
 
-  it("accepts a minus only when asked to", () => {
+  it("accepts a sign only when asked to", () => {
     expect(parseAmount("-5", "PLN")).toEqual({ ok: false, reason: "invalid" });
+    expect(parseAmount("+5", "PLN")).toEqual({ ok: false, reason: "invalid" });
     expect(parseAmount("-5", "PLN", { allowNegative: true })).toEqual({
       ok: true,
       cents: -500,
+    });
+    expect(parseAmount("+5", "PLN", { allowNegative: true })).toEqual({
+      ok: true,
+      cents: 500,
     });
     expect(parseAmount("-0", "PLN", { allowNegative: true })).toEqual({
       ok: true,
       cents: 0,
     });
+  });
+});
+
+describe("parseDecimal", () => {
+  it("reads a percentage as basis points", () => {
+    expect(parseDecimal("12.5", 2)).toEqual({ ok: true, cents: 1250 });
+    expect(parseDecimal("100", 2)).toEqual({ ok: true, cents: 10_000 });
+    expect(parseDecimal("33.333", 2)).toEqual({
+      ok: false,
+      reason: "too-precise",
+    });
+  });
+});
+
+describe("decimalString", () => {
+  it("places the decimal point by exponent", () => {
+    expect(decimalString(1250, 2)).toBe("12.50");
+    expect(decimalString(-7, 3)).toBe("-0.007");
+    expect(decimalString(42, 0)).toBe("42");
   });
 });
 

@@ -47,13 +47,13 @@ export type ParseAmountResult =
   | { ok: false; reason: "empty" | "invalid" | "too-precise" | "too-large" };
 
 export interface ParseAmountOptions {
-  /** Accept a leading minus, as adjustments do. */
+  /** Accept a leading `-` or `+`, as adjustments do. */
   allowNegative?: boolean;
 }
 
 // Digits with at most one `.` or `,` as the decimal separator. Grouping
 // separators aren't accepted, because `1,000` means 1.000 to a Polish user.
-const AMOUNT_PATTERN = /^(-?)(\d*)(?:[.,](\d*))?$/;
+const AMOUNT_PATTERN = /^([-+]?)(\d*)(?:[.,](\d*))?$/;
 const WHITESPACE = /\s/g;
 
 /**
@@ -64,6 +64,18 @@ const WHITESPACE = /\s/g;
 export function parseAmount(
   input: string,
   currency: string,
+  options?: ParseAmountOptions
+): ParseAmountResult {
+  return parseDecimal(input, currencyExponent(currency), options);
+}
+
+/**
+ * `parseAmount` for any number of decimals, such as a percentage with two as
+ * basis points: `12.5` at exponent 2 is 1250.
+ */
+export function parseDecimal(
+  input: string,
+  exponent: number,
   { allowNegative = false }: ParseAmountOptions = {}
 ): ParseAmountResult {
   const text = input.replace(WHITESPACE, "");
@@ -75,7 +87,6 @@ export function parseAmount(
   if (!(match && (whole || fraction)) || (sign && !allowNegative)) {
     return { ok: false, reason: "invalid" };
   }
-  const exponent = currencyExponent(currency);
   if (fraction.length > exponent) {
     return { ok: false, reason: "too-precise" };
   }
@@ -84,7 +95,7 @@ export function parseAmount(
     return { ok: false, reason: "too-large" };
   }
   const cents = Number(units);
-  return { ok: true, cents: sign && cents !== 0 ? -cents : cents };
+  return { ok: true, cents: sign === "-" && cents !== 0 ? -cents : cents };
 }
 
 /**
@@ -92,11 +103,15 @@ export function parseAmount(
  * what a money input shows for a stored amount, and what `Intl` formats.
  */
 export function toDecimalString(cents: Cents, currency: string): string {
-  const exponent = currencyExponent(currency);
-  const digits = Math.abs(cents)
+  return decimalString(cents, currencyExponent(currency));
+}
+
+/** `toDecimalString` for any number of decimals: 1250 at exponent 2 is `12.50`. */
+export function decimalString(units: number, exponent: number): string {
+  const digits = Math.abs(units)
     .toString()
     .padStart(exponent + 1, "0");
-  const sign = cents < 0 ? "-" : "";
+  const sign = units < 0 ? "-" : "";
   if (exponent === 0) {
     return `${sign}${digits}`;
   }

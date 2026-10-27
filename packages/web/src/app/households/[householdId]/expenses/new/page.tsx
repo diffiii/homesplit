@@ -1,12 +1,13 @@
 "use client";
 
 import type { CreateExpenseRequest, UserSummary } from "@homesplit/contracts";
+import { revalidateLogic } from "@tanstack/react-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { type ChecklistOption, useAppForm } from "@/components/form";
+import { useAppForm } from "@/components/form";
 import { ModuleDisabledAlert } from "@/components/module-disabled-alert";
 import { PageHeader } from "@/components/page-header";
 import {
@@ -16,7 +17,6 @@ import {
 } from "@/components/shell/household-context";
 import { householdPath } from "@/components/shell/household-nav";
 import { buttonVariants } from "@/components/ui/button";
-import { UserLabel } from "@/components/user-avatar";
 import { isApiRequestError } from "@/lib/api/api-error";
 import { api } from "@/lib/api/client";
 import { invalidate } from "@/lib/api/queries";
@@ -24,19 +24,21 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { todayIsoDate } from "@/lib/dates";
 import {
   createExpenseServerErrors,
-  previewShares,
-  type SimpleExpenseValues,
+  initialExpenseValues,
   toCreateExpenseRequest,
-  validateSimpleExpense,
+  validateExpense,
 } from "@/lib/expense-form";
 import { showServerErrors } from "@/lib/form";
-import { formatMoney } from "@/lib/money";
 import {
   readLastExpenseCurrency,
   rememberExpenseCurrency,
 } from "@/lib/recent-currencies";
+import { AdvancedSplit, SimpleSplit } from "./expense-split";
 
-/** Add an expense the user paid in full, split equally among the people picked. */
+/**
+ * Add an expense: by default the user paid it all and it's split equally, and
+ * the advanced section takes any payers and split the API accepts.
+ */
 export default function NewExpensePage() {
   const householdId = useHouseholdId();
   const enabled = useFeatureEnabled("expenses");
@@ -54,11 +56,7 @@ export default function NewExpensePage() {
         All expenses
       </Link>
       <PageHeader title="New expense" />
-      {enabled ? (
-        <SimpleExpenseForm />
-      ) : (
-        <ModuleDisabledAlert module="Expenses" />
-      )}
+      {enabled ? <ExpenseForm /> : <ModuleDisabledAlert module="Expenses" />}
     </>
   );
 }
@@ -79,7 +77,7 @@ function useMemberSummaries(): UserSummary[] {
     );
 }
 
-function SimpleExpenseForm() {
+function ExpenseForm() {
   const { household, userId } = useHousehold();
   const householdId = household.id;
   const router = useRouter();
@@ -100,19 +98,22 @@ function SimpleExpenseForm() {
     mutationFn: (body: CreateExpenseRequest) =>
       api("createExpense", { params: { householdId }, body }),
   });
-  const [defaultValues] = useState<SimpleExpenseValues>(() => ({
-    name: "",
-    amount: "",
-    currency: readLastExpenseCurrency(householdId),
-    expenseDate: todayIsoDate(),
-    categoryId: null,
-    participantIds: members.map(({ id }) => id),
-  }));
+  const [defaultValues] = useState(() =>
+    initialExpenseValues({
+      currency: readLastExpenseCurrency(householdId),
+      expenseDate: todayIsoDate(),
+      participantIds: members.map(({ id }) => id),
+      userId,
+    })
+  );
   const form = useAppForm({
     defaultValues,
-    // `CreateExpenseRequest` validates the form, so client and server agree on the rules.
+    // `CreateExpenseRequest` validates the form, so client and server agree on
+    // the rules. After a failed submit it checks again on every change, so a
+    // message goes away once its cause is fixed, wherever that was.
+    validationLogic: revalidateLogic(),
     validators: {
-      onSubmit: ({ value }) => validateSimpleExpense(value, userId),
+      onDynamic: ({ value }) => validateExpense(value, userId),
     },
     onSubmit: async ({ value, formApi }) => {
       const body = toCreateExpenseRequest(value, userId);
@@ -125,7 +126,7 @@ function SimpleExpenseForm() {
       } catch (error) {
         showServerErrors(
           formApi,
-          createExpenseServerErrors(error, value.participantIds, nameOf)
+          createExpenseServerErrors(error, value, nameOf)
         );
         if (isApiRequestError(error) && error.code === "INVALID_REFERENCE") {
           // Someone left or a category is gone: show the household as it is now.
@@ -188,23 +189,26 @@ function SimpleExpenseForm() {
             {(field) => <field.CategoryField label="Category" />}
           </form.AppField>
         </div>
-        <form.Subscribe selector={(state) => state.values}>
-          {(values) => (
-            <form.AppField name="participantIds">
-              {(field) => (
-                <field.ChecklistField
-                  description="You paid. It's split equally between everyone checked."
-                  label="Split between"
-                  options={participantOptions(
-                    values,
-                    members,
-                    seen.current,
-                    userId
-                  )}
-                />
-              )}
-            </form.AppField>
-          )}
+        <form.Subscribe selector={(state) => state.values.advanced}>
+          {(advanced) =>
+            advanced ? (
+              <AdvancedSplit
+                form={form}
+                members={members}
+                nameOf={nameOf}
+                seen={seen.current}
+                userId={userId}
+              />
+            ) : (
+              <SimpleSplit
+                form={form}
+                members={members}
+                nameOf={nameOf}
+                seen={seen.current}
+                userId={userId}
+              />
+            )
+          }
         </form.Subscribe>
         <form.FormError />
         <form.SubmitButton className="self-start">
@@ -213,44 +217,4 @@ function SimpleExpenseForm() {
       </form.Form>
     </form.AppForm>
   );
-}
-
-/**
- * A row per current member, plus anyone still checked who has left, each
- * with their share of what's typed so far.
- */
-function participantOptions(
-  values: SimpleExpenseValues,
-  members: readonly UserSummary[],
-  seen: ReadonlyMap<string, UserSummary>,
-  userId: string
-): ChecklistOption[] {
-  const current = new Set(members.map(({ id }) => id));
-  const departed = values.participantIds
-    .filter((id) => !current.has(id))
-    .map((id) => seen.get(id) ?? { id, name: "Someone", imageUrl: null });
-  const shares = new Map(
-    previewShares(values)?.map((split) => [split.userId, split.amountCents])
-  );
-  return [...members, ...departed].map((user) => {
-    const share = shares.get(user.id);
-    return {
-      value: user.id,
-      label: (
-        <UserLabel
-          departed={!current.has(user.id)}
-          size="sm"
-          user={
-            user.id === userId ? { ...user, name: `${user.name} (you)` } : user
-          }
-        />
-      ),
-      detail:
-        share === undefined ? null : (
-          <span className="shrink-0 text-sm tabular-nums">
-            {formatMoney({ amountCents: share, currency: values.currency })}
-          </span>
-        ),
-    };
-  });
 }
