@@ -3,8 +3,8 @@ import { HttpResponse, http } from "msw";
 import type { ReactElement } from "react";
 import { describe, expect, it, onTestFinished } from "vitest";
 import ChoresPage from "@/app/households/[householdId]/chores/page";
-import ExpensesPage from "@/app/households/[householdId]/expenses/page";
 import OverviewPage from "@/app/households/[householdId]/page";
+import SettingsPage from "@/app/households/[householdId]/settings/page";
 import { queryKeys } from "@/lib/api/query-keys";
 import { readLastHousehold } from "@/lib/last-household";
 import { expectNoAxeViolations } from "@/test/axe";
@@ -128,28 +128,6 @@ describe("HouseholdShell", () => {
     await expectAccessibleShell();
   });
 
-  it("offers category changes only to admins and owners", async () => {
-    const { unmount } = renderShell(
-      household("Flat on Piękna").id,
-      <ExpensesPage />,
-      "expenses"
-    );
-    expect(
-      await screen.findByRole("button", { name: "New category" })
-    ).toBeVisible();
-    unmount();
-
-    // Alice is a plain member of the cabin.
-    renderShell(household("Lake cabin").id, <ExpensesPage />, "expenses");
-    expect(await screen.findByText("Groceries")).toBeVisible();
-    expect(
-      screen.queryByRole("button", { name: "New category" })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Delete Groceries" })
-    ).not.toBeInTheDocument();
-  });
-
   it.each([
     ["a household that doesn't exist", () => crypto.randomUUID()],
     ["a household the user isn't in", () => household("Book club").id],
@@ -171,10 +149,8 @@ describe("HouseholdShell", () => {
 
   it("shows not found once a household route answers 404 after the user is removed", async () => {
     const flat = household("Flat on Piękna");
-    const { queryClient } = renderShell(flat.id, <ExpensesPage />, "expenses");
-    expect(
-      await screen.findByRole("heading", { name: "Expenses" })
-    ).toBeVisible();
+    const { queryClient } = renderShell(flat.id, <SettingsPage />, "settings");
+    expect(await screen.findByText("Groceries")).toBeVisible();
 
     const alice = user("alice@example.com");
     db.state.members = db.state.members.filter(

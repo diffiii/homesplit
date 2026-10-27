@@ -14,14 +14,16 @@ import { households } from "@/lib/api/auth-client";
 import { errorMessage } from "@/lib/api/error-message";
 import { queryKeys } from "@/lib/api/query-keys";
 import { HOUSEHOLDS_PATH } from "@/lib/last-household";
+import { CategorySettings } from "./category-settings";
 import { ModuleSettings } from "./module-settings";
 
-/** Household settings: modules, appearance, and leaving. The households epic adds the rest. */
+/** Household settings: modules, categories, appearance, and leaving. The households epic adds the rest. */
 export default function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" />
       <ModuleSettings />
+      <CategorySettings />
       <Appearance />
       <LeaveHousehold />
     </>
