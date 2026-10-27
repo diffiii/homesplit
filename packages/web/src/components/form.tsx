@@ -36,6 +36,13 @@ import {
   InputGroupInput,
   InputGroupText,
 } from "@/components/ui/input-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 
 const { fieldContext, formContext, useFieldContext, useFormContext } =
@@ -293,7 +300,10 @@ function CheckboxField({
 }
 
 export interface ChecklistOption {
-  /** Shown at the end of the row, such as a person's share. */
+  /**
+   * Shown at the end of the row, such as a person's share or a
+   * `RowInputField`, whose error wraps onto a line of its own.
+   */
   detail?: ReactNode;
   label: ReactNode;
   value: string;
@@ -306,9 +316,12 @@ export interface ChecklistOption {
 function ChecklistField({
   label,
   description,
+  footer,
   options,
 }: {
   description?: ReactNode;
+  /** Shown under the list, above its error, such as a running total. */
+  footer?: ReactNode;
   label: ReactNode;
   options: readonly ChecklistOption[];
 }) {
@@ -350,7 +363,7 @@ function ChecklistField({
           const optionId = `${id}-${option.value}`;
           return (
             <li key={option.value}>
-              <Field className="px-4 py-2" orientation="horizontal">
+              <Field className="flex-wrap px-4 py-2" orientation="horizontal">
                 <Checkbox
                   checked={value.includes(option.value)}
                   id={optionId}
@@ -360,7 +373,8 @@ function ChecklistField({
                   value={option.value}
                 />
                 <FieldLabel
-                  className="min-w-0 flex-1 font-normal"
+                  // Keep names readable; details can wrap onto the next line.
+                  className="min-w-40 flex-1 basis-0! font-normal"
                   htmlFor={optionId}
                 >
                   {option.label}
@@ -371,8 +385,126 @@ function ChecklistField({
           );
         })}
       </ul>
+      {footer}
       <FieldError errors={errors} id={`${id}-error`} />
     </FieldSet>
+  );
+}
+
+interface RowInputFieldProps {
+  inputMode: "decimal" | "numeric";
+  /**
+   * Names the input, such as "Bartek's percentage", since the row's own
+   * label names its checkbox.
+   */
+  label: string;
+  /** Called instead of `field.handleChange`, such as to keep other rows' values too. */
+  onValueChange?: (value: string) => void;
+  placeholder?: string;
+  /** Shown after the input, such as the currency or `%`. */
+  suffix?: ReactNode;
+  /** What the input shows; defaults to the field's value. */
+  value?: string;
+}
+
+/**
+ * A short input in a `ChecklistField` row, such as what a payer paid, passed
+ * as the option's `detail`. Its error takes a line of its own under the row.
+ */
+function RowInputField({
+  label,
+  suffix,
+  inputMode,
+  placeholder,
+  value,
+  onValueChange,
+}: RowInputFieldProps) {
+  const field = useFieldContext<string | undefined>();
+  const stored = useStore(field.store, (state) => state.value);
+  const errors = useVisibleErrors(field);
+  const id = `${field.form.formId}-${field.name}`;
+  const invalid = errors.length > 0;
+  return (
+    <>
+      <InputGroup className="ml-auto w-32 shrink-0">
+        <InputGroupInput
+          aria-describedby={invalid ? `${id}-error` : undefined}
+          aria-invalid={invalid || undefined}
+          aria-label={label}
+          autoComplete="off"
+          className="tabular-nums"
+          id={id}
+          inputMode={inputMode}
+          name={field.name}
+          onBlur={field.handleBlur}
+          onChange={(event) =>
+            (onValueChange ?? field.handleChange)(event.target.value)
+          }
+          placeholder={placeholder}
+          value={value ?? stored ?? ""}
+        />
+        {suffix ? (
+          <InputGroupAddon align="inline-end">
+            <InputGroupText>{suffix}</InputGroupText>
+          </InputGroupAddon>
+        ) : null}
+      </InputGroup>
+      <FieldError
+        className="basis-full pl-6"
+        errors={errors}
+        id={`${id}-error`}
+      />
+    </>
+  );
+}
+
+export interface SelectFieldItem {
+  label: string;
+  value: string;
+}
+
+/** One of a few fixed `items`, such as how an expense is split. */
+function SelectField({
+  label,
+  description,
+  items,
+}: {
+  description?: ReactNode;
+  items: readonly SelectFieldItem[];
+  label: ReactNode;
+}) {
+  const field = useFieldContext<string>();
+  const value = useStore(field.store, (state) => state.value);
+  return (
+    <FieldShell description={description} label={label}>
+      {(control) => (
+        <Select
+          items={items}
+          onOpenChange={(open) => {
+            if (!open) {
+              field.handleBlur();
+            }
+          }}
+          onValueChange={(next: string | null) => {
+            if (next !== null) {
+              field.handleChange(next);
+            }
+          }}
+          value={value}
+        >
+          <SelectTrigger {...control} className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {items.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    </FieldShell>
   );
 }
 
@@ -506,6 +638,8 @@ export const { useAppForm, withForm } = createFormHook({
     DateField,
     CheckboxField,
     ChecklistField,
+    RowInputField,
+    SelectField,
     EmojiField,
     CategoryField,
   },
