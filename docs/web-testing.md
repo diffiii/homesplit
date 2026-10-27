@@ -67,7 +67,7 @@ The database isn't emptied between runs, so tests never rely on what's in it. Im
 
 | Helper | Gives you |
 | --- | --- |
-| `expectNoAxeViolations(page)` in `e2e/axe.ts` | Fails on WCAG 2.2 A and AA or best-practice violations, checking the page in dark and then light mode, so contrast is checked in both. |
+| `expectNoAxeViolations(page, known?)` in `e2e/axe.ts` | Fails on WCAG 2.2 A and AA or best-practice violations, checking the page in dark and then light mode, so contrast is checked in both. `known` skips rules a third-party widget breaks, only inside its `selector`. |
 | `openAccountMenu(page, name)` in `e2e/account.ts` | Opens the account menu, from the mobile top bar or the desktop sidebar. |
 | `signIn(page, { email, password })` in `e2e/account.ts` | Signs in through the sign-in form, trying again if the page hadn't hydrated yet. |
 | `signOut(page, name)` in `e2e/account.ts` | Signs out through the account menu. |

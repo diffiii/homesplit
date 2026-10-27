@@ -12,12 +12,16 @@ import { households } from "@/lib/api/auth-client";
 import { errorMessage } from "@/lib/api/error-message";
 import { queryKeys } from "@/lib/api/query-keys";
 import { HOUSEHOLDS_PATH } from "@/lib/last-household";
+import { CategorySettings } from "./category-settings";
+import { ModuleSettings } from "./module-settings";
 
-/** Placeholder settings: leaving. The households epic adds the rest; the theme is on the account page. */
+/** Household settings: modules, categories, and leaving. The households epic adds the rest; the theme is on the account page. */
 export default function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" />
+      <ModuleSettings />
+      <CategorySettings />
       <LeaveHousehold />
     </>
   );
