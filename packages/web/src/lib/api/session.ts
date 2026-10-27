@@ -4,6 +4,9 @@ export const SIGN_UP_PATH = "/sign-up";
 /** Where a signed-in user goes when nothing asked for another page. */
 export const HOME_PATH = "/";
 
+/** The user's profile, password, and theme. */
+export const ACCOUNT_PATH = "/account";
+
 /**
  * Pages for signed-out visitors. Every other page needs a session, and the
  * proxy sends visitors without one to sign-in before the page renders.

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatIsoDate,
   formatIsoDateTime,
+  formatLocalDate,
   isoToLocalDateTime,
   localDateTimeToIso,
   parseIsoDate,
@@ -59,5 +60,13 @@ describe("IsoDateTime", () => {
 
   it("formats in the user's time zone", () => {
     expect(formatIsoDateTime("2026-03-01T23:30:00Z")).toMatch(EVENING);
+  });
+
+  it("formats a moment's local date", () => {
+    // Still March 1 in New York.
+    expect(formatLocalDate("2026-03-02T03:30:00Z")).toBe("Mar 1, 2026");
+    expect(formatLocalDate(new Date("2026-03-02T03:30:00Z"))).toBe(
+      "Mar 1, 2026"
+    );
   });
 });

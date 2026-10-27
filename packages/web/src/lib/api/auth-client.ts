@@ -207,6 +207,29 @@ export function createAuth({ baseURL, fetch }: AuthClientOptions = {}) {
       unwrap(client.signIn.email(body)),
 
     signOut: () => unwrap(client.signOut()),
+
+    /**
+     * Needs the current password. With `revokeOtherSessions`, Better Auth
+     * deletes every session and signs this device in again with a new one.
+     */
+    changePassword: (body: {
+      currentPassword: string;
+      newPassword: string;
+      revokeOtherSessions: boolean;
+    }) => unwrap(client.changePassword(body)),
+
+    /**
+     * The user's unexpired sessions, the current one included. Each carries
+     * its token, which `revokeSession` takes; never show or log it.
+     */
+    listSessions: async () => (await unwrap(client.listSessions())) ?? [],
+
+    /** Sign out the session with `token`; Better Auth ignores other users' tokens. */
+    revokeSession: ({ token }: { token: string }) =>
+      unwrap(client.revokeSession({ token })),
+
+    /** Sign out every session but the current one. */
+    revokeOtherSessions: () => unwrap(client.revokeOtherSessions()),
   };
 
   return {

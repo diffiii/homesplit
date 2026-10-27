@@ -283,6 +283,16 @@ As a result, any signed-in user can check whether an email has an account, which
 
 Revisit this if sign-up stops revealing accounts. Better Auth returns a generic sign-up response when `requireEmailVerification` is on or `autoSignIn` is off. At that point, propose a uniform response and its contract change before implementing it.
 
+## Signed-in devices
+
+The account page lists the user's signed-in devices and signs them out through Better Auth's `/list-sessions`, `/revoke-session`, and `/revoke-other-sessions`, which HomeSplit doesn't wrap, like the other [Better Auth endpoints](#better-auth-endpoints). `/change-password` with `revokeOtherSessions: true` signs out every other device too, and gives the current one a new session.
+
+- **Freshness:** `session.freshAge` is 0. Better Auth's default of one day makes `/list-sessions` answer 403 `SESSION_NOT_FRESH` to anyone who signed in more than a day ago, and with email and password the only way to become fresh again is signing out and back in. Listing your own devices changes nothing, so it doesn't need a recent sign-in. In 1.7.12, the only other endpoints that check freshness are `/unlink-account`, which does nothing without social sign-in, and `/delete-user`, which is disabled.
+- **Account deletion must ask for the password:** with `freshAge` at 0, Better Auth treats every session as fresh, so its `/delete-user` would delete an account without the password. The account-deletion endpoint (see [Deferred](#deferred)) checks the password itself.
+- **Tokens reach the browser:** `/revoke-session` takes a session token rather than an ID, so `/list-sessions` returns every session's raw token. That's accepted. The session cookie holds the token signed with `BETTER_AUTH_SECRET`, so a raw token can't be turned into a cookie, and `/revoke-session` ignores a token that belongs to another user. The `bearer` plugin, which would accept raw tokens, stays out while this holds. The web client keeps tokens only in its query cache and never shows or logs them.
+- **What a device shows:** Better Auth stores `userAgent` and `ipAddress` when the session is created, the address from `x-forwarded-for` (see `advanced.ipAddress` in `auth.ts`). `updatedAt` moves only when Better Auth extends the session, at most once a day (`updateAge`), so the list shows dates rather than times. Sessions expire after seven days without use (`expiresIn`).
+- `/revoke-sessions`, which also ends the current session, stays enabled but unused: it's signing out everywhere, which the account page doesn't offer.
+
 ## Email links
 
 Emails link to three frontend pages. Each link is built as `new URL(path, FRONTEND_URL)`, never from the `url` that Better Auth passes to its email callbacks:
@@ -347,7 +357,7 @@ Tables, constraints, foreign-key delete behavior, and indexes added by this area
 
 ## Deferred
 
-- An account-deletion endpoint, following [Deleting accounts](#deleting-accounts).
+- An account-deletion endpoint, following [Deleting accounts](#deleting-accounts). It asks for the password, since every session counts as fresh (see [Signed-in devices](#signed-in-devices)).
 - Archiving households.
 - A write-off action that does [Writing off debts](#writing-off-debts) in one step and keeps write-offs apart from real payments.
 - Custom roles and teams.

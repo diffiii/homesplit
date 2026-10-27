@@ -115,6 +115,17 @@ export interface MockFriendship {
   userIds: [string, string];
 }
 
+/** A Better Auth session on another device; the current one stands in through `sessionUserId`. */
+export interface MockSession {
+  createdAt: string;
+  id: string;
+  ipAddress: string | null;
+  token: string;
+  updatedAt: string;
+  userAgent: string | null;
+  userId: string;
+}
+
 export interface MockFriendRequest {
   createdAt: string;
   fromId: string;
@@ -133,6 +144,8 @@ export interface MockState {
   households: MockHousehold[];
   invitations: MockInvitation[];
   members: MockMember[];
+  /** Sessions on the users' other devices. */
+  otherSessions: MockSession[];
   /** The signed-in user, standing in for the session cookie. */
   sessionUserId: string | null;
   settlements: MockSettlement[];

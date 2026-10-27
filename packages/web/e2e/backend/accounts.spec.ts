@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { signOut } from "../account";
+import { signIn, signOut } from "../account";
 import { expectNoAxeViolations } from "../axe";
 import { newUser, test } from "./fixtures";
 
@@ -99,9 +99,71 @@ test("creates households, switches, and signs back in to the last opened one", a
   await expect(page).toHaveURL(flatUrl);
 
   await signOut(page, user.name);
-  await page.getByLabel("Email").fill(user.email);
-  await page.getByLabel("Password").fill(user.password);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await signIn(page, user);
   await expect(page).toHaveURL(flatUrl);
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+});
+
+test("renames the user and changes the password", async ({ page, user }) => {
+  await page.goto("/account");
+  await expect(page.getByLabel("Name")).toHaveValue(user.name);
+  await expectNoAxeViolations(page);
+
+  await page.getByLabel("Name").fill("  Erin Renamed ");
+  await page.getByRole("button", { name: "Save name" }).click();
+  await expect(page.getByText("Name saved.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Name")).toHaveValue("Erin Renamed");
+
+  const current = page.getByLabel("Current password");
+  await current.fill("not the password");
+  await page.getByLabel("New password").fill("a brand new password");
+  await page.getByRole("button", { name: "Change password" }).click();
+  await expect(
+    page.getByText("That's not your current password.")
+  ).toBeVisible();
+
+  await current.fill(user.password);
+  await page.getByRole("button", { name: "Change password" }).click();
+  await expect(
+    page.getByText("Password changed. Your other devices are signed out.")
+  ).toBeVisible();
+  // This device got a new session, so it stays signed in.
+  await page.reload();
+  await expect(page.getByLabel("Name")).toHaveValue("Erin Renamed");
+
+  await signOut(page, "Erin Renamed");
+  await signIn(page, { email: user.email, password: "a brand new password" });
+  await expect(page.getByText("No households yet")).toBeVisible();
+});
+
+test("lists another device and signs it out", async ({
+  page,
+  user,
+  playwright,
+  baseURL,
+}) => {
+  const phone = await playwright.request.newContext({
+    baseURL,
+    userAgent:
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+  });
+  const phoneSignIn = await phone.post("/api/auth/sign-in/email", {
+    data: { email: user.email, password: user.password },
+    headers: { Origin: baseURL ?? "" },
+  });
+  expect(phoneSignIn.ok(), await phoneSignIn.text()).toBe(true);
+
+  await page.goto("/account");
+  const devices = page.getByRole("region", { name: "Signed-in devices" });
+  await expect(devices.getByRole("listitem")).toHaveCount(2);
+  await expect(devices.getByRole("listitem").first()).toContainText(
+    "This device"
+  );
+  await page.getByRole("button", { name: "Sign out Safari on iOS" }).click();
+  await expect(devices.getByRole("listitem")).toHaveCount(1);
+
+  const phoneSession = await phone.get("/api/auth/get-session");
+  expect(await phoneSession.json()).toBeNull();
+  await phone.dispose();
 });

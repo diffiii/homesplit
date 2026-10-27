@@ -81,6 +81,13 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  session: {
+    // `/list-sessions` would otherwise answer 403 `SESSION_NOT_FRESH` to
+    // anyone who signed in more than a day ago. Besides it, only
+    // `/unlink-account` (no social sign-in) and `/delete-user` (disabled)
+    // check freshness; see "Signed-in devices" in docs/decisions.md.
+    freshAge: 0,
+  },
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
       // Households are deleted only through DELETE /api/households/:householdId,
