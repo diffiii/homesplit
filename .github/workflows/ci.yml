@@ -81,7 +81,7 @@ jobs:
         with:
           cache: true
           require-lockfile: true
-          runtime: node@lts
+          runtime: node@26.12.1
 
       - name: Run lint
         run: pnpm lint
@@ -104,7 +104,7 @@ jobs:
         with:
           cache: true
           require-lockfile: true
-          runtime: node@lts
+          runtime: node@26.12.1
 
       - name: Build workspace dependencies
         run: pnpm --filter "${{ matrix.package }}^..." build
@@ -133,7 +133,7 @@ jobs:
         with:
           cache: true
           require-lockfile: true
-          runtime: node@lts
+          runtime: node@26.12.1
 
       - name: Build workspace dependencies
         run: pnpm --filter "${{ matrix.package }}^..." build
@@ -175,7 +175,7 @@ jobs:
         with:
           cache: true
           require-lockfile: true
-          runtime: node@lts
+          runtime: node@26.12.1
 
       - name: Build workspace dependencies
         run: pnpm --filter "${{ matrix.package }}^..." build
@@ -197,7 +197,7 @@ jobs:
         with:
           cache: true
           require-lockfile: true
-          runtime: node@lts
+          runtime: node@26.12.1
 
       - name: Build workspace dependencies
         run: pnpm --filter "web^..." build
@@ -246,7 +246,7 @@ jobs:
         with:
           cache: true
           require-lockfile: true
-          runtime: node@lts
+          runtime: node@26.12.1
 
       - name: Build workspace dependencies
         run: pnpm --filter "web^..." --filter "backend^..." build
@@ -287,7 +287,7 @@ jobs:
         with:
           cache: true
           require-lockfile: true
-          runtime: node@lts
+          runtime: node@26.12.1
 
       - name: Apply migrations
         run: pnpm --filter backend db:migrate
@@ -350,7 +350,7 @@ jobs:
         with:
           cache: true
           require-lockfile: true
-          runtime: node@lts
+          runtime: node@26.12.1
 
       - name: Validate pushed commits with commitlint
         if: github.event_name == 'push'
