@@ -1,6 +1,6 @@
 # Shopping API
 
-Module flag: `shopping` · Tasks: #50 · Contracts: [shopping](../../packages/contracts/src/features/shopping/index.ts)
+Module flag: `shopping` · Tasks: #50, #51 · Contracts: [shopping](../../packages/contracts/src/features/shopping/index.ts)
 
 ## Routes
 
@@ -11,18 +11,22 @@ Module flag: `shopping` · Tasks: #50 · Contracts: [shopping](../../packages/co
 | GET | `/api/households/:householdId/shopping-items/:itemId` | `ShoppingItemIdParams` | `ShoppingItem` | 200 | all |
 | PATCH | `/api/households/:householdId/shopping-items/:itemId` | `ShoppingItemIdParams`, `UpdateShoppingItemRequest` | `ShoppingItem` | 200 | all |
 | DELETE | `/api/households/:householdId/shopping-items/:itemId` | `ShoppingItemIdParams` | none | 204 | all |
+| POST | `/api/households/:householdId/shopping-items/:itemId/purchase` | `ShoppingItemIdParams` | `PurchasedShoppingItem` | 200 | all |
+| POST | `/api/households/:householdId/shopping-items/:itemId/unpurchase` | `ShoppingItemIdParams` | `UnpurchasedShoppingItem` | 200 | all |
+| POST | `/api/households/:householdId/shopping-items/clear-purchased` | `HouseholdIdParams` | `ClearPurchasedShoppingItemsResponse` | 200 | all |
 
 ## Rules
 
 - Server-set fields: `id`, `householdId`, `addedBy`, `addedAt`, `isPurchased`, `purchasedBy`, and `purchasedAt`. The author is the caller, and `addedAt` is the database's time of the insert. The request schemas strip these fields, so they're ignored; a `PATCH` that holds only such fields answers 400 `EMPTY_PATCH`.
-- Purchase state: new items are unpurchased, with `purchasedBy` and `purchasedAt` `null`. Neither `POST` nor `PATCH` can change it.
+- Purchase state: new items are unpurchased, with `purchasedBy` and `purchasedAt` `null`. Neither `POST` nor `PATCH` can change it; only the actions do. `purchase` sets `purchasedBy` to the caller and `purchasedAt` to the database's transaction time in one update, and `unpurchase` clears both. Any member may purchase or unpurchase any item, and `PATCH` still edits a purchased one.
+- Clearing: `clear-purchased` deletes the household's purchased items for good in one `DELETE` and answers how many it deleted. Unpurchased items and other households' items stay.
 - Fields: `name` and `unit` are trimmed, then must be non-empty, so a blank value answers 400 `VALIDATION_ERROR`. `unit` is a free-text label such as `kg` or `pack`, not an enum; clients offer a picker with a custom value. `quantity` is an integer from 1 to 2,147,483,647, the range of the `integer` column, so a larger value answers 400 `VALIDATION_ERROR` instead of failing in the database.
 - Defaults: an omitted `quantity` is 1, and an omitted `unit` is `null`.
 - Partial updates: in `PATCH`, an omitted field stays unchanged and `unit: null` clears the unit. `name` and `quantity` can't be `null`. Any member may edit or delete any item, whoever added it.
 - Reading back: a departed member still shows as `addedBy`. Another household's item answers 404, as a missing one does.
 - Ordering and filter: unpurchased items first, then purchased ones, each by `addedAt` ascending, then `id`. Purchased items are left out unless `includePurchased=true`; the query value must be `true` or `false`. A page and its `totalItems` are read in one `readSnapshot`, and a page past the end has no items and the real `totalItems`.
-- Disabled module: both `GET` routes keep working, and `POST`, `PATCH`, and `DELETE` answer 403 `MODULE_DISABLED`.
-- Repeated requests: `POST` isn't idempotent, so a repeat adds a second item. A repeated `DELETE` answers 404.
+- Disabled module: both `GET` routes keep working, and `POST`, `PATCH`, `DELETE`, and the three actions answer 403 `MODULE_DISABLED`.
+- Repeated and concurrent requests: `POST` isn't idempotent, so a repeat adds a second item. A repeated `DELETE` answers 404. `purchase` and `unpurchase` are idempotent: purchasing a purchased item answers 200 with it unchanged, keeping the original `purchasedBy` and `purchasedAt`, and unpurchasing an unpurchased item answers 200 with it unchanged. Each action locks the item row `FOR UPDATE`, so concurrent actions are serialized: of two simultaneous purchases, the first wins and the second sees it, and the last of a purchase and an unpurchase decides the state. An action that waited on a deletion or a clear answers 404. A repeated `clear-purchased` answers `{ deletedCount: 0 }`. A clear skips an item that a concurrent unpurchase holds once that commits, and doesn't see a purchase that hasn't committed, so both items stay; two simultaneous clears delete each item once, and their counts add up.
 
 ## Errors
 
