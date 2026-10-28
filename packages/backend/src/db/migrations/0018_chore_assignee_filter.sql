@@ -1,0 +1,1 @@
+CREATE INDEX "chores_assignee_list_idx" ON "chores" USING btree ("household_id","assigned_to_id","is_completed","due_at","created_at","id");

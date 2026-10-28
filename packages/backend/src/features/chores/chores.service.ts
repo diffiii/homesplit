@@ -90,6 +90,11 @@ export class ChoresService {
     if (!includeCompleted) {
       whereConditions.push(eq(chores.isCompleted, false));
     }
+    // Any user ID is accepted: a departed member's chores stay findable, and
+    // another household's user matches nothing.
+    if (query.assignedToId) {
+      whereConditions.push(eq(chores.assignedToId, query.assignedToId));
+    }
 
     const combinedWhere = and(...whereConditions);
 

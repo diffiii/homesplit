@@ -45,6 +45,15 @@ export const chores = pgTable(
   (table) => [
     index("chores_householdId_idx").on(table.householdId),
     index("chores_assignedToId_idx").on(table.assignedToId),
+    // The list order within one assignee, open or completed.
+    index("chores_assignee_list_idx").on(
+      table.householdId,
+      table.assignedToId,
+      table.isCompleted,
+      table.dueAt,
+      table.createdAt,
+      table.id
+    ),
     index("chores_addedById_idx").on(table.addedById),
     // Open chores have no completion metadata; completed chores have both.
     check(

@@ -127,6 +127,13 @@
       "when": 1793048217667,
       "tag": "0017_shopping_items",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793208354795,
+      "tag": "0018_chore_assignee_filter",
+      "breakpoints": true
     }
   ]
 }
