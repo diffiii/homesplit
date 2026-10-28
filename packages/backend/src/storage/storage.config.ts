@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const TRAILING_SLASHES = /\/+$/;
+
 /** Unset and empty variables both mean "use the default". */
 const optional = <T extends z.ZodType>(schema: T) =>
   z.preprocess(
@@ -15,6 +17,10 @@ const S3Config = z
     S3_FORCE_PATH_STYLE: optional(z.stringbool()).default(false),
     S3_ACCESS_KEY_ID: optional(z.string().min(1)),
     S3_SECRET_ACCESS_KEY: optional(z.string().min(1)),
+    S3_AVATAR_BUCKET: z.string().min(1),
+    S3_AVATAR_PUBLIC_URL: z
+      .url({ protocol: /^https?$/ })
+      .transform((url) => url.replace(TRAILING_SLASHES, "")),
   })
   .refine(
     (env) =>
@@ -29,6 +35,11 @@ const StorageDriver = optional(z.enum(["s3", "memory"])).default("s3");
 
 export interface S3StorageConfig {
   accessKeyId?: string;
+  /** Bucket anyone can read, for avatars. */
+  avatarBucket: string;
+  /** Serves `avatarBucket` without signing; no trailing slash. */
+  avatarPublicUrl: string;
+  /** Private bucket for attachments. */
   bucket: string;
   /** Unset for AWS; the service's URL for MinIO, R2, and others. */
   endpoint?: string;
@@ -52,6 +63,8 @@ export function loadStorageConfig(
   return {
     driver,
     bucket: s3.S3_BUCKET,
+    avatarBucket: s3.S3_AVATAR_BUCKET,
+    avatarPublicUrl: s3.S3_AVATAR_PUBLIC_URL,
     region: s3.S3_REGION,
     endpoint: s3.S3_ENDPOINT,
     forcePathStyle: s3.S3_FORCE_PATH_STYLE,
