@@ -1,4 +1,9 @@
 import {
+  ATTACHMENT_UPLOAD_FIELD,
+  buildPath,
+  endpoints,
+} from "@homesplit/contracts";
+import {
   afterAll,
   afterEach,
   beforeAll,
@@ -10,6 +15,7 @@ import {
 } from "vitest";
 import { createAuth } from "@/lib/api/auth-client";
 import { createApiClient } from "@/lib/api/client";
+import { ATTACHMENT_MAX_BYTES } from "@/lib/attachments";
 import { MOCK_PASSWORD } from "./factories";
 import { setupMockServer } from "./node";
 import { createApiHandlers } from "./routes";
@@ -496,6 +502,59 @@ describe("application routes", () => {
       details: {
         issues: [{ path: ["allocation", "participants", 1, "userId"] }],
       },
+    });
+  });
+
+  it("check uploads like the backend", async () => {
+    const alice = signInAs("Alice");
+    const upload = async (...files: File[]) => {
+      const form = new FormData();
+      for (const file of files) {
+        form.append(ATTACHMENT_UPLOAD_FIELD, file);
+      }
+      const response = await fetch(
+        new URL(buildPath(endpoints.uploadAttachment, flat().params), BASE_URL),
+        { method: "POST", body: form }
+      );
+      return { status: response.status, body: await response.json() };
+    };
+    const pdf = new File(["%PDF-1.7"], "invoice.pdf", {
+      type: "application/pdf",
+    });
+
+    await expect(upload(pdf)).resolves.toMatchObject({
+      status: 201,
+      body: {
+        householdId: flat().params.householdId,
+        mimeType: "application/pdf",
+        sizeBytes: 8,
+        uploadedBy: { id: alice.id },
+      },
+    });
+    await expect(upload()).resolves.toMatchObject({
+      status: 400,
+      body: { code: "VALIDATION_ERROR" },
+    });
+    await expect(upload(pdf, pdf)).resolves.toMatchObject({
+      status: 400,
+      body: { code: "VALIDATION_ERROR" },
+    });
+    await expect(
+      upload(new File(["GIF89a"], "anim.gif", { type: "image/gif" }))
+    ).resolves.toMatchObject({
+      status: 415,
+      body: { code: "UNSUPPORTED_FILE_TYPE" },
+    });
+    await expect(
+      upload(
+        // Over the limit and of the wrong type: the size is checked first.
+        new File([new Uint8Array(ATTACHMENT_MAX_BYTES + 1)], "huge.gif", {
+          type: "image/gif",
+        })
+      )
+    ).resolves.toMatchObject({
+      status: 413,
+      body: { code: "PAYLOAD_TOO_LARGE" },
     });
   });
 });
