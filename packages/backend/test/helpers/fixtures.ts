@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { INestApplication } from "@nestjs/common";
 import type { HouseholdRole } from "@/features/households/access/roles";
+import { sessionCookie } from "./api";
 import { createClient, type TestClient } from "./app";
+import { verificationLink, waitForVerificationEmails } from "./mail";
 
 export const TEST_PASSWORD = "correct-horse-battery-staple";
 
@@ -17,28 +19,30 @@ export interface TestHousehold {
   name: string;
 }
 
+/**
+ * Signs up, follows the verification link from the captured email, and signs
+ * in, because sign-in requires a verified email.
+ */
 export async function createUser(
   app: INestApplication,
   name = "Test User"
 ): Promise<TestUser> {
   const email = `user-${randomUUID()}@test.local`;
-  const response = await createClient(app)
+  const signUp = await createClient(app)
     .post("/api/auth/sign-up/email")
     .send({ email, name, password: TEST_PASSWORD })
     .expect(200);
 
-  const setCookie = response.headers["set-cookie"] as unknown as
-    | string[]
-    | undefined;
-  if (!setCookie?.length) {
-    throw new Error("Sign-up returned no session cookie");
-  }
-  const cookie = setCookie.map((value) => value.split(";")[0]).join("; ");
+  await waitForVerificationEmails(email, 1);
+
+  const verification = await createClient(app)
+    .get(verificationLink(email).path)
+    .expect(200);
 
   return {
-    client: createClient(app, cookie),
+    client: createClient(app, sessionCookie(verification)),
     email,
-    id: response.body.user.id,
+    id: signUp.body.user.id,
     name,
   };
 }
