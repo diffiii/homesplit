@@ -26,7 +26,8 @@ const DOMAIN_ATTRIBUTE = /domain=/iu;
 @Controller("api/whoami")
 class WhoamiController {
   @Get()
-  static get(@Session() current: UserSession): { userId: string } {
+  // biome-ignore lint/style/useThisInClassMethods: NestJS controller methods require instance context
+  get(@Session() current: UserSession): { userId: string } {
     return { userId: current.user.id };
   }
 }
