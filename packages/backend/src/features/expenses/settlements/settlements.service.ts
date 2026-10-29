@@ -8,26 +8,14 @@ import {
 } from "@homesplit/contracts";
 import { Injectable } from "@nestjs/common";
 import { and, desc, eq, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
 import { db, type Executor, readSnapshot, type Transaction } from "@/db";
-import { settlements, user } from "@/db/schema";
+import { settlements } from "@/db/schema";
 import { lockHouseholdForLedgerWrite } from "@/features/expenses/household-ledger-lock";
 import type { HouseholdContext } from "@/features/households/access/household.guard";
 import { assertUsersEligible } from "@/features/households/access/household-access";
 import { hasRole } from "@/features/households/access/roles";
+import { userRole } from "@/features/users/user-projections";
 import { AppError, forbidden, notFound } from "@/http/app-error";
-
-/**
- * A settlement references `user` four times, so each role joins its own copy
- * of the table under a different name, selected as a `UserSummary`.
- */
-function userRole(name: string) {
-  const table = alias(user, name);
-  return {
-    table,
-    summary: { id: table.id, name: table.name, imageUrl: table.image },
-  };
-}
 
 const payer = userRole("payer");
 const payee = userRole("payee");

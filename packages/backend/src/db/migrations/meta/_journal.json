@@ -120,6 +120,20 @@
       "when": 1792841009132,
       "tag": "0016_expense_attachments",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793048217667,
+      "tag": "0017_shopping_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793208354795,
+      "tag": "0018_chore_assignee_filter",
+      "breakpoints": true
     }
   ]
 }

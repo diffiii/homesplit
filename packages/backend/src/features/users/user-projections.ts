@@ -1,3 +1,4 @@
+import { alias } from "drizzle-orm/pg-core";
 import { user } from "@/db/schema";
 
 export const userSummaryColumns = {
@@ -11,3 +12,12 @@ export const friendUserColumns = {
   ...userSummaryColumns,
   email: user.email,
 };
+
+/** `user` under another name, for rows that reference several users. */
+export function userRole(name: string) {
+  const table = alias(user, name);
+  return {
+    table,
+    summary: { id: table.id, name: table.name, imageUrl: table.image },
+  };
+}

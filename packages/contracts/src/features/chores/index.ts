@@ -73,10 +73,13 @@ export const UpdateChoreRequest = ChoreWritableFields.partial();
 export type UpdateChoreRequest = z.infer<typeof UpdateChoreRequest>;
 
 /**
- * Query parameters for listing chores in a household.
+ * Query parameters for listing chores in a household. Every given filter
+ * must match: `includeCompleted` adds completed chores to the open ones, and
+ * `assignedToId` keeps only chores assigned to that user.
  */
 export const ListChoresQuery = Pagination.extend({
   includeCompleted: queryBoolean().default(false),
+  assignedToId: Id.optional(),
 });
 export type ListChoresQuery = z.infer<typeof ListChoresQuery>;
 

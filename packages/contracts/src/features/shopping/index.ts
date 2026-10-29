@@ -11,7 +11,7 @@ const ShoppingItemBase = z.object({
   householdId: Id,
   name: z.string().min(1),
   quantity: z.int().min(1),
-  unit: z.string().min(1).nullable(), // TODO: maybe we can use some kind of enum here?
+  unit: z.string().min(1).nullable(),
   addedBy: UserSummary,
   addedAt: IsoDateTime,
 });
@@ -39,19 +39,30 @@ export const ShoppingItem = z.discriminatedUnion("isPurchased", [
 ]);
 export type ShoppingItem = z.infer<typeof ShoppingItem>;
 
+/** The largest PostgreSQL `integer`, the type of the stored quantity. */
+const MAX_QUANTITY = 2_147_483_647;
+
+const Quantity = z.int().min(1).max(MAX_QUANTITY);
+
 const ShoppingItemWritableFields = z.object({
-  name: z.string().min(1),
-  quantity: z.int().min(1),
-  unit: z.string().min(1).nullable().optional(),
+  name: z.string().trim().min(1),
+  quantity: Quantity,
+  unit: z.string().trim().min(1).nullable().optional(),
 });
 
 /** Create a shopping item; quantity defaults to 1. */
 export const CreateShoppingItemRequest = ShoppingItemWritableFields.extend({
-  quantity: z.int().min(1).default(1),
+  quantity: Quantity.default(1),
 });
+export type CreateShoppingItemRequest = z.infer<
+  typeof CreateShoppingItemRequest
+>;
 
 /** Partial update of writable fields only (not purchase state). */
 export const UpdateShoppingItemRequest = ShoppingItemWritableFields.partial();
+export type UpdateShoppingItemRequest = z.infer<
+  typeof UpdateShoppingItemRequest
+>;
 
 /** List shopping items; by default excludes purchased. Decodes raw URL query strings. */
 export const ListShoppingItemsQuery = Pagination.extend({

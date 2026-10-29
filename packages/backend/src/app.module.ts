@@ -9,6 +9,7 @@ import { ExpenseCategoriesModule } from "./features/expense-categories/expense-c
 import { ExpensesModule } from "./features/expenses/expenses.module";
 import { FriendsModule } from "./features/friends/friends.module";
 import { HouseholdsModule } from "./features/households/households.module";
+import { ShoppingModule } from "./features/shopping/shopping.module";
 import { UsersModule } from "./features/users/users.module";
 
 @Module({
@@ -22,6 +23,7 @@ import { UsersModule } from "./features/users/users.module";
     ExpensesModule,
     AttachmentsModule,
     FriendsModule,
+    ShoppingModule,
     UsersModule,
   ],
 })
