@@ -1,4 +1,5 @@
 import type { HttpHandler } from "msw";
+import { attachmentRoutes } from "./api/attachments";
 import { choreRoutes } from "./api/chores";
 import { expenseRoutes } from "./api/expenses";
 import { householdRoutes } from "./api/households";
@@ -12,6 +13,7 @@ import { createApiHandlers, type MockNetwork, type MockRoutes } from "./routes";
 export const mockRoutes: MockRoutes = {
   ...householdRoutes,
   ...expenseRoutes,
+  ...attachmentRoutes,
   ...choreRoutes,
   ...shoppingRoutes,
   ...meRoutes,

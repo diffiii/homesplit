@@ -16,6 +16,12 @@ export const ATTACHMENT_MIME_TYPES = [
 export const AttachmentMimeType = z.enum(ATTACHMENT_MIME_TYPES);
 export type AttachmentMimeType = z.infer<typeof AttachmentMimeType>;
 
+/**
+ * Largest upload when the backend's `ATTACHMENT_MAX_BYTES` isn't set: 10 MiB.
+ * The web app checks files against the same limit before uploading.
+ */
+export const DEFAULT_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+
 /** Multipart form field that carries the file in an upload. */
 export const ATTACHMENT_UPLOAD_FIELD = "file";
 
