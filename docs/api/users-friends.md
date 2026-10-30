@@ -1,12 +1,14 @@
 # Users and friends API
 
-Module flag: none · Tasks: #30, #31, #32 · Contracts: [users](../../packages/contracts/src/features/users/index.ts), [friends](../../packages/contracts/src/features/friends/index.ts)
+Module flag: none · Tasks: #30, #31, #32, #115 · Contracts: [users](../../packages/contracts/src/features/users/index.ts), [friends](../../packages/contracts/src/features/friends/index.ts)
 
 ## Routes
 
 | Method | Path | Request | Response | Success | Allowed |
 | --- | --- | --- | --- | --- | --- |
 | PATCH | `/api/me` | `UpdateProfileRequest` | `UserSummary` | 200 | the signed-in user |
+| PUT | `/api/me/avatar` | `multipart/form-data` with the image in `file` | `UserSummary` | 200 | the signed-in user |
+| DELETE | `/api/me/avatar` | none | none | 204 | the signed-in user |
 | POST | `/api/me/friend-requests` | `CreateFriendRequest` | `FriendRequest` | 201 | the signed-in user |
 | GET | `/api/me/friend-requests/incoming` | none | `FriendRequestListResponse` | 200 | the signed-in user |
 | GET | `/api/me/friend-requests/sent` | none | `FriendRequestListResponse` | 200 | the signed-in user |
@@ -19,17 +21,20 @@ Module flag: none · Tasks: #30, #31, #32 · Contracts: [users](../../packages/c
 
 | Status | `code` | When |
 | --- | --- | --- |
+| 400 | `VALIDATION_ERROR` | `imageUrl` isn't the caller's own uploaded avatar, or an avatar upload has no file in `file` or has other fields. |
 | 400 | `USER_NOT_FOUND` | No account has the requested email. |
 | 400 | `SELF_FRIEND_REQUEST` | The email is the caller's own. |
 | 409 | `FRIEND_REQUEST_EXISTS` | The caller already has a pending request to this user. |
 | 409 | `INCOMING_FRIEND_REQUEST_EXISTS` | This user already has a pending request to the caller. |
 | 409 | `ALREADY_FRIENDS` | The caller and this user are already friends, when sending or accepting a request. |
+| 413 | `PAYLOAD_TOO_LARGE` | The avatar is over `AVATAR_MAX_BYTES` (default 10 MiB). |
+| 415 | `UNSUPPORTED_FILE_TYPE` | The avatar isn't a JPEG, PNG, WebP, or HEIC that decodes. `details.allowed` lists the types. |
 | 429 | `RATE_LIMITED` | The caller made more than 20 friend-request attempts in the last hour. |
 
 ## Rules
 
 - Target: `PATCH /api/me` always updates the session user. Server-set and auth-owned fields (`id`, `email`, `emailVerified`, timestamps) are stripped from the body, so a body that holds only those answers 400 `EMPTY_PATCH`.
-- Partial updates: an omitted field stays unchanged and `imageUrl: null` clears the avatar. `name` is trimmed and must then be 1 to 100 characters (never `null`), and `imageUrl` must be an `https:` URL.
+- Partial updates: an omitted field stays unchanged and `imageUrl: null` clears the avatar. `name` is trimmed and must then be 1 to 100 characters (never `null`), and `imageUrl` must be the URL of an avatar the caller uploaded (`S3_AVATAR_PUBLIC_URL/<their id>/<uuid>.webp`). Any other URL, another user's avatar included, answers 400 `VALIDATION_ERROR`.
 - Better Auth's `/api/auth/update-user` is in `disabledPaths` and answers 404, so profile changes can't skip the `imageUrl` check.
 - Sign-up: Better Auth's `databaseHooks.user.create.before` checks every new user against the same `DisplayName` and `AvatarUrl` rules (the avatar field is `image` there). `/api/auth/sign-up/email` answers 400 `VALIDATION_ERROR` for a bad value and stores the trimmed name.
 - Projections: every response that nests a user selects `userSummaryColumns` from `packages/backend/src/features/users/user-projections.ts`, which maps the `image` column to `imageUrl` (`null` without an avatar) and leaves out email. Friend contexts select `friendUserColumns`, which adds `email`.
@@ -44,6 +49,13 @@ Module flag: none · Tasks: #30, #31, #32 · Contracts: [users](../../packages/c
 - Stale requests: the check for an existing friendship isn't serialized against accepting, so a new request sent while the pair's pending one is being accepted can still be created. Accepting such a request answers 409 `ALREADY_FRIENDS` and rolls back, leaving the request in place; declining removes it.
 - Friend list: `friend` is the other person and `createdAt` is when the request was accepted. The list is unpaginated and ordered by the friend's name ascending, ignoring case, then by `id` ascending.
 - Removal: either friend may end the friendship. Anyone else, and a repeated removal, gets 404.
+
+## Avatars
+
+- Upload: `PUT /api/me/avatar` takes one file in `file` (`AVATAR_UPLOAD_FIELD`). The type is detected from the content, as for [attachments](attachments.md#rules); the file name and declared type are ignored. HEIC is decoded with `heic-decode`, because sharp's prebuilt binaries can't read it.
+- Processing: the image is turned upright, cropped to a centered square, and re-encoded as a 512×512 WebP, which carries no EXIF, GPS, or ICC data. Images over 50 million pixels answer 415.
+- Storage: every upload gets a new key, `<userId>/<uuid>.webp`, in the public avatar bucket (`S3_AVATAR_BUCKET`), and `user.image` is set to its URL (`S3_AVATAR_PUBLIC_URL` + key), which needs no signing ([configuration](attachments.md#configuration)).
+- Replacing or deleting: the profile is updated first, then the previous object is deleted. A failed deletion is logged and leaves the object behind. Only the user's own `<userId>/` objects are deleted, never an avatar set some other way. A CDN in front of the bucket, such as Cloudflare's, may keep serving a deleted avatar until its cache expires (4 hours by default on R2 custom domains); the URL is no longer in any profile by then.
 
 ## Storage
 

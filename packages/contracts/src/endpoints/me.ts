@@ -23,6 +23,22 @@ export const meEndpoints = {
     status: 200,
     response: UserSummary,
   },
+  /**
+   * The body is `multipart/form-data`, not JSON, with one image in the
+   * `AVATAR_UPLOAD_FIELD` field, so it has no body schema.
+   */
+  uploadAvatar: {
+    method: "PUT",
+    path: `${ME}/avatar`,
+    status: 200,
+    response: UserSummary,
+  },
+  deleteAvatar: {
+    method: "DELETE",
+    path: `${ME}/avatar`,
+    status: 204,
+    response: null,
+  },
   listMyBalances: {
     method: "GET",
     path: `${ME}/balances`,

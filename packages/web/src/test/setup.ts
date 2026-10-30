@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom/vitest";
+import { File as NodeFile } from "node:buffer";
 import { cleanup } from "@testing-library/react";
 import { afterAll, afterEach, beforeEach, vi } from "vitest";
 import { DEFAULT_SCENARIO } from "@/mocks/scenarios";
@@ -25,6 +26,20 @@ window.matchMedia ??= (query: string): MediaQueryList => ({
   removeListener: () => undefined,
   dispatchEvent: () => false,
 });
+
+// Node's multipart parser builds files with the global `File`, which jsdom
+// replaces with one Node's `FormData` refuses, so mocks reading an upload
+// would fail. Parse with Node's own instead.
+const parseFormData = Request.prototype.formData;
+const JsdomFile = globalThis.File;
+Request.prototype.formData = async function formData(this: Request) {
+  globalThis.File = NodeFile as typeof File;
+  try {
+    return await parseFormData.call(this);
+  } finally {
+    globalThis.File = JsdomFile;
+  }
+};
 
 // jsdom has no canvas and logs whenever axe asks it for one to check icon fonts.
 HTMLCanvasElement.prototype.getContext = () => null;

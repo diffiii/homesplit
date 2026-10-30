@@ -1,9 +1,12 @@
 "use client";
 
+import { MailIcon } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { z } from "zod";
 import { useAppForm } from "@/components/form";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useRedirectIfSignedIn } from "@/hooks/use-redirect-if-signed-in";
 import { account } from "@/lib/api/auth-client";
 import { safeRedirectPath, signInUrl } from "@/lib/api/session";
@@ -30,20 +33,55 @@ const SignUpValues = z.object({
 export function SignUpForm() {
   const redirectTo = safeRedirectPath(useSearchParams().get("redirectTo"));
   useRedirectIfSignedIn(redirectTo);
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const form = useAppForm({
     defaultValues: { name: "", email: "", password: "" },
     validators: { onSubmit: SignUpValues },
     onSubmit: async ({ value, formApi }) => {
+      let signedIn: boolean;
       try {
-        await account.signUp({ ...value, name: value.name.trim() });
+        const result = await account.signUp({
+          ...value,
+          name: value.name.trim(),
+          callbackURL: redirectTo,
+        });
+        signedIn = Boolean(result?.token);
       } catch (error) {
         applyAuthErrors(formApi, error);
         return;
       }
-      // Signing up signs the user in; a full load lets the proxy see the cookie.
+      // No session until the emailed link is opened (docs/decisions.md).
+      if (!signedIn) {
+        setSentTo(value.email);
+        return;
+      }
+      // A full load lets the proxy see the session cookie.
       window.location.replace(redirectTo);
     },
   });
+
+  if (sentTo !== null) {
+    return (
+      <>
+        <Alert role="status">
+          <MailIcon aria-hidden />
+          <AlertTitle>Check your inbox</AlertTitle>
+          <AlertDescription>
+            We sent a link to {sentTo}. Open it within 24 hours to finish
+            creating your account. No email? Sign in, and we'll send a new one.
+          </AlertDescription>
+        </Alert>
+        <p className="text-center text-muted-foreground text-sm">
+          <Link
+            className="font-medium text-foreground underline underline-offset-4"
+            href={signInUrl(redirectTo)}
+          >
+            Sign in
+          </Link>
+        </p>
+      </>
+    );
+  }
 
   return (
     <>

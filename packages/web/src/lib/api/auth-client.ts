@@ -200,10 +200,23 @@ export function createAuth({ baseURL, fetch }: AuthClientOptions = {}) {
 
   /** Email-and-password accounts. Signing in or up sets the session cookie. */
   const account = {
-    signUp: (body: { name: string; email: string; password: string }) =>
-      unwrap(client.signUp.email(body)),
+    /**
+     * Gives no session (`token: null`) while the email is unverified; Better
+     * Auth emails a link that verifies it, signs the user in, and goes to
+     * `callbackURL`. A taken email gets the same answer, and no email.
+     */
+    signUp: (body: {
+      name: string;
+      email: string;
+      password: string;
+      callbackURL?: string;
+    }) => unwrap(client.signUp.email(body)),
 
-    signIn: (body: { email: string; password: string }) =>
+    /**
+     * An unverified email answers 403 `EMAIL_NOT_VERIFIED`, after Better Auth
+     * emails a new link that goes to `callbackURL` once opened.
+     */
+    signIn: (body: { email: string; password: string; callbackURL?: string }) =>
       unwrap(client.signIn.email(body)),
 
     signOut: () => unwrap(client.signOut()),

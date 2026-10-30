@@ -14,19 +14,18 @@ import { db } from "@/db";
 import { session } from "@/db/schema";
 import { createTestApp } from "./helpers/app";
 import { TEST_PASSWORD } from "./helpers/fixtures";
-import { verificationLink, waitForVerificationEmails } from "./helpers/mail";
+import { verificationLink } from "./helpers/mail";
 
 const FRONTEND_URL = process.env.FRONTEND_URL ?? "";
 const PREVIEW_ORIGIN = "https://homesplit-web-git-feature.vercel.app";
 const VISITOR_IP = "203.0.113.7";
-const SECURE_SESSION_COOKIE = /^__Secure-better-auth\.session_token=/u;
-const DOMAIN_ATTRIBUTE = /domain=/iu;
+const SECURE_SESSION_COOKIE = /^__Secure-better-auth\.session_token=/;
+const DOMAIN_ATTRIBUTE = /domain=/i;
 
 /** A test-only route behind the session guard. */
 @Controller("api/whoami")
 class WhoamiController {
   @Get()
-  // biome-ignore lint/style/useThisInClassMethods: NestJS controller methods require instance context
   get(@Session() current: UserSession): { userId: string } {
     return { userId: current.user.id };
   }
@@ -112,7 +111,6 @@ describe("API behind the frontend rewrite", () => {
     expect(signedUp.status).toBe(200);
     const { user } = await signedUp.json();
 
-    await waitForVerificationEmails(email, 1);
     const verified = await call(verificationLink(email).path);
     expect(verified.status).toBe(200);
 
@@ -182,9 +180,10 @@ describe("API behind the frontend rewrite", () => {
       .from(session)
       .where(eq(session.userId, userId));
     // The verification link and the sign-in each open a session.
-    expect(new Set(rows.map((row) => row.ipAddress))).toEqual(
-      new Set([VISITOR_IP])
-    );
+    expect(rows).toEqual([
+      { ipAddress: VISITOR_IP },
+      { ipAddress: VISITOR_IP },
+    ]);
   });
 
   it("trusts preview origins and rejects other origins", async () => {

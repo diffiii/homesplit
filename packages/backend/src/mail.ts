@@ -1,55 +1,100 @@
+import { Logger } from "@nestjs/common";
 import { Resend } from "resend";
+import { z } from "zod";
 
-const MAX_CAPTURED_EMAILS = 100;
-const DEFAULT_MAIL_FROM = "HomeSplit <onboarding@resend.dev>";
-
-// Captured messages for local development and tests.
-export const capturedEmails: Array<{
-  to: string;
-  subject: string;
-  html: string;
-}> = [];
-
-interface SendEmailOptions {
+export interface Email {
   html: string;
   subject: string;
+  text: string;
   to: string;
 }
 
-export async function sendEmail({ to, subject, html }: SendEmailOptions) {
-  const { NODE_ENV, RESEND_API_KEY, MAIL_FROM, E2E } = process.env;
+export interface Mailer {
+  /** Rejects when the message wasn't accepted for delivery. */
+  send: (email: Email) => Promise<void>;
+}
 
-  if (
-    NODE_ENV === "test" ||
-    NODE_ENV === "development" ||
-    E2E === "true" ||
-    RESEND_API_KEY?.startsWith("re_dummy")
-  ) {
-    capturedEmails.push({ to, subject, html });
+/** Sends through Resend, the production transport. */
+export class ResendMailer implements Mailer {
+  private readonly resend: Resend;
+  private readonly from: string;
 
-    if (capturedEmails.length > MAX_CAPTURED_EMAILS) {
-      capturedEmails.splice(0, capturedEmails.length - MAX_CAPTURED_EMAILS);
+  constructor(apiKey: string, from: string) {
+    this.resend = new Resend(apiKey);
+    this.from = from;
+  }
+
+  async send(email: Email): Promise<void> {
+    const { error } = await this.resend.emails.send({
+      from: this.from,
+      ...email,
+    });
+    if (error) {
+      throw new Error(`Resend rejected the email: ${error.message}`);
     }
-
-    console.log(`[Mail Captured] Subject: ${subject} -> To: ${to}`);
-
-    return { success: true, captured: true };
   }
+}
 
-  if (!RESEND_API_KEY) {
-    throw new Error("missing RESEND_API_KEY");
+const MAX_LOGGED_EMAILS = 100;
+
+/**
+ * Logs each message, links included, instead of sending it, so a developer
+ * can follow them locally. Keeps the latest ones in `sent` for tests.
+ */
+export class LogMailer implements Mailer {
+  /** The latest messages, oldest first. */
+  readonly sent: Email[] = [];
+  private readonly logger = new Logger("Mail");
+
+  send(email: Email): Promise<void> {
+    this.sent.push(email);
+    if (this.sent.length > MAX_LOGGED_EMAILS) {
+      this.sent.shift();
+    }
+    this.logger.log(`To ${email.to}: ${email.subject}\n${email.text}`);
+    return Promise.resolve();
   }
+}
 
-  const { data, error } = await new Resend(RESEND_API_KEY).emails.send({
-    from: MAIL_FROM || DEFAULT_MAIL_FROM,
-    to,
-    subject,
-    html,
-  });
+/** Unset and empty variables both mean "use the default". */
+const optional = <T extends z.ZodType>(schema: T) =>
+  z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    schema.optional()
+  );
 
-  if (error) {
-    throw new Error(`Failed to send email via Resend: ${error.message}`);
+const MailDriver = optional(z.enum(["resend", "log"])).default("resend");
+
+const ResendConfig = z.object({
+  RESEND_API_KEY: z.string().min(1),
+  MAIL_FROM: z.string().min(1),
+});
+
+export type MailConfig =
+  | { driver: "log" }
+  | { driver: "resend"; apiKey: string; from: string };
+
+export function loadMailConfig(
+  env: NodeJS.ProcessEnv = process.env
+): MailConfig {
+  const driver = parseEnv(MailDriver, env.MAIL_DRIVER);
+  if (driver === "log") {
+    return { driver };
   }
+  const resend = parseEnv(ResendConfig, env);
+  return { driver, apiKey: resend.RESEND_API_KEY, from: resend.MAIL_FROM };
+}
 
-  return data;
+export function createMailer(config: MailConfig): Mailer {
+  return config.driver === "log"
+    ? new LogMailer()
+    : new ResendMailer(config.apiKey, config.from);
+}
+
+function parseEnv<T extends z.ZodType>(schema: T, value: unknown): z.output<T> {
+  const result = schema.safeParse(value);
+  if (!result.success) {
+    throw new Error(`Invalid mail config: ${z.prettifyError(result.error)}`);
+  }
+  return result.data;
 }

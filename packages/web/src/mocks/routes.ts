@@ -55,6 +55,8 @@ type HasHouseholdParam<E> = E extends {
 export type MockRequest<E extends Endpoint> = {
   body: Parsed<E, "body">;
   db: MockDb;
+  /** The `multipart/form-data` body, for endpoints without a body schema that take one. */
+  form: FormData | undefined;
   params: Parsed<E, "params">;
   query: Parsed<E, "query">;
   /** The session user. */
@@ -192,6 +194,7 @@ async function respond(
   const body = endpoint.body
     ? parseBody(endpoint.method, endpoint.body, await readJson(request))
     : undefined;
+  const form = endpoint.body ? undefined : await readForm(request);
 
   const result = (route.resolve as AnyResolve)({
     db,
@@ -199,6 +202,7 @@ async function respond(
     params,
     query,
     body,
+    form,
     ...scope,
   });
 
@@ -278,6 +282,19 @@ async function readJson(request: Request): Promise<unknown> {
     return JSON.parse(text);
   } catch (error) {
     throw validationError([{ path: [], message: "Malformed JSON" }], {
+      cause: error,
+    });
+  }
+}
+
+async function readForm(request: Request): Promise<FormData | undefined> {
+  if (!request.headers.get("Content-Type")?.startsWith("multipart/form-data")) {
+    return;
+  }
+  try {
+    return await request.formData();
+  } catch (error) {
+    throw validationError([{ path: [], message: "Malformed multipart body" }], {
       cause: error,
     });
   }

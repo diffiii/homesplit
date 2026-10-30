@@ -3,7 +3,7 @@ import type { INestApplication } from "@nestjs/common";
 import type { HouseholdRole } from "@/features/households/access/roles";
 import { sessionCookie } from "./api";
 import { createClient, type TestClient } from "./app";
-import { verificationLink, waitForVerificationEmails } from "./mail";
+import { verificationLink } from "./mail";
 
 export const TEST_PASSWORD = "correct-horse-battery-staple";
 
@@ -20,8 +20,8 @@ export interface TestHousehold {
 }
 
 /**
- * Signs up, follows the verification link from the captured email, and signs
- * in, because sign-in requires a verified email.
+ * Signs up and opens the emailed verification link, which signs the user in:
+ * sign-up alone gives no session while the email is unverified.
  */
 export async function createUser(
   app: INestApplication,
@@ -32,8 +32,6 @@ export async function createUser(
     .post("/api/auth/sign-up/email")
     .send({ email, name, password: TEST_PASSWORD })
     .expect(200);
-
-  await waitForVerificationEmails(email, 1);
 
   const verification = await createClient(app)
     .get(verificationLink(email).path)

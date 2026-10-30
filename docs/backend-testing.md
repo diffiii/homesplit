@@ -37,7 +37,8 @@ Integration tests go in `packages/backend/test` and end in `.test.ts`. Unit test
 | --- | --- |
 | `createTestApp()` | The Nest app configured like `main.ts`, without a listening port |
 | `createClient(app)` | An unauthenticated HTTP client (supertest) |
-| `createUser(app, name?)` | A signed-up user with a unique email and a `client` that sends their session cookie |
+| `createUser(app, name?)` | A signed-up user with a unique email, verified through the emailed link, and a `client` that sends their session cookie |
+| `sentEmails()`, `verificationEmails(to)`, `verificationLink(to)` | What the app emailed (tests run with `MAIL_DRIVER=log`), and the newest verification link to `to` |
 | `createHousehold(user, name?)` | A household owned by that user |
 | `createTwoHouseholds(app)` | `alice` and `bob`, each owning a separate household |
 | `inviteAndAccept(inviter, household, invitee, role?)` | `invitee` joins through Better Auth's invite and accept endpoints |

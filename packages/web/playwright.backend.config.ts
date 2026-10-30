@@ -51,9 +51,9 @@ export default defineConfig({
         FRONTEND_URL: baseURL,
         FRONTEND_PREVIEW_ORIGINS: "",
         STORAGE_DRIVER: "memory",
-        RESEND_API_KEY: "re_dummy_e2e_key_123456789",
-        E2E: "true",
-        IS_E2E: "true",
+        MAIL_DRIVER: "log",
+        // Tests sign up through the UI and can't follow the emailed link.
+        AUTH_SKIP_EMAIL_VERIFICATION: "true",
       },
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,
