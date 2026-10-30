@@ -35,15 +35,19 @@ describe("SignInForm", () => {
   });
 
   it("explains that the email needs verifying", async () => {
+    let body: unknown;
     server.use(
-      http.post("*/api/auth/sign-in/email", () =>
-        HttpResponse.json(
+      http.post("*/api/auth/sign-in/email", async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(
           { code: "EMAIL_NOT_VERIFIED", message: "Email not verified" },
           { status: 403 }
-        )
-      )
+        );
+      })
     );
-    const { user } = renderWithProviders(<SignInForm />, { url: "/sign-in" });
+    const { user } = renderWithProviders(<SignInForm />, {
+      url: "/sign-in?redirectTo=%2Fhouseholds",
+    });
 
     await user.type(screen.getByLabelText("Email"), "alice@example.com");
     await user.type(screen.getByLabelText("Password"), "correct horse");
@@ -54,6 +58,8 @@ describe("SignInForm", () => {
         "Verify your email first. We've sent you a new link."
       )
     ).toBeVisible();
+    // The new link goes back to where the user was headed.
+    expect(body).toMatchObject({ callbackURL: "/households" });
   });
 
   it("keeps redirectTo when switching to sign-up", () => {

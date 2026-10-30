@@ -96,6 +96,42 @@ describe("email verification", () => {
       expect(response.body.token).toBeNull();
       expect(verificationEmails(email)).toHaveLength(1);
     });
+
+    it("checks the name the same way for a taken email", async () => {
+      const email = newEmail();
+      await signUp(email).expect(200);
+
+      const invalid = await Promise.all(
+        [email, newEmail()].map((address) =>
+          createClient(app)
+            .post("/api/auth/sign-up/email")
+            .send({ name: "   ", email: address, password: TEST_PASSWORD })
+            .expect(400)
+        )
+      );
+      for (const response of invalid) {
+        expect(response.body.code).toBe("VALIDATION_ERROR");
+      }
+      const padded = await createClient(app)
+        .post("/api/auth/sign-up/email")
+        .send({ name: " Alice ", email, password: TEST_PASSWORD })
+        .expect(200);
+      expect(padded.body.user.name).toBe("Alice");
+    });
+
+    it("sends the link that sign-in resends to the callbackURL given there", async () => {
+      const email = newEmail();
+      await signUp(email).expect(200);
+
+      await createClient(app)
+        .post("/api/auth/sign-in/email")
+        .send({ email, password: TEST_PASSWORD, callbackURL: "/households" })
+        .expect(403);
+
+      expect(verificationLink(email).url.searchParams.get("callbackURL")).toBe(
+        "/households"
+      );
+    });
   });
 
   describe("the link", () => {

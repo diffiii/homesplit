@@ -51,6 +51,23 @@ const NewUserProfile = z.object({
   image: AvatarUrl.nullish(),
 });
 
+/** The trimmed name, or 400 `VALIDATION_ERROR` with the issues. */
+function parseNewUserName(input: unknown): string {
+  const result = NewUserProfile.safeParse(input);
+  if (!result.success) {
+    const issues = result.error.issues.map(({ path, message }) => ({
+      path,
+      message,
+    }));
+    throw new APIError("BAD_REQUEST", {
+      code: "VALIDATION_ERROR",
+      message: "Invalid request",
+      details: { issues },
+    });
+  }
+  return result.data.name;
+}
+
 export const auth = betterAuth({
   // The browser reaches the API only through the frontend's `/api/*` rewrite,
   // so the frontend origin is Better Auth's public URL. Cookies carry no
@@ -76,27 +93,14 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
-        before: (user) => {
-          const result = NewUserProfile.safeParse(user);
-          if (!result.success) {
-            const issues = result.error.issues.map(({ path, message }) => ({
-              path,
-              message,
-            }));
-            throw new APIError("BAD_REQUEST", {
-              code: "VALIDATION_ERROR",
-              message: "Invalid request",
-              details: { issues },
-            });
-          }
-          return Promise.resolve({
+        before: (user) =>
+          Promise.resolve({
             data: {
               ...user,
-              name: result.data.name,
+              name: parseNewUserName(user),
               ...(skipEmailVerification ? { emailVerified: true } : {}),
             },
-          });
-        },
+          }),
       },
     },
   },
@@ -140,6 +144,15 @@ export const auth = betterAuth({
   },
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      // A sign-up for a taken email answers like a new one but skips
+      // `user.create.before`, so the profile is checked here too. Otherwise a
+      // bad name would answer 400 for a new email and 200 for a taken one.
+      if (ctx.path === "/sign-up/email") {
+        return {
+          context: { body: { ...ctx.body, name: parseNewUserName(ctx.body) } },
+        };
+      }
+
       // Households are deleted only through DELETE /api/households/:householdId,
       // which checks and deletes in one transaction.
       if (ctx.path === "/organization/delete") {

@@ -212,7 +212,11 @@ export function createAuth({ baseURL, fetch }: AuthClientOptions = {}) {
       callbackURL?: string;
     }) => unwrap(client.signUp.email(body)),
 
-    signIn: (body: { email: string; password: string }) =>
+    /**
+     * An unverified email answers 403 `EMAIL_NOT_VERIFIED`, after Better Auth
+     * emails a new link that goes to `callbackURL` once opened.
+     */
+    signIn: (body: { email: string; password: string; callbackURL?: string }) =>
       unwrap(client.signIn.email(body)),
 
     signOut: () => unwrap(client.signOut()),
