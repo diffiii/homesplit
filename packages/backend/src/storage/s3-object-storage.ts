@@ -12,10 +12,13 @@ import type { S3StorageConfig } from "./storage.config";
 export class S3ObjectStorage extends ObjectStorage {
   private readonly client: S3Client;
   private readonly bucket: string;
+  private readonly publicUrl?: string;
 
-  constructor(config: S3StorageConfig) {
+  /** `publicUrl` serves the bucket without signing, for a public bucket. */
+  constructor(config: S3StorageConfig, bucket: string, publicUrl?: string) {
     super();
-    this.bucket = config.bucket;
+    this.bucket = bucket;
+    this.publicUrl = publicUrl;
     this.client = new S3Client({
       region: config.region,
       endpoint: config.endpoint,
@@ -66,5 +69,12 @@ export class S3ObjectStorage extends ObjectStorage {
       }),
       { expiresIn: expiresInSeconds }
     );
+  }
+
+  getPublicUrl(key: string): string {
+    if (!this.publicUrl) {
+      throw new Error(`Bucket ${this.bucket} has no public URL`);
+    }
+    return `${this.publicUrl}/${key}`;
   }
 }

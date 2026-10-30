@@ -1,6 +1,6 @@
+import { DEFAULT_ATTACHMENT_MAX_BYTES } from "@homesplit/contracts";
 import { z } from "zod";
 
-const MIB = 1024 * 1024;
 // SigV4 presigned URLs can't outlive a week.
 const MAX_SIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 
@@ -11,7 +11,7 @@ const positiveInt = (fallback: number, max = Number.MAX_SAFE_INTEGER) =>
   );
 
 const AttachmentsEnv = z.object({
-  ATTACHMENT_MAX_BYTES: positiveInt(10 * MIB),
+  ATTACHMENT_MAX_BYTES: positiveInt(DEFAULT_ATTACHMENT_MAX_BYTES),
   ATTACHMENT_DOWNLOAD_URL_TTL_SECONDS: positiveInt(
     5 * 60,
     MAX_SIGNED_URL_TTL_SECONDS

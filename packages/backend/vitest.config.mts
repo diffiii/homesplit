@@ -42,6 +42,7 @@ export default defineConfig({
             STORAGE_DRIVER: "memory",
             ATTACHMENT_MAX_BYTES: "65536",
             ATTACHMENT_MAX_PER_EXPENSE: "2",
+            AVATAR_MAX_BYTES: "65536",
           },
           globalSetup: ["test/global-setup.ts"],
           setupFiles: ["test/setup.ts"],

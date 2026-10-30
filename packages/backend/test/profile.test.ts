@@ -10,7 +10,10 @@ import { createClient, createTestApp } from "./helpers/app";
 import { createUser, TEST_PASSWORD, type TestUser } from "./helpers/fixtures";
 
 const ME = "/api/me";
-const AVATAR = "https://example.com/avatar.png";
+
+/** A URL of the caller's own avatar, as `PUT /api/me/avatar` gives it. */
+const avatarOf = (userId: string) =>
+  `https://avatars.invalid/${userId}/${randomUUID()}.webp`;
 
 const storedUser = async (id: string) => {
   const [row] = await db.select().from(user).where(eq(user.id, id));
@@ -54,33 +57,35 @@ describe("profile", () => {
 
     it("updates only the avatar and keeps the name", async () => {
       const alice = await createUser(app, "Alice");
+      const avatar = avatarOf(alice.id);
 
-      const summary = await updateProfile(alice, { imageUrl: AVATAR });
+      const summary = await updateProfile(alice, { imageUrl: avatar });
 
       expect(summary).toEqual({
         id: alice.id,
         name: "Alice",
-        imageUrl: AVATAR,
+        imageUrl: avatar,
       });
       expect(await storedUser(alice.id)).toMatchObject({
         name: "Alice",
-        image: AVATAR,
+        image: avatar,
       });
     });
 
     it("updates both fields and bumps updatedAt", async () => {
       const alice = await createUser(app, "Alice");
+      const avatar = avatarOf(alice.id);
       const before = await storedUser(alice.id);
 
       const summary = await updateProfile(alice, {
         name: "Alicja",
-        imageUrl: AVATAR,
+        imageUrl: avatar,
       });
 
       expect(summary).toEqual({
         id: alice.id,
         name: "Alicja",
-        imageUrl: AVATAR,
+        imageUrl: avatar,
       });
       const after = await storedUser(alice.id);
       expect(after.updatedAt.getTime()).toBeGreaterThan(
@@ -90,7 +95,7 @@ describe("profile", () => {
 
     it("clears the avatar with null", async () => {
       const alice = await createUser(app, "Alice");
-      await updateProfile(alice, { imageUrl: AVATAR });
+      await updateProfile(alice, { imageUrl: avatarOf(alice.id) });
 
       const summary = await updateProfile(alice, { imageUrl: null });
 
@@ -148,6 +153,7 @@ describe("profile", () => {
       ["a javascript: avatar", { imageUrl: "javascript:alert(1)" }],
       ["a data: avatar", { imageUrl: "data:image/png;base64,AAAA" }],
       ["an http: avatar", { imageUrl: "http://example.com/avatar.png" }],
+      ["an avatar on another host", { imageUrl: "https://example.com/a.webp" }],
       ["an empty name", { name: "" }],
       ["a whitespace-only name", { name: "   " }],
       ["a name over 100 characters", { name: "a".repeat(101) }],
@@ -182,12 +188,12 @@ describe("profile", () => {
     it("stores a trimmed name and the avatar", async () => {
       const response = await signUp({
         name: "  Jan Kowalski  ",
-        image: AVATAR,
+        image: "https://example.com/avatar.png",
       }).expect(200);
 
       expect(await storedUser(response.body.user.id)).toMatchObject({
         name: "Jan Kowalski",
-        image: AVATAR,
+        image: "https://example.com/avatar.png",
       });
     });
 

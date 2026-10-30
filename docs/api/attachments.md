@@ -14,7 +14,7 @@ Module flag: none · Tasks: #44, #45 · Contracts: [attachments](../../packages/
 - Server-set fields: every field. `mimeType` is the detected type, `sizeBytes` the stored size, and `uploadedBy` the session user. The storage key is generated as `households/<householdId>/attachments/<id>` and never exposed. The client's file name is ignored.
 - Uploads: the body holds exactly one file, in the `file` field (`ATTACHMENT_UPLOAD_FIELD`), and no other fields. It's read only after the household guard has admitted the caller, so non-members never get to send one.
 - Allowed types: JPEG, PNG, WebP, HEIC, and PDF (`ATTACHMENT_MIME_TYPES`). The type is detected from the file's content with [`file-type`](https://github.com/sindresorhus/file-type), and the `Content-Type` the client declares is ignored, so a PDF sent as `image/png` is stored as a PDF. Content the detector can't parse counts as an unsupported type. HEIC means a file whose major brand is `heic` or `heix`, as iPhones save them; AVIF and other HEIF files are rejected.
-- Size: at most `ATTACHMENT_MAX_BYTES`. The default is 10 MiB.
+- Size: at most `ATTACHMENT_MAX_BYTES`. The default is 10 MiB (`DEFAULT_ATTACHMENT_MAX_BYTES`). The web app checks files against the same limit before uploading; set `NEXT_PUBLIC_ATTACHMENT_MAX_BYTES` there when the backend uses another one.
 - Module flags: uploading and downloading belong to no module, because expenses and receipts (#55) share this storage. Linking a file to an expense or a receipt checks that module's flag; see [expense attachments](expenses.md#attachments).
 - Downloads: the response holds a signed `GET` URL to the object storage, valid for `ATTACHMENT_DOWNLOAD_URL_TTL_SECONDS`. Membership is checked when the URL is issued; after that, the URL works for anyone who has it until `expiresAt`, so the TTL stays short. The URL is valid at least until `expiresAt`. The storage answers with the stored type and `Content-Disposition: inline`.
 - Write order: the object is stored first, and the row is inserted only after that succeeds, so a failed storage write leaves no row and answers 500. If the insert fails, the object is deleted again, or queued in `storage_object_deletions` when that fails too. A crash between the two leaves an object with no row, which nothing can reach and cleanup doesn't find.
@@ -55,12 +55,15 @@ The backend reads these from its environment; see [`.env.example`](../../package
 | `S3_ENDPOINT` | AWS | URL of another S3-compatible service, such as `http://localhost:8333` for the `object-storage` service in `compose.yaml`. Signed URLs point at it, so browsers must reach it too. |
 | `S3_FORCE_PATH_STYLE` | `false` | `true` for services without virtual-hosted buckets, such as SeaweedFS and MinIO. |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | AWS default chain | Set both or neither. |
+| `S3_AVATAR_BUCKET` | required | Separate bucket for [avatars](users-friends.md#avatars), which anyone can read. |
+| `S3_AVATAR_PUBLIC_URL` | required | URL that serves `S3_AVATAR_BUCKET` without signing: an R2 custom domain such as `https://avatars.homesplit.janmarek.pl`, a CDN, or the bucket's own URL, such as `http://localhost:8333/homesplit-avatars`. |
+| `AVATAR_MAX_BYTES` | `10485760` (10 MiB) | Largest avatar upload. |
 | `ATTACHMENT_MAX_BYTES` | `10485760` (10 MiB) | Largest upload. |
 | `ATTACHMENT_DOWNLOAD_URL_TTL_SECONDS` | `300` | Lifetime of a download URL, at most 7 days. |
 | `ATTACHMENT_UNREFERENCED_TTL_HOURS` | `24` | Age after which cleanup deletes an unreferenced attachment. |
 | `ATTACHMENT_MAX_PER_EXPENSE` | `10` | Most files linked to one expense; see [expense attachments](expenses.md#attachments). |
 
-The S3 client sends checksums only where the API requires them, because not every S3-compatible service accepts the ones newer AWS SDKs add by default. The bucket stays private: nothing is read without a signed URL.
+The S3 client sends checksums only where the API requires them, because not every S3-compatible service accepts the ones newer AWS SDKs add by default. `S3_BUCKET` stays private: attachments are read only through signed URLs. Avatars live in `S3_AVATAR_BUCKET`, which anyone can read (on R2, through a public custom domain), so a public setting never reaches attachments. The same credentials need read and write access to both buckets. In development, the `object-storage-setup` service in `compose.yaml` creates the avatar bucket and makes it public.
 
 ## Storage
 
