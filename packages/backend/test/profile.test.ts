@@ -121,7 +121,7 @@ describe("profile", () => {
         .expect(400);
 
       expectApiError(response, "EMPTY_PATCH");
-      // createUser verifies the email, so it must stay verified.
+      // createUser verifies the email, and the body must not unverify it.
       expect(await storedUser(alice.id)).toMatchObject({
         email: alice.email,
         emailVerified: true,

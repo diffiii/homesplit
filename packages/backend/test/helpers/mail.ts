@@ -1,33 +1,39 @@
-import { expect, vi } from "vitest";
-import { capturedEmails } from "@/mail";
+import { mailer } from "@/auth";
+import { type Email, LogMailer } from "@/mail";
 
-export const VERIFY_SUBJECT = "Verify your email address";
+export const VERIFICATION_SUBJECT = "Verify your email for HomeSplit";
 
-export const verificationEmails = (email: string) =>
-  capturedEmails.filter(
-    (mail) => mail.to === email && mail.subject === VERIFY_SUBJECT
-  );
+const URL_IN_TEXT = /https?:\/\/\S+/u;
 
-// Better Auth may send in the background, so wait instead of asserting at once.
-export function waitForVerificationEmails(
-  email: string,
-  count: number
-): Promise<void> {
-  return vi.waitFor(() => {
-    expect(verificationEmails(email)).toHaveLength(count);
-  });
+/** What the test app's mailer would have sent, oldest first. */
+export function sentEmails(): Email[] {
+  if (!(mailer instanceof LogMailer)) {
+    throw new Error("Tests expect MAIL_DRIVER=log");
+  }
+  return mailer.sent;
 }
 
-/** The newest verification link for `email`, as a path the test app can serve. */
-export function verificationLink(email: string): { path: string; url: URL } {
-  const html = verificationEmails(email).at(-1)?.html;
-  const href = html?.match(/href="([^"]+)"/u)?.[1];
+export function verificationEmails(to: string): Email[] {
+  return sentEmails().filter(
+    (email) => email.to === to && email.subject === VERIFICATION_SUBJECT
+  );
+}
+
+/**
+ * The link in the newest verification email to `to`. `path` drops its
+ * `callbackURL`, so the test app answers JSON and sets the session cookie
+ * instead of redirecting.
+ */
+export function verificationLink(to: string): { path: string; url: URL } {
+  const href = verificationEmails(to).at(-1)?.text.match(URL_IN_TEXT)?.[0];
   if (!href) {
-    throw new Error(`No verification email captured for ${email}`);
+    throw new Error(`No verification email sent to ${to}`);
   }
-  const url = new URL(href.replaceAll("&amp;", "&"));
-  // Without callbackURL, Better Auth answers JSON and sets the cookie
-  // instead of redirecting.
-  url.searchParams.delete("callbackURL");
-  return { path: `${url.pathname}${url.search}`, url };
+  const url = new URL(href);
+  const withoutCallback = new URL(url);
+  withoutCallback.searchParams.delete("callbackURL");
+  return {
+    path: `${withoutCallback.pathname}${withoutCallback.search}`,
+    url,
+  };
 }

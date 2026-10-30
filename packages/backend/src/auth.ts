@@ -11,18 +11,33 @@ import { organization } from "better-auth/plugins";
 import { z } from "zod";
 import { db } from "./db";
 // biome-ignore lint/performance/noNamespaceImport: drizzle schema bag for better-auth adapter
-import * as schema from "./db/schema";
+import * as schema from "./db/schema/auth";
 import { seedDefaultCategories } from "./features/expense-categories/default-categories";
 import { hasUnsettledBalances } from "./features/expenses/balances/balances.repository";
-import { sendEmail } from "./mail";
+import { createMailer, loadMailConfig } from "./mail";
 
 const frontendUrl = process.env.FRONTEND_URL;
-
-const isE2E = process.env.PORT === "8180" || process.env.IS_E2E === "true";
 
 if (!frontendUrl) {
   throw new Error("FRONTEND_URL is not set");
 }
+
+const mailConfig = loadMailConfig();
+
+/** The app's mailer. Better Auth is configured outside Nest, so it's not a provider. */
+export const mailer = createMailer(mailConfig);
+
+// The web end-to-end tests sign up through the UI and can't read the emailed
+// link, so they turn verification off. It needs the log driver, so it can't
+// reach a deployment that sends real mail.
+const skipEmailVerification =
+  process.env.AUTH_SKIP_EMAIL_VERIFICATION === "true";
+
+if (skipEmailVerification && mailConfig.driver !== "log") {
+  throw new Error("AUTH_SKIP_EMAIL_VERIFICATION needs MAIL_DRIVER=log");
+}
+
+const VERIFICATION_LINK_TTL_SECONDS = 24 * 60 * 60;
 
 const logger = new Logger("Auth");
 
@@ -37,14 +52,20 @@ const NewUserProfile = z.object({
 });
 
 export const auth = betterAuth({
+  // The browser reaches the API only through the frontend's `/api/*` rewrite,
+  // so the frontend origin is Better Auth's public URL. Cookies carry no
+  // `Domain`, use `SameSite=Lax`, and are `Secure` when this URL is https.
   baseURL: frontendUrl,
   trustedOrigins: [new URL(frontendUrl).origin, ...previewOrigins],
   advanced: {
     database: {
       generateId: "uuid",
     },
+    // Better Auth skips the origin check under test unless this is explicit.
     disableOriginCheck: false,
     ipAddress: {
+      // Vercel replaces this header with the visitor's address and forwards it
+      // through the rewrite. Better Auth ignores it when it lists several hops.
       ipAddressHeaders: ["x-forwarded-for"],
     },
   },
@@ -68,56 +89,59 @@ export const auth = betterAuth({
               details: { issues },
             });
           }
-
           return Promise.resolve({
             data: {
               ...user,
               name: result.data.name,
-              ...(isE2E ? { emailVerified: true } : {}),
+              ...(skipEmailVerification ? { emailVerified: true } : {}),
             },
           });
         },
       },
     },
   },
-
+  // Profiles change only through PATCH /api/me, which validates `imageUrl`.
   disabledPaths: ["/update-user"],
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: !isE2E,
+    // Sign-up then sends the verification email and answers without a
+    // session, and sign-in answers 403 `EMAIL_NOT_VERIFIED` until the link
+    // is opened; see "Better Auth endpoints" in docs/decisions.md.
+    requireEmailVerification: !skipEmailVerification,
   },
-  ...(isE2E
-    ? {}
-    : {
-        emailVerification: {
-          sendOnSignIn: true,
-          sendOnSignUp: true,
-          autoSignInAfterVerification: true,
-          expiresIn: 86_400,
-          sendVerificationEmail: async ({ user, url }) => {
-            try {
-              await sendEmail({
-                to: user.email,
-                subject: "Verify your email address",
-                html: `
-                  <p>Please verify your email address by clicking
-                  <a href="${url}">Verify email</a>.</p>
-                `,
-              });
-            } catch (error) {
-              logger.error(
-                `Verification email not sent to user ${user.id}`,
-                error
-              );
-            }
-          },
-        },
-      }),
+  emailVerification: {
+    // A link that expired or never arrived is replaced on the next sign-in.
+    sendOnSignIn: true,
+    autoSignInAfterVerification: true,
+    expiresIn: VERIFICATION_LINK_TTL_SECONDS,
+    // `url` is `/api/auth/verify-email` on the frontend origin, with a
+    // URL-encoded `callbackURL`, so it's safe to put in HTML as is.
+    sendVerificationEmail: async ({ user, url }) => {
+      // The user row exists by now. A failed send is logged rather than
+      // thrown, so sign-up still succeeds and the next sign-in sends again.
+      try {
+        await mailer.send({
+          to: user.email,
+          subject: "Verify your email for HomeSplit",
+          text: `Open this link to verify your email and finish signing up for HomeSplit:\n\n${url}\n\nThe link works for 24 hours. If you didn't sign up, ignore this email.`,
+          html: `<p>Open this link to verify your email and finish signing up for HomeSplit:</p><p><a href="${url}">Verify my email</a></p><p>The link works for 24 hours. If you didn't sign up, ignore this email.</p>`,
+        });
+      } catch (error) {
+        logger.error(`Verification email not sent to user ${user.id}`, error);
+      }
+    },
+  },
   session: {
+    // `/list-sessions` would otherwise answer 403 `SESSION_NOT_FRESH` to
+    // anyone who signed in more than a day ago. Besides it, only
+    // `/unlink-account` (no social sign-in) and `/delete-user` (disabled)
+    // check freshness; see "Signed-in devices" in docs/decisions.md.
     freshAge: 0,
   },
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      // Households are deleted only through DELETE /api/households/:householdId,
+      // which checks and deletes in one transaction.
       if (ctx.path === "/organization/delete") {
         throw new APIError("NOT_FOUND", {
           code: "NOT_FOUND",
@@ -125,10 +149,15 @@ export const auth = betterAuth({
         });
       }
 
+      // Members settle up before they leave. `/organization/leave` calls no
+      // organization hook, so the check runs here, before Better Auth's write
+      // and outside its transaction: an expense committed in between can
+      // still leave a departed member with a balance, as a removal can.
       if (ctx.path === "/organization/leave") {
         const organizationId: unknown = ctx.body?.organizationId;
         const householdId = Id.safeParse(organizationId);
-
+        // Better Auth would pass any string to a `uuid` column and fail with
+        // 500. It answers a missing ID or session itself.
         if (typeof organizationId === "string" && !householdId.success) {
           throw new APIError("BAD_REQUEST", {
             code: "VALIDATION_ERROR",
@@ -152,6 +181,9 @@ export const auth = betterAuth({
   plugins: [
     organization({
       organizationHooks: {
+        // Runs after Better Auth has committed the household, outside any
+        // transaction. Default categories are a convenience, so a failure
+        // here is logged and the household is still created.
         afterCreateOrganization: async ({ organization: household }) => {
           try {
             await seedDefaultCategories(db, household.id);
