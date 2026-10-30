@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const DIGITS = /^\d+$/;
+const DIGITS = /^\d+$/u;
 
 /**
  * Integer from a URL query value, only digits are accepted.

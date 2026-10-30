@@ -71,9 +71,9 @@ export function SignUpForm() {
             creating your account. No email? Sign in, and we'll send a new one.
           </AlertDescription>
         </Alert>
-        <p className="text-center text-muted-foreground text-sm">
+        <p className="text-muted-foreground text-center text-sm">
           <Link
-            className="font-medium text-foreground underline underline-offset-4"
+            className="text-foreground font-medium underline underline-offset-4"
             href={signInUrl(redirectTo)}
           >
             Sign in
@@ -119,10 +119,10 @@ export function SignUpForm() {
           <form.SubmitButton size="lg">Create account</form.SubmitButton>
         </form.Form>
       </form.AppForm>
-      <p className="text-center text-muted-foreground text-sm">
+      <p className="text-muted-foreground text-center text-sm">
         Already have an account?{" "}
         <Link
-          className="font-medium text-foreground underline underline-offset-4"
+          className="text-foreground font-medium underline underline-offset-4"
           href={signInUrl(redirectTo)}
         >
           Sign in

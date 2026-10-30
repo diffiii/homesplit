@@ -1,25 +1,25 @@
 // Order matters: Edge and Opera also say Chrome, and Chrome also says Safari.
 const BROWSERS: readonly [pattern: RegExp, name: string][] = [
-  [/\bEdg(?:e|A|iOS)?\//, "Edge"],
-  [/\bOPR\/|\bOpera\b/, "Opera"],
-  [/\bSamsungBrowser\//, "Samsung Internet"],
-  [/\bFirefox\/|\bFxiOS\//, "Firefox"],
-  [/\bChrome\/|\bCriOS\//, "Chrome"],
-  [/\bVersion\/[\d.]+.*\bSafari\//, "Safari"],
+  [/\bEdg(?:e|A|iOS)?\//u, "Edge"],
+  [/\bOPR\/|\bOpera\b/u, "Opera"],
+  [/\bSamsungBrowser\//u, "Samsung Internet"],
+  [/\bFirefox\/|\bFxiOS\//u, "Firefox"],
+  [/\bChrome\/|\bCriOS\//u, "Chrome"],
+  [/\bVersion\/[\d.]+.*\bSafari\//u, "Safari"],
 ];
 
 // iPads and Android also say Mac OS X and Linux.
 const SYSTEMS: readonly [pattern: RegExp, name: string][] = [
-  [/\biPhone\b|\biPod\b/, "iOS"],
-  [/\biPad\b/, "iPadOS"],
-  [/\bAndroid\b/, "Android"],
-  [/\bCrOS\b/, "ChromeOS"],
-  [/\bWindows\b/, "Windows"],
-  [/\bMac OS X\b|\bMacintosh\b/, "macOS"],
-  [/\bLinux\b/, "Linux"],
+  [/\biPhone\b|\biPod\b/u, "iOS"],
+  [/\biPad\b/u, "iPadOS"],
+  [/\bAndroid\b/u, "Android"],
+  [/\bCrOS\b/u, "ChromeOS"],
+  [/\bWindows\b/u, "Windows"],
+  [/\bMac OS X\b|\bMacintosh\b/u, "macOS"],
+  [/\bLinux\b/u, "Linux"],
 ];
 
-const MOBILE = /\bMobile\b|\biPhone\b|\bAndroid\b/;
+const MOBILE = /\bMobile\b|\biPhone\b|\bAndroid\b/u;
 
 export interface DeviceDescription {
   /** `Chrome on macOS`, or as much of it as the user agent tells. */

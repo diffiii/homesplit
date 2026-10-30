@@ -56,12 +56,12 @@ export default function LandingPage() {
         >
           <div className="flex flex-col items-start gap-6">
             <h1
-              className="text-balance font-heading font-semibold text-[clamp(3rem,10vw,6.25rem)] leading-[0.92] tracking-[-0.045em]"
+              className="font-heading text-[clamp(3rem,10vw,6.25rem)] leading-[0.92] font-semibold tracking-[-0.045em] text-balance"
               id="hero-heading"
             >
               Keep the house even.
             </h1>
-            <p className="max-w-[34rem] text-lg text-muted-foreground leading-relaxed sm:text-xl">
+            <p className="text-muted-foreground max-w-[34rem] text-lg leading-relaxed sm:text-xl">
               HomeSplit is one place for what you share at home: what each of
               you paid, who owes whom, whose chore is whose, and what you've run
               out of.
@@ -73,7 +73,7 @@ export default function LandingPage() {
 
         <section
           aria-labelledby="loop-heading"
-          className="border-y bg-muted/40 py-20 lg:py-28"
+          className="bg-muted/40 border-y py-20 lg:py-28"
         >
           <div className={`${SECTION} flex flex-col gap-12`}>
             <SectionIntro
@@ -116,7 +116,7 @@ export default function LandingPage() {
 
         <section
           aria-labelledby="start-heading"
-          className="border-t bg-muted/40 py-20 lg:py-24"
+          className="bg-muted/40 border-t py-20 lg:py-24"
         >
           <div className={`${SECTION} flex flex-col items-start gap-8`}>
             <SectionIntro
@@ -130,7 +130,7 @@ export default function LandingPage() {
       </main>
 
       <footer className={`${SECTION} py-8`}>
-        <span className="flex items-center gap-2 font-medium text-sm">
+        <span className="flex items-center gap-2 text-sm font-medium">
           <Logo className="size-4" />
           HomeSplit
         </span>
@@ -174,12 +174,12 @@ function SectionIntro({
   return (
     <div className="flex max-w-xl flex-col gap-3">
       <h2
-        className="text-balance font-heading font-semibold text-3xl tracking-[-0.03em] sm:text-4xl"
+        className="font-heading text-3xl font-semibold tracking-[-0.03em] text-balance sm:text-4xl"
         id={id}
       >
         {title}
       </h2>
-      <p className="text-lg text-muted-foreground leading-relaxed">
+      <p className="text-muted-foreground text-lg leading-relaxed">
         {description}
       </p>
     </div>
@@ -207,14 +207,14 @@ function Step({
         aria-hidden
         className="flex flex-col items-center lg:flex-row lg:items-center"
       >
-        <span className="mt-1.5 size-3 shrink-0 rounded-full bg-primary lg:mt-0" />
+        <span className="bg-primary mt-1.5 size-3 shrink-0 rounded-full lg:mt-0" />
         <span
-          className={`my-1.5 w-0.5 flex-1 bg-primary/40 lg:mx-1.5 lg:my-0 lg:-mr-8.5 lg:h-0.5 lg:w-auto ${last ? "lg:hidden" : ""}`}
+          className={`bg-primary/40 my-1.5 w-0.5 flex-1 lg:mx-1.5 lg:my-0 lg:-mr-8.5 lg:h-0.5 lg:w-auto ${last ? "lg:hidden" : ""}`}
         />
       </span>
       <div className={`flex flex-col gap-4 ${last ? "" : "pb-12 lg:pb-0"}`}>
         <div className="flex flex-col gap-1.5">
-          <h3 className="font-medium text-lg">{title}</h3>
+          <h3 className="text-lg font-medium">{title}</h3>
           <p className="text-muted-foreground leading-relaxed">{description}</p>
         </div>
         {preview}

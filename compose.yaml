@@ -11,7 +11,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d homesplit"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d homesplit" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -30,7 +30,15 @@ services:
     volumes:
       - object-storage-data:/data
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8333/healthz"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "-O",
+          "/dev/null",
+          "http://127.0.0.1:8333/healthz",
+        ]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -47,7 +55,7 @@ services:
       AWS_SECRET_ACCESS_KEY: homesplit-dev-secret
       AWS_DEFAULT_REGION: us-east-1
       AWS_ENDPOINT_URL: http://object-storage:8333
-    entrypoint: ["/bin/sh", "-c"]
+    entrypoint: [ "/bin/sh", "-c" ]
     command:
       - |
         aws s3api head-bucket --bucket homesplit-avatars 2>/dev/null ||
@@ -65,7 +73,7 @@ services:
   # Throwaway database for backend tests: separate port, data in memory only.
   postgres-test:
     image: postgres:18-alpine
-    profiles: [test]
+    profiles: [ test ]
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -75,7 +83,7 @@ services:
     tmpfs:
       - /var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d homesplit_test"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d homesplit_test" ]
       interval: 2s
       timeout: 5s
       retries: 15

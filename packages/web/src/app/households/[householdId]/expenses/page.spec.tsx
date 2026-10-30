@@ -35,9 +35,9 @@ function renderExpenses(householdId: string, search = "") {
 }
 
 const row = (name: string) =>
-  screen.getByRole("link", { name: new RegExp(`^${name}`) });
+  screen.getByRole("link", { name: new RegExp(`^${name}`, "u") });
 
-const DAWID = /Dawid Lewandowski/;
+const DAWID = /Dawid Lewandowski/u;
 
 // jsdom sees both navs labelled "Household"; a browser shows one per screen size.
 const AXE_OPTIONS = { rules: { "landmark-unique": { enabled: false } } };
@@ -70,7 +70,7 @@ describe("ExpensesPage", () => {
     expect(row("Pizza night")).toHaveAttribute(
       "href",
       expect.stringMatching(
-        new RegExp(`^/households/${flat.id}/expenses/[0-9a-f-]+$`)
+        new RegExp(`^/households/${flat.id}/expenses/[0-9a-f-]+$`, "u")
       )
     );
     await expectNoAxeViolations(document.body, AXE_OPTIONS);

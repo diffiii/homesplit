@@ -102,7 +102,7 @@ describe("avatars", () => {
 
       const { imageUrl } = UserSummary.parse(response.body);
       expect(keyOf(imageUrl)).toMatch(
-        new RegExp(`^${alice.id}/[0-9a-f-]{36}\\.webp$`)
+        new RegExp(`^${alice.id}/[0-9a-f-]{36}\\.webp$`, "u")
       );
       expect(await storedImage(alice.id)).toBe(imageUrl);
       const stored = storage.objects.get(keyOf(imageUrl));

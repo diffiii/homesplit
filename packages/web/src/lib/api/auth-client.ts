@@ -20,7 +20,7 @@ export const BLOCKED_AUTH_PATHS: ReadonlySet<string> = new Set([
 ]);
 
 // Better Auth may prefix a path with its method, as in `@post/sign-out`.
-const METHOD_PREFIX = /^@\w+\//;
+const METHOD_PREFIX = /^@\w+\//u;
 
 /** A call to a path in `BLOCKED_AUTH_PATHS`: a bug in the caller, not a failed request. */
 export class BlockedAuthPathError extends Error {

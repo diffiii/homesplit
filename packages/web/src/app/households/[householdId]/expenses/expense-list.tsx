@@ -118,7 +118,7 @@ export function ExpenseList({
           key={group.date}
         >
           <h2
-            className="font-medium text-muted-foreground text-sm"
+            className="text-muted-foreground text-sm font-medium"
             id={`expenses-${group.date}`}
           >
             <time dateTime={group.date}>{formatGroupDate(group.date)}</time>
@@ -180,13 +180,13 @@ function ExpenseRow({ expense }: { expense: Expense }) {
   return (
     <li>
       <Link
-        className="flex items-center gap-3 px-4 py-3 outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="hover:bg-muted/50 focus-visible:ring-ring/50 flex items-center gap-3 px-4 py-3 outline-none focus-visible:ring-3"
         href={`${householdPath(household.id, "expenses")}/${expense.id}${search && `?${search}`}`}
       >
         <CategoryIcon category={expense.category} />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate font-medium">{expense.name}</span>
-          <span className="truncate text-muted-foreground text-sm">
+          <span className="text-muted-foreground truncate text-sm">
             {expense.category ? `${expense.category.name} · ` : null}
             Paid by {formatPayers(expense)}
           </span>

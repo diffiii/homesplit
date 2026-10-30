@@ -33,7 +33,7 @@ function LeaveHousehold() {
   const router = useRouter();
   return (
     <section aria-labelledby="leave-heading" className="flex flex-col gap-3">
-      <h2 className="font-medium text-base" id="leave-heading">
+      <h2 className="text-base font-medium" id="leave-heading">
         Leave household
       </h2>
       <p className="text-muted-foreground text-sm">

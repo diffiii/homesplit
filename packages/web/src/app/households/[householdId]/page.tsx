@@ -18,7 +18,7 @@ export default function HouseholdOverviewPage() {
         aria-labelledby="members-heading"
         className="flex flex-col gap-3"
       >
-        <h2 className="font-medium text-base" id="members-heading">
+        <h2 className="text-base font-medium" id="members-heading">
           Members
         </h2>
         {members.length === 0 ? (

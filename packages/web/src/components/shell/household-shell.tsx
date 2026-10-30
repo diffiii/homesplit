@@ -190,7 +190,7 @@ export function HouseholdShell({ householdId, children }: HouseholdShellProps) {
   return (
     <SidebarProvider>
       <a
-        className="sr-only z-50 rounded-md bg-background px-3 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:ring-3 focus:ring-ring/50"
+        className="bg-background focus:ring-ring/50 sr-only z-50 rounded-md px-3 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:ring-3"
         href="#main"
       >
         Skip to content
@@ -287,7 +287,7 @@ function DesktopSidebar({ householdId }: { householdId: string }) {
 
 function MobileTopBar({ householdId }: { householdId: string }) {
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/95 px-2 backdrop-blur md:hidden">
+    <header className="bg-background/95 sticky top-0 z-30 flex h-14 items-center gap-2 border-b px-2 backdrop-blur md:hidden">
       <div className="min-w-0 flex-1">
         <HouseholdSwitcher householdId={householdId} />
       </div>
@@ -303,7 +303,7 @@ function BottomNav({ householdId }: { householdId: string }) {
   return (
     <nav
       aria-label="Household"
-      className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+      className="bg-background/95 fixed inset-x-0 bottom-0 z-40 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
     >
       <ul className="grid grid-cols-5">
         {HOUSEHOLD_NAV.map(({ segment, label, icon: Icon, feature }) => {
@@ -314,7 +314,7 @@ function BottomNav({ householdId }: { householdId: string }) {
               <Link
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex h-16 flex-col items-center justify-center gap-1 font-medium text-muted-foreground text-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                  "text-muted-foreground focus-visible:ring-ring/50 flex h-16 flex-col items-center justify-center gap-1 text-xs font-medium outline-none focus-visible:ring-3",
                   active && "text-primary"
                 )}
                 href={householdPath(householdId, segment)}

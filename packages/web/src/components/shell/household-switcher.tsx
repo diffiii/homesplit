@@ -48,7 +48,7 @@ export function HouseholdSwitcher({ householdId }: { householdId: string }) {
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="start"
-          className="min-w-56 max-w-[calc(100vw-2rem)]"
+          className="max-w-[calc(100vw-2rem)] min-w-56"
           render={(props) => (
             <nav aria-label="Household selection">
               <div {...props} />

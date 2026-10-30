@@ -62,7 +62,7 @@ export function PasswordSection({ onChanged }: PasswordSectionProps) {
 
   return (
     <section aria-labelledby="password-heading" className="flex flex-col gap-4">
-      <h2 className="font-medium text-base" id="password-heading">
+      <h2 className="text-base font-medium" id="password-heading">
         Password
       </h2>
       <form.AppForm>

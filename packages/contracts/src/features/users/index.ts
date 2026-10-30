@@ -18,7 +18,7 @@ export type DisplayName = z.infer<typeof DisplayName>;
  * Avatar link. Only https, so it can't hold a `javascript:` or `data:` URL.
  * The backend also requires it to be the caller's own uploaded avatar.
  */
-export const AvatarUrl = z.url({ protocol: /^https$/ });
+export const AvatarUrl = z.url({ protocol: /^https$/u });
 export type AvatarUrl = z.infer<typeof AvatarUrl>;
 
 /** File types an avatar upload may have, detected from the file's content. */

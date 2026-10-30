@@ -27,6 +27,11 @@
         "rules": {
           "correctness": {
             "useHookAtTopLevel": "off"
+          },
+          // Nest controllers and services are injectable classes whose methods
+          // often don't read `this`, as they query the module-level `db`.
+          "style": {
+            "useThisInClassMethods": "off"
           }
         }
       }

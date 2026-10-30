@@ -9,9 +9,9 @@ import { renderWithProviders } from "@/test/render";
 import { FileUpload } from "./file-upload";
 
 const UPLOAD_URL = "*/api/households/:householdId/attachments";
-const UPLOADED = /Uploaded/;
-const CANCELED = /Canceled/;
-const RETRY = /Retry/;
+const UPLOADED = /Uploaded/u;
+const CANCELED = /Canceled/u;
+const RETRY = /Retry/u;
 
 const householdId = () => {
   const flat = db.state.households.find(

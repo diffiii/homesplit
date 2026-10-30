@@ -2,7 +2,7 @@ import { expect } from "@playwright/test";
 import { expectNoAxeViolations } from "../axe";
 import { test } from "./fixtures";
 
-const HOUSEHOLD_URL = /\/households\/[^/]+$/;
+const HOUSEHOLD_URL = /\/households\/[^/]+$/u;
 
 // A few emoji in Emojibase's format, so the picker never reaches the CDN.
 const EMOJIBASE_MESSAGES = {

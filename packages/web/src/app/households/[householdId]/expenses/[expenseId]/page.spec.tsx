@@ -43,7 +43,7 @@ function spokenText(element: Element): string {
   for (const avatar of copy.querySelectorAll('[data-slot="avatar"]')) {
     avatar.remove();
   }
-  return (copy.textContent ?? "").replace(/\s+/g, " ");
+  return (copy.textContent ?? "").replace(/\s+/gu, " ");
 }
 
 const rowsOf = (name: string) =>

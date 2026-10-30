@@ -111,7 +111,7 @@ export function Kit() {
 function Section({ title, children }: { children: ReactNode; title: string }) {
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="border-b pb-2 font-medium text-base">{title}</h2>
+      <h2 className="border-b pb-2 text-base font-medium">{title}</h2>
       {children}
     </section>
   );

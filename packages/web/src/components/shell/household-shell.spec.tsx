@@ -39,6 +39,18 @@ function renderShell(householdId: string, page: ReactElement, segment = "") {
   );
 }
 
+function Roles() {
+  const { role, members } = useHousehold();
+  const isDeparted = useIsDeparted();
+  const dawid = user("dawid@example.com");
+  return (
+    <p>
+      {role}, {members.length} members, Dawid{" "}
+      {isDeparted({ id: dawid.id }) ? "left" : "stayed"}
+    </p>
+  );
+}
+
 /** Requests to `/api/...` paths, as `method path`, while the test runs. */
 function recordRequests(): string[] {
   const requests: string[] = [];
@@ -63,17 +75,6 @@ describe("HouseholdShell", () => {
   it("loads the household once and shares it with the page", async () => {
     const requests = recordRequests();
     const flat = household("Flat on Piękna");
-    function Roles() {
-      const { role, members } = useHousehold();
-      const isDeparted = useIsDeparted();
-      const dawid = user("dawid@example.com");
-      return (
-        <p>
-          {role}, {members.length} members, Dawid{" "}
-          {isDeparted({ id: dawid.id }) ? "left" : "stayed"}
-        </p>
-      );
-    }
     renderShell(
       flat.id,
       <>

@@ -2,19 +2,19 @@ import { expect, type Locator } from "@playwright/test";
 import { expectNoAxeViolations } from "../axe";
 import { test } from "./fixtures";
 
-const HOUSEHOLD_URL = /\/households\/[^/]+$/;
-const CATEGORY_IN_URL = /[?&]category=[0-9a-f-]+/;
-const EXPENSE_URL = /\/expenses\/[0-9a-f-]+\?category=/;
-const LIST_URL = /\/expenses$/;
-const INTERNET = /^Internet/;
-const DATES_IN_URL = /from=\d{4}-\d{2}-\d{2}&to=\d{4}-\d{2}-\d{2}/;
-const PREVIOUS = /previous/i;
-const NEXT = /next/i;
-const BARTEK = /^Bartek/;
-const SUSHI = /^Sushi/;
-const ALICE = /^Alice/;
-const CELINA = /^Celina/;
-const GROCERIES_RUN = /^Groceries run/;
+const HOUSEHOLD_URL = /\/households\/[^/]+$/u;
+const CATEGORY_IN_URL = /[?&]category=[0-9a-f-]+/u;
+const EXPENSE_URL = /\/expenses\/[0-9a-f-]+\?category=/u;
+const LIST_URL = /\/expenses$/u;
+const INTERNET = /^Internet/u;
+const DATES_IN_URL = /from=\d{4}-\d{2}-\d{2}&to=\d{4}-\d{2}-\d{2}/u;
+const PREVIOUS = /previous/iu;
+const NEXT = /next/iu;
+const BARTEK = /^Bartek/u;
+const SUSHI = /^Sushi/u;
+const ALICE = /^Alice/u;
+const CELINA = /^Celina/u;
+const GROCERIES_RUN = /^Groceries run/u;
 
 test("scrolls, filters, and opens an expense", async ({ page }) => {
   test.slow();

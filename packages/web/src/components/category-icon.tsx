@@ -13,11 +13,11 @@ export function CategoryIcon({ category, className }: CategoryIconProps) {
     <span
       aria-hidden
       className={cn(
-        "flex size-8 shrink-0 items-center justify-center rounded-full bg-muted",
+        "bg-muted flex size-8 shrink-0 items-center justify-center rounded-full",
         className
       )}
     >
-      {category?.icon ?? <TagIcon className="size-4 text-muted-foreground" />}
+      {category?.icon ?? <TagIcon className="text-muted-foreground size-4" />}
     </span>
   );
 }

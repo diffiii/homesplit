@@ -13,7 +13,7 @@ const BASE_URL = "http://localhost:3000";
 const HOUSEHOLD_ID = "0b6f1f4e-3c1a-4b8e-9a59-1d2f3e4a5b6c";
 const MEMBER_ID = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
 const UUID =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 
 interface SentRequest {
   body: Record<string, unknown> | undefined;

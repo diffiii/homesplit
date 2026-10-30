@@ -101,14 +101,14 @@ const SPLIT_KEYS = {
 } as const satisfies Record<WeightedMethod, string>;
 
 const PERCENT_EXPONENT = 2;
-const WHOLE_NUMBER = /^\d+$/;
-const TRAILING_ZEROS = /\.0+$|(\.\d*?)0+$/;
+const WHOLE_NUMBER = /^\d+$/u;
+const TRAILING_ZEROS = /\.0+$|(?<kept>\.\d*?)0+$/u;
 
 /** `33.3` for 3330 basis points: a percentage without trailing zeros. */
 export function formatPercentage(basisPoints: number): string {
   return decimalString(basisPoints, PERCENT_EXPONENT).replace(
     TRAILING_ZEROS,
-    "$1"
+    "$<kept>"
   );
 }
 

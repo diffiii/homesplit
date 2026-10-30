@@ -25,10 +25,10 @@ export function NotFoundPage({ title, description }: NotFoundPageProps) {
         className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-4 px-4 pb-24 text-center"
         id="main"
       >
-        <span className="flex size-12 items-center justify-center rounded-full bg-muted">
-          <SearchXIcon aria-hidden className="size-6 text-muted-foreground" />
+        <span className="bg-muted flex size-12 items-center justify-center rounded-full">
+          <SearchXIcon aria-hidden className="text-muted-foreground size-6" />
         </span>
-        <h1 className="font-heading font-semibold text-2xl tracking-tight">
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">
           {title}
         </h1>
         <p className="text-muted-foreground text-sm">{description}</p>

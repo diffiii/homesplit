@@ -8,7 +8,7 @@ export async function openAccountMenu(page: Page, name: string): Promise<void> {
     .click();
 }
 
-const SIGN_IN_URL = /\/sign-in(?:\?|$)/;
+const SIGN_IN_URL = /\/sign-in(?:\?|$)/u;
 
 /**
  * Sign in through the form on the sign-in page. Typing before React hydrates

@@ -76,7 +76,7 @@ export function CurrencyPicker({
               <span className="w-10 shrink-0 font-medium tabular-nums">
                 {code}
               </span>
-              <span className="truncate text-muted-foreground">
+              <span className="text-muted-foreground truncate">
                 {currencyName(code)}
               </span>
             </ComboboxItem>

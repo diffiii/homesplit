@@ -4,7 +4,7 @@ import { DEFAULT_SCENARIO, SCENARIOS } from "../../src/mocks/scenarios";
 import { expectNoAxeViolations } from "../axe";
 import { test } from "./fixtures";
 
-const HOUSEHOLD_URL = /\/households\/[^/]+$/;
+const HOUSEHOLD_URL = /\/households\/[^/]+$/u;
 
 test("switches from every household screen and remembers the last household", async ({
   page,

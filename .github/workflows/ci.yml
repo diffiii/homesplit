@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
 
 permissions:
@@ -117,7 +117,7 @@ jobs:
 
   build:
     name: build (${{ matrix.package }})
-    needs: [changes, typecheck]
+    needs: [ changes, typecheck ]
     if: needs.changes.outputs.packages != '[]'
     runs-on: ubuntu-latest
     strategy:
@@ -272,7 +272,7 @@ jobs:
   # requests until its new one is live, so a migration must work with both.
   migrate-database:
     name: migrate (database)
-    needs: [changes, lint, build, test, e2e-web-backend]
+    needs: [ changes, lint, build, test, e2e-web-backend ]
     if: >-
       !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
       && github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -296,7 +296,7 @@ jobs:
 
   deploy-backend:
     name: deploy (backend)
-    needs: [changes, migrate-database]
+    needs: [ changes, migrate-database ]
     if: >-
       !cancelled() && needs.migrate-database.result == 'success'
     runs-on: ubuntu-latest
@@ -315,7 +315,17 @@ jobs:
 
   deploy-web:
     name: deploy (web)
-    needs: [changes, lint, build, test, e2e-web, e2e-web-backend, migrate-database, deploy-backend]
+    needs:
+      [
+        changes,
+        lint,
+        build,
+        test,
+        e2e-web,
+        e2e-web-backend,
+        migrate-database,
+        deploy-backend,
+      ]
     if: >-
       !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
       && github.event_name == 'push' && github.ref == 'refs/heads/main'

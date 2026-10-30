@@ -58,10 +58,10 @@ export function SignInForm() {
           <form.SubmitButton size="lg">Sign in</form.SubmitButton>
         </form.Form>
       </form.AppForm>
-      <p className="text-center text-muted-foreground text-sm">
+      <p className="text-muted-foreground text-center text-sm">
         New to HomeSplit?{" "}
         <Link
-          className="font-medium text-foreground underline underline-offset-4"
+          className="text-foreground font-medium underline underline-offset-4"
           href={signUpUrl(redirectTo)}
         >
           Create an account

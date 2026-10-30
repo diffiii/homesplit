@@ -49,7 +49,7 @@ export function DevicesSection({ currentSessionId }: DevicesSectionProps) {
   return (
     <section aria-labelledby="devices-heading" className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="font-medium text-base" id="devices-heading">
+        <h2 className="text-base font-medium" id="devices-heading">
           Signed-in devices
         </h2>
         <p className="text-muted-foreground text-sm">
@@ -128,7 +128,7 @@ function DeviceRow({ session, current, onSignedOut }: DeviceRowProps) {
 
   return (
     <li className="flex items-center gap-3 px-4 py-3">
-      <Icon aria-hidden className="size-5 shrink-0 text-muted-foreground" />
+      <Icon aria-hidden className="text-muted-foreground size-5 shrink-0" />
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="flex flex-wrap items-center gap-2 font-medium">
           {label}
