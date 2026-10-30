@@ -14,9 +14,26 @@ export type UserSummary = z.infer<typeof UserSummary>;
 export const DisplayName = z.string().trim().min(1).max(100);
 export type DisplayName = z.infer<typeof DisplayName>;
 
-/** Avatar link. Only https, so it can't hold a `javascript:` or `data:` URL. */
+/**
+ * Avatar link. Only https, so it can't hold a `javascript:` or `data:` URL.
+ * The backend also requires it to be the caller's own uploaded avatar.
+ */
 export const AvatarUrl = z.url({ protocol: /^https$/ });
 export type AvatarUrl = z.infer<typeof AvatarUrl>;
+
+/** File types an avatar upload may have, detected from the file's content. */
+export const AVATAR_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+] as const;
+
+export const AvatarMimeType = z.enum(AVATAR_MIME_TYPES);
+export type AvatarMimeType = z.infer<typeof AvatarMimeType>;
+
+/** Multipart form field that carries the image in an avatar upload. */
+export const AVATAR_UPLOAD_FIELD = "file";
 
 /** Partial profile update (display name / avatar). */
 export const UpdateProfileRequest = z.object({

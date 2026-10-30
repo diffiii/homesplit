@@ -16,8 +16,8 @@ services:
       timeout: 5s
       retries: 10
 
-  # S3-compatible object storage for attachments. Buckets are created on the
-  # first upload.
+  # S3-compatible object storage for attachments and avatars. Buckets are
+  # created on the first upload, except the avatar bucket below.
   object-storage:
     image: chrislusf/seaweedfs:4.48
     restart: unless-stopped
@@ -34,6 +34,33 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+
+  # Creates the avatar bucket and lets anyone read it, as production's public
+  # bucket does. Runs once per `up`, then exits.
+  object-storage-setup:
+    image: amazon/aws-cli:2.31.0
+    depends_on:
+      object-storage:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: homesplit
+      AWS_SECRET_ACCESS_KEY: homesplit-dev-secret
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ENDPOINT_URL: http://object-storage:8333
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        aws s3api head-bucket --bucket homesplit-avatars 2>/dev/null ||
+          aws s3api create-bucket --bucket homesplit-avatars
+        aws s3api put-bucket-policy --bucket homesplit-avatars --policy '{
+          "Version": "2012-10-17",
+          "Statement": [{
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::homesplit-avatars/*"
+          }]
+        }'
 
   # Throwaway database for backend tests: separate port, data in memory only.
   postgres-test:

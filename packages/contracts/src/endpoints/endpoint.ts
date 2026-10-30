@@ -1,6 +1,6 @@
 import type { z } from "zod";
 
-export type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
+export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 type EndpointResult =
   | { readonly status: 200 | 201; readonly response: z.ZodType }
