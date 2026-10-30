@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const TRAILING_SLASHES = /\/+$/;
+const TRAILING_SLASHES = /\/+$/u;
 
 /** Unset and empty variables both mean "use the default". */
 const optional = <T extends z.ZodType>(schema: T) =>
@@ -19,7 +19,7 @@ const S3Config = z
     S3_SECRET_ACCESS_KEY: optional(z.string().min(1)),
     S3_AVATAR_BUCKET: z.string().min(1),
     S3_AVATAR_PUBLIC_URL: z
-      .url({ protocol: /^https?$/ })
+      .url({ protocol: /^https?$/u })
       .transform((url) => url.replace(TRAILING_SLASHES, "")),
   })
   .refine(

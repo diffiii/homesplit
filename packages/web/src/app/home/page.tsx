@@ -46,7 +46,7 @@ export default function SignedInHomePage() {
           title="Couldn't load your households"
         />
       ) : (
-        <Spinner className="size-6 text-muted-foreground" />
+        <Spinner className="text-muted-foreground size-6" />
       )}
     </main>
   );

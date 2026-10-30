@@ -57,7 +57,7 @@ export function SettleUpPreview() {
           >
             <Person user={payment.payer} />
             <div className="flex flex-col gap-2 pb-[1.375rem] sm:pb-6">
-              <span className="text-center font-semibold text-2xl tabular-nums tracking-tight sm:text-4xl">
+              <span className="text-center text-2xl font-semibold tracking-tight tabular-nums sm:text-4xl">
                 {pln(payment.amountCents)}
               </span>
               <EvenLine />
@@ -90,9 +90,9 @@ function Person({ user }: { user: typeof ALICE }) {
 function EvenLine() {
   return (
     <span className="relative flex h-3 items-center">
-      <span className="absolute left-0 size-3 rounded-full bg-primary" />
-      <span className="mx-1.5 h-0.5 flex-1 origin-left bg-primary motion-safe:animate-[even-line_700ms_cubic-bezier(0.3,0.7,0.2,1)_var(--even-delay)_both]" />
-      <span className="absolute right-0 size-3 rounded-full bg-primary motion-safe:animate-[even-dot_250ms_ease-out_calc(var(--even-delay)+650ms)_both]" />
+      <span className="bg-primary absolute left-0 size-3 rounded-full" />
+      <span className="bg-primary mx-1.5 h-0.5 flex-1 origin-left motion-safe:animate-[even-line_700ms_cubic-bezier(0.3,0.7,0.2,1)_var(--even-delay)_both]" />
+      <span className="bg-primary absolute right-0 size-3 rounded-full motion-safe:animate-[even-dot_250ms_ease-out_calc(var(--even-delay)+650ms)_both]" />
     </span>
   );
 }
@@ -110,7 +110,7 @@ function Surface({
   return (
     <div
       aria-label={label}
-      className={cn("rounded-xl border bg-card text-sm", className)}
+      className={cn("bg-card rounded-xl border text-sm", className)}
       role="img"
     >
       {children}
@@ -120,11 +120,11 @@ function Surface({
 
 function Check({ checked }: { checked: boolean }) {
   return checked ? (
-    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+    <span className="bg-primary text-primary-foreground flex size-5 shrink-0 items-center justify-center rounded-full">
       <CheckIcon className="size-3.5" strokeWidth={3} />
     </span>
   ) : (
-    <span className="size-5 shrink-0 rounded-full border-2 border-foreground/40" />
+    <span className="border-foreground/40 size-5 shrink-0 rounded-full border-2" />
   );
 }
 
@@ -157,7 +157,7 @@ export function ShoppingPreview() {
           </li>
         ))}
       </ul>
-      <p className="border-t px-4 py-3 text-muted-foreground">
+      <p className="text-muted-foreground border-t px-4 py-3">
         Celina bought 2 items
       </p>
     </Surface>
@@ -171,7 +171,7 @@ export function ExpensePreview() {
         <span className="font-medium">Lidl</span>
         <span className="font-medium tabular-nums">{pln(6480)}</span>
       </div>
-      <p className="px-4 pb-3 text-muted-foreground">
+      <p className="text-muted-foreground px-4 pb-3">
         Paid by Celina, split equally
       </p>
       <ul className="divide-y border-t">

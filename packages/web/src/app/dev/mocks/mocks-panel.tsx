@@ -71,7 +71,7 @@ function Controls({
           {controls.scenarios.map(({ name, label, description }) => (
             <li className="flex items-center justify-between gap-4" key={name}>
               <div className="flex min-w-0 flex-col">
-                <span className="font-medium text-sm">
+                <span className="text-sm font-medium">
                   {label}
                   {name === controls.scenario ? (
                     <Badge className="ml-2" variant="secondary">
@@ -109,9 +109,9 @@ function Controls({
               key={user.id}
             >
               <div className="flex min-w-0 flex-col">
-                <span className="font-medium text-sm">
+                <span className="text-sm font-medium">
                   {user.name}{" "}
-                  <span className="font-normal text-muted-foreground">
+                  <span className="text-muted-foreground font-normal">
                     {user.email}
                   </span>
                 </span>
@@ -196,7 +196,7 @@ function Choice<T extends string>({
 }) {
   return (
     <fieldset className="flex flex-wrap items-center gap-2">
-      <legend className="mb-2 font-medium text-sm">{label}</legend>
+      <legend className="mb-2 text-sm font-medium">{label}</legend>
       {options.map((option) => (
         <Button
           aria-pressed={option === value}
@@ -215,7 +215,7 @@ function Choice<T extends string>({
 function Section({ title, children }: { children: ReactNode; title: string }) {
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="border-b pb-2 font-medium text-base">{title}</h2>
+      <h2 className="border-b pb-2 text-base font-medium">{title}</h2>
       {children}
     </section>
   );

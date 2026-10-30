@@ -11,7 +11,7 @@ import {
 } from "./dates";
 
 // ICU versions differ on the space before PM.
-const EVENING = /^Mar 1, 2026, 6:30\sPM$/;
+const EVENING = /^Mar 1, 2026, 6:30\sPM$/u;
 
 // vitest.config.mts runs these in America/New_York, west of UTC and with DST.
 

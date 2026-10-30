@@ -44,11 +44,11 @@ function renderForm() {
 const ALICE = "Alice Nowak (you)";
 const BARTEK = "Bartek Kowalski";
 const CELINA = "Celina Wiśniewska";
-const DAWID = /Dawid/;
-const BARTEK_ROW = /^Bartek/;
-const KWD = /^KWD/;
-const PLN_63 = /^PLN\s63/;
-const PLN_60 = /^PLN\s60/;
+const DAWID = /Dawid/u;
+const BARTEK_ROW = /^Bartek/u;
+const KWD = /^KWD/u;
+const PLN_63 = /^PLN\s63/u;
+const PLN_60 = /^PLN\s60/u;
 
 /** A person's checkbox; someone who left also has a badge in its name. */
 const person = (name: string) =>
@@ -60,13 +60,13 @@ const shareOf = (name: string) =>
   (
     person(name).closest("li")?.querySelector(".tabular-nums")?.textContent ??
     ""
-  ).replace(/\s/g, " ");
+  ).replace(/\s/gu, " ");
 
 /** A list's group, such as "Paid by". */
 const group = (name: string) => screen.getByRole("group", { name });
 /** Text with the non-breaking spaces `Intl` puts in amounts made plain. */
 const plain = (text: string | null | undefined) =>
-  (text ?? "").replace(/\s/g, " ");
+  (text ?? "").replace(/\s/gu, " ");
 /** The running check under a list. */
 const checkOf = (name: string) =>
   plain(group(name).querySelector("[aria-live]")?.textContent);

@@ -35,7 +35,7 @@ export function ModuleSettings() {
   const can = usePermissions();
   return (
     <section aria-labelledby="modules-heading" className="flex flex-col gap-3">
-      <h2 className="font-medium text-base" id="modules-heading">
+      <h2 className="text-base font-medium" id="modules-heading">
         Modules
       </h2>
       <p className="text-muted-foreground text-sm">
@@ -87,9 +87,9 @@ function ModuleRow({
   return (
     <li className="flex flex-col gap-2 px-4 py-3">
       <div className="flex items-start gap-3">
-        <Icon aria-hidden className="mt-0.5 size-5 text-muted-foreground" />
+        <Icon aria-hidden className="text-muted-foreground mt-0.5 size-5" />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="font-medium text-sm" id={`${id}-label`}>
+          <span className="text-sm font-medium" id={`${id}-label`}>
             {label}
           </span>
           <p className="text-muted-foreground text-sm" id={`${id}-hint`}>
@@ -116,7 +116,7 @@ function ModuleRow({
               Expenses stay on while anyone owes or is owed money, so everyone
               can still settle up.{" "}
               <Link
-                className="underline underline-offset-4 hover:text-foreground"
+                className="hover:text-foreground underline underline-offset-4"
                 href={householdPath(householdId, "expenses")}
               >
                 Settle the balances first

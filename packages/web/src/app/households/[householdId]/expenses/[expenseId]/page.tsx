@@ -95,7 +95,7 @@ function ExpenseDetails({ expense }: { expense: Expense }) {
     <>
       <PageHeader
         description={
-          <span className="font-medium text-foreground text-xl tabular-nums">
+          <span className="text-foreground text-xl font-medium tabular-nums">
             {formatMoney(expense.total)}
           </span>
         }
@@ -134,7 +134,7 @@ function ExpenseDetails({ expense }: { expense: Expense }) {
       </dl>
 
       <section aria-labelledby="payers-heading" className="flex flex-col gap-3">
-        <h2 className="font-medium text-base" id="payers-heading">
+        <h2 className="text-base font-medium" id="payers-heading">
           Paid by
         </h2>
         <ul className="flex flex-col divide-y rounded-xl border">
@@ -153,7 +153,7 @@ function ExpenseDetails({ expense }: { expense: Expense }) {
 
       <section aria-labelledby="split-heading" className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <h2 className="font-medium text-base" id="split-heading">
+          <h2 className="text-base font-medium" id="split-heading">
             Split
           </h2>
           <p className="text-muted-foreground text-sm">
@@ -181,7 +181,7 @@ function ExpenseDetails({ expense }: { expense: Expense }) {
                   />
                 </th>
                 {expense.allocation.method === "equal" ? null : (
-                  <td className="py-2 pr-3 text-right text-muted-foreground tabular-nums">
+                  <td className="text-muted-foreground py-2 pr-3 text-right tabular-nums">
                     {allocationInput(expense.allocation, user.id, currency)}
                   </td>
                 )}

@@ -30,7 +30,7 @@ export function ErrorState({
   title = "Couldn't load this",
 }: ErrorStateProps) {
   return (
-    <Empty className="flex-none border border-destructive/30" role="alert">
+    <Empty className="border-destructive/30 flex-none border" role="alert">
       <EmptyHeader>
         <EmptyMedia className="text-destructive" variant="icon">
           <CircleAlertIcon aria-hidden />

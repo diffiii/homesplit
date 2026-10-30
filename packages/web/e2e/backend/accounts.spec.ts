@@ -4,7 +4,7 @@ import { expectNoAxeViolations } from "../axe";
 import { newUser, test } from "./fixtures";
 
 const UUID =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 
 test("signs up to the first-run screen", async ({ page }) => {
   const user = newUser();

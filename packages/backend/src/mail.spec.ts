@@ -23,9 +23,9 @@ const message: Email = {
   html: "<p>Hi</p>",
 };
 
-const MISSING_RESEND_CONFIG = /RESEND_API_KEY[\s\S]*MAIL_FROM/;
-const MISSING_SENDER = /MAIL_FROM/;
-const INVALID_CONFIG = /Invalid mail config/;
+const MISSING_RESEND_CONFIG = /RESEND_API_KEY[\s\S]*MAIL_FROM/u;
+const MISSING_SENDER = /MAIL_FROM/u;
+const INVALID_CONFIG = /Invalid mail config/u;
 
 afterEach(() => {
   send.mockReset();

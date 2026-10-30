@@ -6,7 +6,7 @@ import LandingPage from "./page";
 
 // Currency amounts keep a no-break space after the code.
 const PAYMENTS_LABEL =
-  /^Suggested payments: Bartek pays Alice PLN\s86\.40, Celina pays Alice PLN\s42\.10\.$/;
+  /^Suggested payments: Bartek pays Alice PLN\s86\.40, Celina pays Alice PLN\s42\.10\.$/u;
 
 describe("LandingPage", () => {
   it("presents each part of HomeSplit", async () => {

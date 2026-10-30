@@ -3,7 +3,7 @@ import { openAccountMenu } from "../account";
 import { expectNoAxeViolations } from "../axe";
 import { test } from "./fixtures";
 
-const DARK = /\bdark\b/;
+const DARK = /\bdark\b/u;
 
 test("renames the user everywhere and remembers the theme", async ({
   page,

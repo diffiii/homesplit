@@ -296,7 +296,7 @@ function UploadRow({ item, actions }: UploadRowProps) {
     <li className="flex items-center gap-3 rounded-lg border p-2">
       <Preview item={item} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <p className="truncate font-medium text-sm">{file.name}</p>
+        <p className="truncate text-sm font-medium">{file.name}</p>
         {status === "rejected" || status === "failed" ? (
           <p className="text-destructive text-xs" role="alert">
             {error}
@@ -363,10 +363,10 @@ function Preview({ item }: { item: UploadItem }) {
   const Icon = fileIcon(item.type);
   return (
     <div
-      className={cn(box, "flex items-center justify-center bg-muted")}
+      className={cn(box, "bg-muted flex items-center justify-center")}
       data-testid="file-icon"
     >
-      <Icon aria-hidden className="size-5 text-muted-foreground" />
+      <Icon aria-hidden className="text-muted-foreground size-5" />
     </div>
   );
 }

@@ -3,8 +3,8 @@ import type { INestApplication } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestApp } from "./helpers/app";
 
-const APP_ROUTE = /^\/api\//;
-const AUTH_ROUTE = /^\/api\/auth(\/|$)/;
+const APP_ROUTE = /^\/api\//u;
+const AUTH_ROUTE = /^\/api\/auth(?:\/|$)/u;
 
 interface RouterLayer {
   route?: { path: string; methods: Record<string, boolean> };

@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { Endpoint, PathParams, QueryInput } from "./endpoint";
 
-const PARAM_SEGMENT = /:(\w+)/g;
+const PARAM_SEGMENT = /:(?<name>\w+)/gu;
 
 type PathParamsArgs<E extends Endpoint> = E extends { params: z.ZodObject }
   ? [params: PathParams<E>]

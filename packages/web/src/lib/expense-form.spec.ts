@@ -23,7 +23,7 @@ const NAMES: Record<string, string> = {
   [B]: "Bartek",
   [C]: "Celina",
 };
-const TURNED_OFF = /turned off/;
+const TURNED_OFF = /turned off/u;
 const nameOf = (id: string) => NAMES[id] ?? "Someone";
 
 const values = (
@@ -375,7 +375,7 @@ describe("running checks", () => {
   it("say how much of the amount the payers leave unassigned", () => {
     const paid = (payerAmounts: Record<string, string>) =>
       payersCheck(advanced({ payerIds: [A, B], payerAmounts }))?.text.replace(
-        /\s/g,
+        /\s/gu,
         " "
       );
     expect(paid({ [A]: "60" })).toBe("PLN 40.00 unassigned.");
@@ -389,7 +389,7 @@ describe("running checks", () => {
     (payerAmounts) => {
       const check = payersCheck(advanced({ payerIds: [], payerAmounts }));
       expect(check?.ok).toBe(false);
-      expect(check?.text.replace(/\s/g, " ")).toBe("PLN 100.00 unassigned.");
+      expect(check?.text.replace(/\s/gu, " ")).toBe("PLN 100.00 unassigned.");
     }
   );
 
@@ -418,7 +418,7 @@ describe("running checks", () => {
           splits: splits({ exact: { [A]: "100", [B]: "5" } }),
         }),
         nameOf
-      )?.text.replace(/\s/g, " ")
+      )?.text.replace(/\s/gu, " ")
     ).toBe("PLN 5.00 over the amount.");
   });
 
@@ -454,7 +454,7 @@ describe("running checks", () => {
           splits: splits({ adjustment: { [A]: "10" } }),
         }),
         nameOf
-      )?.text.replace(/\s/g, " ")
+      )?.text.replace(/\s/gu, " ")
     ).toBe("PLN 90.00 is split equally before adjustments.");
   });
 

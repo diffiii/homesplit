@@ -19,8 +19,8 @@ import { verificationLink } from "./helpers/mail";
 const FRONTEND_URL = process.env.FRONTEND_URL ?? "";
 const PREVIEW_ORIGIN = "https://homesplit-web-git-feature.vercel.app";
 const VISITOR_IP = "203.0.113.7";
-const SECURE_SESSION_COOKIE = /^__Secure-better-auth\.session_token=/;
-const DOMAIN_ATTRIBUTE = /domain=/i;
+const SECURE_SESSION_COOKIE = /^__Secure-better-auth\.session_token=/u;
+const DOMAIN_ATTRIBUTE = /domain=/iu;
 
 /** A test-only route behind the session guard. */
 @Controller("api/whoami")

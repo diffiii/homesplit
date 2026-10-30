@@ -184,9 +184,9 @@ export const SimpleSplit = withForm({
                 form.setFieldValue("payerAmounts", null);
                 form.setFieldValue("method", "equal");
                 flushSync(() => field.handleChange(true));
-                document
-                  .getElementById(`${form.formId}-payerIds-${userId}`)
-                  ?.focus();
+                const id = `${form.formId}-payerIds-${userId}`;
+                // biome-ignore lint/style/useDomQuerySelector: the id starts with `useId` output, which a selector would need escaped
+                document.getElementById(id)?.focus();
               }}
               size="sm"
               type="button"
@@ -301,7 +301,7 @@ export const AdvancedSplit = withForm({
                             userId={userId}
                           >
                             {share ? (
-                              <span className="pl-8 text-muted-foreground text-xs tabular-nums">
+                              <span className="text-muted-foreground pl-8 text-xs tabular-nums">
                                 {share}
                               </span>
                             ) : null}
@@ -351,9 +351,9 @@ export const AdvancedSplit = withForm({
                       onClick={() => {
                         form.setFieldValue("payerAmounts", null);
                         flushSync(() => field.handleChange(false));
-                        document
-                          .getElementById(`${form.formId}-advanced`)
-                          ?.focus();
+                        const id = `${form.formId}-advanced`;
+                        // biome-ignore lint/style/useDomQuerySelector: the id starts with `useId` output, which a selector would need escaped
+                        document.getElementById(id)?.focus();
                       }}
                       size="sm"
                       type="button"

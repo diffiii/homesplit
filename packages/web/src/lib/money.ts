@@ -53,8 +53,9 @@ export interface ParseAmountOptions {
 
 // Digits with at most one `.` or `,` as the decimal separator. Grouping
 // separators aren't accepted, because `1,000` means 1.000 to a Polish user.
-const AMOUNT_PATTERN = /^([-+]?)(\d*)(?:[.,](\d*))?$/;
-const WHITESPACE = /\s/g;
+const AMOUNT_PATTERN =
+  /^(?<sign>[-+]?)(?<whole>\d*)(?:[.,](?<fraction>\d*))?$/u;
+const WHITESPACE = /\s/gu;
 
 /**
  * Parse what the user typed into integer minor units, using only string and

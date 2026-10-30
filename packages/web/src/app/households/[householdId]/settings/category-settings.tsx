@@ -64,7 +64,7 @@ export function CategorySettings() {
     >
       <div className="flex items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h2 className="font-medium text-base" id="categories-heading">
+          <h2 className="text-base font-medium" id="categories-heading">
             Expense categories
           </h2>
           <p className="text-muted-foreground text-sm">{hint}</p>

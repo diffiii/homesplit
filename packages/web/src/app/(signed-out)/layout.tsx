@@ -9,7 +9,7 @@ export default function SignedOutLayout({ children }: LayoutProps<"/">) {
     <div className="flex min-h-svh flex-col">
       <header className="flex h-14 items-center justify-between px-4">
         <Link
-          className="flex items-center gap-2 rounded-md font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="focus-visible:ring-ring/50 flex items-center gap-2 rounded-md font-semibold outline-none focus-visible:ring-3"
           href={HOME_PATH}
         >
           <Logo className="size-5" />

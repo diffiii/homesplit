@@ -14,7 +14,7 @@ export interface FileUpload {
   buffer: Buffer;
 }
 
-const AVATAR_FILE_NAME = /^[0-9a-f-]{36}\.webp$/;
+const AVATAR_FILE_NAME = /^[0-9a-f-]{36}\.webp$/u;
 
 const notOwnAvatar = (): AppError =>
   new AppError(400, "VALIDATION_ERROR", "Invalid request", {

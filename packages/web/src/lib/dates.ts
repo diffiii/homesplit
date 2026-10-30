@@ -1,7 +1,8 @@
 import type { IsoDate, IsoDateTime } from "@homesplit/contracts";
 
-const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
-const LOCAL_DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
+const ISO_DATE = /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})$/u;
+const LOCAL_DATE_TIME =
+  /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})T(?<hours>\d{2}):(?<minutes>\d{2})$/u;
 
 function pad(value: number, length = 2): string {
   return value.toString().padStart(length, "0");

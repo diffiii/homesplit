@@ -50,14 +50,14 @@ export function ProfileSection({ user, onSaved }: ProfileSectionProps) {
 
   return (
     <section aria-labelledby="profile-heading" className="flex flex-col gap-4">
-      <h2 className="font-medium text-base" id="profile-heading">
+      <h2 className="text-base font-medium" id="profile-heading">
         Profile
       </h2>
       <div className="flex items-center gap-4">
         <UserAvatar decorative size="lg" user={user} />
         <div className="flex min-w-0 flex-col">
           <span className="truncate font-medium">{user.name}</span>
-          <span className="truncate text-muted-foreground text-sm">
+          <span className="text-muted-foreground truncate text-sm">
             {user.email}
           </span>
         </div>

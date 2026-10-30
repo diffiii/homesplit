@@ -1,5 +1,5 @@
 const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);
-const INTEGER_PATTERN = /^-?\d+$/;
+const INTEGER_PATTERN = /^-?\d+$/u;
 
 /**
  * Converts an integer read from PostgreSQL (`bigint` and `numeric` arrive as

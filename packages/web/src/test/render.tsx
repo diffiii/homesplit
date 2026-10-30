@@ -1,4 +1,4 @@
-import { QueryClientProvider } from "@tanstack/react-query";
+import { type QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement, ReactNode } from "react";
@@ -13,6 +13,23 @@ export interface RenderOptions {
   params?: Record<string, string | string[]>;
   /** The page's path and query, for the `next/navigation` hooks and `window.location`. */
   url?: string;
+}
+
+function Providers({
+  children,
+  queryClient,
+}: {
+  children: ReactNode;
+  queryClient: QueryClient;
+}) {
+  return (
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>{children}</TooltipProvider>
+        <Toaster />
+      </QueryClientProvider>
+    </ThemeProvider>
+  );
 }
 
 /**
@@ -32,19 +49,12 @@ export function renderWithProviders(
     queries: { ...queryClient.getDefaultOptions().queries, retry: false },
   });
 
-  function Providers({ children }: { children: ReactNode }) {
-    return (
-      <ThemeProvider>
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider>{children}</TooltipProvider>
-          <Toaster />
-        </QueryClientProvider>
-      </ThemeProvider>
-    );
-  }
-
   return {
-    ...render(ui, { wrapper: Providers }),
+    ...render(ui, {
+      wrapper: ({ children }) => (
+        <Providers queryClient={queryClient}>{children}</Providers>
+      ),
+    }),
     queryClient,
     user: userEvent.setup(),
   };

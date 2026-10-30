@@ -66,19 +66,19 @@ export default function HouseholdsPage() {
                 {data.map((household) => (
                   <li key={household.id}>
                     <Link
-                      className="flex items-center gap-3 px-4 py-3 outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+                      className="hover:bg-muted focus-visible:ring-ring/50 flex items-center gap-3 px-4 py-3 outline-none focus-visible:ring-3"
                       href={householdPath(household.id)}
                     >
                       <HouseIcon
                         aria-hidden
-                        className="size-5 text-muted-foreground"
+                        className="text-muted-foreground size-5"
                       />
                       <span className="flex-1 truncate font-medium">
                         {household.name}
                       </span>
                       <ChevronRightIcon
                         aria-hidden
-                        className="size-4 text-muted-foreground"
+                        className="text-muted-foreground size-4"
                       />
                     </Link>
                   </li>
