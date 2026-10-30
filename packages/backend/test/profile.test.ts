@@ -117,13 +117,14 @@ describe("profile", () => {
 
       const response = await alice.client
         .patch(ME)
-        .send({ email: "taken@test.local", id: bob.id, emailVerified: true })
+        .send({ email: "taken@test.local", id: bob.id, emailVerified: false })
         .expect(400);
 
       expectApiError(response, "EMPTY_PATCH");
+      // createUser verifies the email, and the body must not unverify it.
       expect(await storedUser(alice.id)).toMatchObject({
         email: alice.email,
-        emailVerified: false,
+        emailVerified: true,
       });
     });
 

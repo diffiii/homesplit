@@ -1,7 +1,8 @@
 import { screen } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it } from "vitest";
 import { expectNoAxeViolations } from "@/test/axe";
-import { loadScenario } from "@/test/mock-server";
+import { loadScenario, server } from "@/test/mock-server";
 import { renderWithProviders } from "@/test/render";
 import { SignInForm } from "./sign-in-form";
 
@@ -31,6 +32,34 @@ describe("SignInForm", () => {
 
     expect(await screen.findByText("Wrong email or password.")).toBeVisible();
     await expectNoAxeViolations();
+  });
+
+  it("explains that the email needs verifying", async () => {
+    let body: unknown;
+    server.use(
+      http.post("*/api/auth/sign-in/email", async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(
+          { code: "EMAIL_NOT_VERIFIED", message: "Email not verified" },
+          { status: 403 }
+        );
+      })
+    );
+    const { user } = renderWithProviders(<SignInForm />, {
+      url: "/sign-in?redirectTo=%2Fhouseholds",
+    });
+
+    await user.type(screen.getByLabelText("Email"), "alice@example.com");
+    await user.type(screen.getByLabelText("Password"), "correct horse");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+    expect(
+      await screen.findByText(
+        "Verify your email first. We've sent you a new link."
+      )
+    ).toBeVisible();
+    // The new link goes back to where the user was headed.
+    expect(body).toMatchObject({ callbackURL: "/households" });
   });
 
   it("keeps redirectTo when switching to sign-up", () => {

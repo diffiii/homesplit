@@ -18,6 +18,11 @@ const AUTH_FORM_ERRORS: Partial<Record<string, ServerErrors>> = {
         "There's already an account with this email. Sign in instead, or use another email.",
     },
   },
+  // Sign-in sends a new link before answering this.
+  EMAIL_NOT_VERIFIED: {
+    fields: {},
+    form: "Verify your email first. We've sent you a new link.",
+  },
   INVALID_EMAIL: {
     fields: { email: "Enter a valid email address." },
   },

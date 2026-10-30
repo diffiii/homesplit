@@ -14,6 +14,7 @@ import { db } from "@/db";
 import { session } from "@/db/schema";
 import { createTestApp } from "./helpers/app";
 import { TEST_PASSWORD } from "./helpers/fixtures";
+import { verificationLink } from "./helpers/mail";
 
 const FRONTEND_URL = process.env.FRONTEND_URL ?? "";
 const PREVIEW_ORIGIN = "https://homesplit-web-git-feature.vercel.app";
@@ -100,7 +101,8 @@ describe("API behind the frontend rewrite", () => {
     });
   };
 
-  const signUp = async (): Promise<{ cookie: string; userId: string }> => {
+  /** Signs up and opens the emailed link, because sign-in needs a verified email. */
+  const register = async (): Promise<{ email: string; userId: string }> => {
     const email = `user-${crypto.randomUUID()}@test.local`;
     const signedUp = await call("/api/auth/sign-up/email", {
       body: JSON.stringify({ email, name: "Alice", password: TEST_PASSWORD }),
@@ -109,17 +111,29 @@ describe("API behind the frontend rewrite", () => {
     expect(signedUp.status).toBe(200);
     const { user } = await signedUp.json();
 
-    const signedIn = await call("/api/auth/sign-in/email", {
+    const verified = await call(verificationLink(email).path);
+    expect(verified.status).toBe(200);
+
+    return { email, userId: user.id };
+  };
+
+  const signIn = (email: string): Promise<Response> =>
+    call("/api/auth/sign-in/email", {
       body: JSON.stringify({ email, password: TEST_PASSWORD }),
       method: "POST",
     });
+
+  const signUp = async (): Promise<{ cookie: string; userId: string }> => {
+    const { email, userId } = await register();
+
+    const signedIn = await signIn(email);
     expect(signedIn.status).toBe(200);
     const cookie = signedIn.headers
       .getSetCookie()
       .map((value) => value.split(";")[0])
       .join("; ");
 
-    return { cookie, userId: user.id };
+    return { cookie, userId };
   };
 
   beforeAll(async () => {
@@ -142,14 +156,9 @@ describe("API behind the frontend rewrite", () => {
   });
 
   it("sets first-party session cookies for the frontend origin", async () => {
-    const response = await call("/api/auth/sign-up/email", {
-      body: JSON.stringify({
-        email: `user-${crypto.randomUUID()}@test.local`,
-        name: "Alice",
-        password: TEST_PASSWORD,
-      }),
-      method: "POST",
-    });
+    const { email } = await register();
+
+    const response = await signIn(email);
 
     const sessionCookie = response.headers
       .getSetCookie()
@@ -170,6 +179,7 @@ describe("API behind the frontend rewrite", () => {
       .select({ ipAddress: session.ipAddress })
       .from(session)
       .where(eq(session.userId, userId));
+    // The verification link and the sign-in each open a session.
     expect(rows).toEqual([
       { ipAddress: VISITOR_IP },
       { ipAddress: VISITOR_IP },

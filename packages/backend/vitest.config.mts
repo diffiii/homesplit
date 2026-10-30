@@ -40,6 +40,7 @@ export default defineConfig({
             FRONTEND_URL: "https://homesplit.test",
             FRONTEND_PREVIEW_ORIGINS: "https://homesplit-web-*.vercel.app",
             STORAGE_DRIVER: "memory",
+            MAIL_DRIVER: "log",
             ATTACHMENT_MAX_BYTES: "65536",
             ATTACHMENT_MAX_PER_EXPENSE: "2",
             AVATAR_MAX_BYTES: "65536",

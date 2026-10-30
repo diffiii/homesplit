@@ -51,6 +51,9 @@ export default defineConfig({
         FRONTEND_URL: baseURL,
         FRONTEND_PREVIEW_ORIGINS: "",
         STORAGE_DRIVER: "memory",
+        MAIL_DRIVER: "log",
+        // Tests sign up through the UI and can't follow the emailed link.
+        AUTH_SKIP_EMAIL_VERIFICATION: "true",
       },
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,

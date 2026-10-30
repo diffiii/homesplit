@@ -22,7 +22,7 @@ export function SignInForm() {
     validators: { onSubmit: SignInValues },
     onSubmit: async ({ value, formApi }) => {
       try {
-        await account.signIn(value);
+        await account.signIn({ ...value, callbackURL: redirectTo });
       } catch (error) {
         applyAuthErrors(formApi, error);
         return;
