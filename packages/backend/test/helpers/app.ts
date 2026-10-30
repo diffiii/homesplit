@@ -25,6 +25,7 @@ export interface TestClient {
   get: (path: string) => Test;
   patch: (path: string) => Test;
   post: (path: string) => Test;
+  put: (path: string) => Test;
 }
 
 /**
@@ -48,5 +49,6 @@ export function createClient(
     get: (path) => prepare(request(server).get(path)),
     patch: (path) => prepare(request(server).patch(path)),
     post: (path) => prepare(request(server).post(path)),
+    put: (path) => prepare(request(server).put(path)),
   };
 }

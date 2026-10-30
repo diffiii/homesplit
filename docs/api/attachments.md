@@ -55,12 +55,15 @@ The backend reads these from its environment; see [`.env.example`](../../package
 | `S3_ENDPOINT` | AWS | URL of another S3-compatible service, such as `http://localhost:8333` for the `object-storage` service in `compose.yaml`. Signed URLs point at it, so browsers must reach it too. |
 | `S3_FORCE_PATH_STYLE` | `false` | `true` for services without virtual-hosted buckets, such as SeaweedFS and MinIO. |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | AWS default chain | Set both or neither. |
+| `S3_AVATAR_BUCKET` | required | Separate bucket for [avatars](users-friends.md#avatars), which anyone can read. |
+| `S3_AVATAR_PUBLIC_URL` | required | URL that serves `S3_AVATAR_BUCKET` without signing: an R2 custom domain such as `https://avatars.homesplit.janmarek.pl`, a CDN, or the bucket's own URL, such as `http://localhost:8333/homesplit-avatars`. |
+| `AVATAR_MAX_BYTES` | `10485760` (10 MiB) | Largest avatar upload. |
 | `ATTACHMENT_MAX_BYTES` | `10485760` (10 MiB) | Largest upload. |
 | `ATTACHMENT_DOWNLOAD_URL_TTL_SECONDS` | `300` | Lifetime of a download URL, at most 7 days. |
 | `ATTACHMENT_UNREFERENCED_TTL_HOURS` | `24` | Age after which cleanup deletes an unreferenced attachment. |
 | `ATTACHMENT_MAX_PER_EXPENSE` | `10` | Most files linked to one expense; see [expense attachments](expenses.md#attachments). |
 
-The S3 client sends checksums only where the API requires them, because not every S3-compatible service accepts the ones newer AWS SDKs add by default. The bucket stays private: nothing is read without a signed URL.
+The S3 client sends checksums only where the API requires them, because not every S3-compatible service accepts the ones newer AWS SDKs add by default. `S3_BUCKET` stays private: attachments are read only through signed URLs. Avatars live in `S3_AVATAR_BUCKET`, which anyone can read (on R2, through a public custom domain), so a public setting never reaches attachments. The same credentials need read and write access to both buckets. In development, the `object-storage-setup` service in `compose.yaml` creates the avatar bucket and makes it public.
 
 ## Storage
 
