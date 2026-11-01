@@ -13,13 +13,17 @@ import { errorMessage } from "@/lib/api/error-message";
 import { queryKeys } from "@/lib/api/query-keys";
 import { HOUSEHOLDS_PATH } from "@/lib/last-household";
 import { CategorySettings } from "./category-settings";
+import { HouseholdNameSettings } from "./household-name-settings";
+import { MemberSettings } from "./member-settings";
 import { ModuleSettings } from "./module-settings";
 
-/** Household settings: modules, categories, and leaving. The households epic adds the rest; the theme is on the account page. */
+/** Household settings: the name, members, modules, categories, and leaving. The theme is on the account page. */
 export default function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" />
+      <HouseholdNameSettings />
+      <MemberSettings />
       <ModuleSettings />
       <CategorySettings />
       <LeaveHousehold />
