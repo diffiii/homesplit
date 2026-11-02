@@ -1,5 +1,6 @@
 "use client";
 
+import type { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog";
 import { type ReactElement, type ReactNode, useState } from "react";
 import {
   AlertDialog,
@@ -23,14 +24,20 @@ interface ConfirmDialogProps {
   description?: ReactNode;
   /** Styles the confirm button for actions that delete or can't be undone. */
   destructive?: boolean;
+  /** Where focus goes on close, when the element that opened the dialog may be gone. */
+  finalFocus?: AlertDialogPrimitive.Popup.Props["finalFocus"];
   /**
    * Runs the action. The dialog stays open, with its buttons disabled, until
    * the promise settles; it closes on success and shows the error otherwise.
    */
   onConfirm: () => unknown;
+  /** Called when the dialog opens or closes, for a dialog opened from elsewhere, such as a menu. */
+  onOpenChange?: (open: boolean) => void;
+  /** Controls the dialog when given; leave it out to let `trigger` open it. */
+  open?: boolean;
   title: ReactNode;
-  /** The button that opens the dialog. */
-  trigger: ReactElement;
+  /** The button that opens the dialog, unless `open` controls it. */
+  trigger?: ReactElement;
 }
 
 /** Asks before an action the user may not mean, such as deleting or leaving. */
@@ -43,8 +50,16 @@ export function ConfirmDialog({
   destructive = false,
   describeError = errorMessage,
   onConfirm,
+  finalFocus,
+  open: controlledOpen,
+  onOpenChange,
 }: ConfirmDialogProps) {
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const setOpen = (next: boolean) => {
+    setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(null);
 
@@ -71,8 +86,8 @@ export function ConfirmDialog({
       }}
       open={open}
     >
-      <AlertDialogTrigger render={trigger} />
-      <AlertDialogContent>
+      {trigger ? <AlertDialogTrigger render={trigger} /> : null}
+      <AlertDialogContent finalFocus={finalFocus}>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           {description ? (
