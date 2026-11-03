@@ -44,6 +44,8 @@ export default defineConfig({
             ATTACHMENT_MAX_BYTES: "65536",
             ATTACHMENT_MAX_PER_EXPENSE: "2",
             AVATAR_MAX_BYTES: "65536",
+            AI_DRIVER: "fake",
+            AI_DAILY_REQUEST_LIMIT: "3",
           },
           globalSetup: ["test/global-setup.ts"],
           setupFiles: ["test/setup.ts"],

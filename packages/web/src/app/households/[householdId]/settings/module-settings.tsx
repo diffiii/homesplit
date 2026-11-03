@@ -24,6 +24,7 @@ const PURPOSE: Record<FeatureId, string> = {
   expenses: "Split costs, see balances, and settle up.",
   chores: "Share recurring tasks and see who's next.",
   shopping: "Keep one shopping list for everyone.",
+  ai: "Suggest categories and read receipts. Sends receipt photos and expense text to an AI provider.",
 };
 
 const MODULES = HOUSEHOLD_NAV.filter(

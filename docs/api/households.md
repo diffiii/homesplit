@@ -38,7 +38,7 @@ A household is settled up when every party's balance in every currency is zero, 
 
 Every household route uses these helpers from `packages/backend/src/features/households/access`:
 
-- `@HouseholdRoute(endpoint, { minRole, module })` binds the route and runs `HouseholdGuard` after the global auth guard. The guard validates `:householdId` (400), requires the caller's `member` row for that household (404), checks whether the route's module is enabled for non-`GET` methods (403 `MODULE_DISABLED`), then checks `minRole`, which defaults to `member` (403 `FORBIDDEN`). It never reads `session.activeOrganizationId`. Pass `module` (`expenses`, `chores`, or `shopping`) on write routes for that feature area; `GET` routes ignore `module` and stay available while the module is off.
+- `@HouseholdRoute(endpoint, { minRole, module })` binds the route and runs `HouseholdGuard` after the global auth guard. The guard validates `:householdId` (400), requires the caller's `member` row for that household (404), checks whether the route's module is enabled for non-`GET` methods (403 `MODULE_DISABLED`), then checks `minRole`, which defaults to `member` (403 `FORBIDDEN`). It never reads `session.activeOrganizationId`. Pass `module` (`expenses`, `chores`, or `shopping`) on write routes for that feature area; `ai` is checked by `AiService` on every call instead (see [AI provider](../decisions.md#ai-provider)); `GET` routes ignore `module` and stay available while the module is off.
 - `@CurrentHousehold()` gives the handler a `HouseholdContext` (`householdId`, `role`, `userId`). `userId` is the only source of the acting user.
 - `assertUsersEligible(executor, householdId, refs, "current" | "party")` checks referenced users against `member` or `household_membership_history`, answering 400 `INVALID_REFERENCE` with one issue per failing path.
 - `hasRole(role, minRole)` with `forbidden()` covers resource-level rights such as "author or admin+".
@@ -81,6 +81,7 @@ Shared errors from [the decision record](../decisions.md) apply. Feature codes:
 | `expenses_enabled` | `boolean`, not null, default `true` |
 | `chores_enabled` | `boolean`, not null, default `true` |
 | `shopping_enabled` | `boolean`, not null, default `true` |
+| `ai_enabled` | `boolean`, not null, default `false`; households opt in (see [AI provider](../decisions.md#ai-provider)) |
 
 - The `organization_seed_features` trigger (`AFTER INSERT ON organization`) inserts a row with defaults. Every Better Auth path that creates a household gets a row, including tests.
 - Migration `0004_household_features_trigger` backfills existing organizations with `ON CONFLICT DO NOTHING`.

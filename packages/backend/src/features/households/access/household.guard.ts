@@ -60,6 +60,7 @@ export class HouseholdGuard implements CanActivate {
         expensesEnabled: householdFeatures.expensesEnabled,
         choresEnabled: householdFeatures.choresEnabled,
         shoppingEnabled: householdFeatures.shoppingEnabled,
+        aiEnabled: householdFeatures.aiEnabled,
       })
       .from(member)
       .leftJoin(
@@ -82,7 +83,8 @@ export class HouseholdGuard implements CanActivate {
       if (
         membership.expensesEnabled === null ||
         membership.choresEnabled === null ||
-        membership.shoppingEnabled === null
+        membership.shoppingEnabled === null ||
+        membership.aiEnabled === null
       ) {
         throw new Error(
           `Missing household_features row for organization ${householdId}`
@@ -94,6 +96,7 @@ export class HouseholdGuard implements CanActivate {
             expensesEnabled: membership.expensesEnabled,
             choresEnabled: membership.choresEnabled,
             shoppingEnabled: membership.shoppingEnabled,
+            aiEnabled: membership.aiEnabled,
           },
           requiredModule
         )
