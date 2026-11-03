@@ -5,9 +5,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
 import { useAppForm } from "@/components/form";
-import { UserAvatar } from "@/components/user-avatar";
 import { api } from "@/lib/api/client";
 import { applyServerErrors } from "@/lib/form";
+import { AvatarField } from "./avatar-field";
 
 const ProfileValues = z.object({
   // The limits of `DisplayName`, which `PATCH /api/me` checks.
@@ -20,13 +20,17 @@ const ProfileValues = z.object({
 
 interface ProfileSectionProps {
   /** Refetch the session, whose user the page and the account menu show. */
-  onSaved: () => Promise<unknown>;
+  onChanged: () => Promise<unknown>;
   user: Pick<UserSummary, "name" | "imageUrl"> & { email: string };
 }
 
 /** The avatar, or initials without one, and the display name. */
-export function ProfileSection({ user, onSaved }: ProfileSectionProps) {
+export function ProfileSection({ user, onChanged }: ProfileSectionProps) {
   const queryClient = useQueryClient();
+  // Members, payers, assignees, and friends embed the user's `UserSummary`
+  // in queries of every household, so all of them refetch.
+  const refresh = () =>
+    Promise.all([onChanged(), queryClient.invalidateQueries()]);
   const form = useAppForm({
     defaultValues: { name: user.name },
     validators: { onSubmit: ProfileValues },
@@ -42,9 +46,7 @@ export function ProfileSection({ user, onSaved }: ProfileSectionProps) {
       }
       formApi.reset({ name: saved.name });
       toast.success("Name saved.");
-      // Members, payers, assignees, and friends embed the user's
-      // `UserSummary` in queries of every household, so all of them refetch.
-      await Promise.all([onSaved(), queryClient.invalidateQueries()]);
+      await refresh();
     },
   });
 
@@ -54,7 +56,7 @@ export function ProfileSection({ user, onSaved }: ProfileSectionProps) {
         Profile
       </h2>
       <div className="flex items-center gap-4">
-        <UserAvatar decorative size="lg" user={user} />
+        <AvatarField onChanged={refresh} user={user} />
         <div className="flex min-w-0 flex-col">
           <span className="truncate font-medium">{user.name}</span>
           <span className="text-muted-foreground truncate text-sm">

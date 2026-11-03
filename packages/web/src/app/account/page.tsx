@@ -25,7 +25,7 @@ export default function AccountPage() {
     content = (
       <>
         <ProfileSection
-          onSaved={() => session.refetch()}
+          onChanged={() => session.refetch()}
           user={{
             email: user.email,
             imageUrl: user.image ?? null,
