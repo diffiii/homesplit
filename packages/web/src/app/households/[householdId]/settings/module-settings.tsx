@@ -2,6 +2,13 @@
 
 import type { FeatureId } from "@homesplit/contracts";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  ListChecksIcon,
+  type LucideIcon,
+  ReceiptIcon,
+  ShoppingCartIcon,
+  SparklesIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useId } from "react";
 import {
@@ -9,28 +16,50 @@ import {
   useHouseholdId,
   usePermissions,
 } from "@/components/shell/household-context";
-import {
-  HOUSEHOLD_NAV,
-  householdPath,
-  type NavItem,
-} from "@/components/shell/household-nav";
+import { householdPath } from "@/components/shell/household-nav";
 import { Switch } from "@/components/ui/switch";
 import { isApiRequestError } from "@/lib/api/api-error";
 import { api } from "@/lib/api/client";
 import { errorMessage } from "@/lib/api/error-message";
 import { endpointQuery } from "@/lib/api/queries";
 
-const PURPOSE: Record<FeatureId, string> = {
-  expenses: "Split costs, see balances, and settle up.",
-  chores: "Share recurring tasks and see who's next.",
-  shopping: "Keep one shopping list for everyone.",
-};
+interface Module {
+  feature: FeatureId;
+  hint: string;
+  icon: LucideIcon;
+  label: string;
+}
 
-const MODULES = HOUSEHOLD_NAV.filter(
-  (item): item is NavItem & { feature: FeatureId } => item.feature !== undefined
-);
+const READ_ONLY = "Turning it off makes it read-only and deletes nothing.";
 
-/** Turn expenses, chores, and shopping on and off; everyone sees the flags, admins change them. */
+const MODULES: readonly Module[] = [
+  {
+    feature: "expenses",
+    label: "Expenses",
+    icon: ReceiptIcon,
+    hint: `Split costs, see balances, and settle up. ${READ_ONLY}`,
+  },
+  {
+    feature: "chores",
+    label: "Chores",
+    icon: ListChecksIcon,
+    hint: `Share recurring tasks and see who's next. ${READ_ONLY}`,
+  },
+  {
+    feature: "shopping",
+    label: "Shopping",
+    icon: ShoppingCartIcon,
+    hint: `Keep one shopping list for everyone. ${READ_ONLY}`,
+  },
+  {
+    feature: "ai",
+    label: "AI",
+    icon: SparklesIcon,
+    hint: "Suggest categories and read receipts. While it's on, receipt photos and expense text are sent to an AI provider; turning it off stops that.",
+  },
+];
+
+/** Turn modules on and off; everyone sees the flags, admins change them. */
 export function ModuleSettings() {
   const can = usePermissions();
   return (
@@ -57,11 +86,11 @@ export function ModuleSettings() {
 }
 
 function ModuleRow({
-  module: { feature, label, icon: Icon },
+  module: { feature, label, icon: Icon, hint },
   editable,
 }: {
   editable: boolean;
-  module: NavItem & { feature: FeatureId };
+  module: Module;
 }) {
   const householdId = useHouseholdId();
   const enabled = useFeatureEnabled(feature);
@@ -93,8 +122,7 @@ function ModuleRow({
             {label}
           </span>
           <p className="text-muted-foreground text-sm" id={`${id}-hint`}>
-            {PURPOSE[feature]} Turning it off makes it read-only and deletes
-            nothing.
+            {hint}
           </p>
         </div>
         <span aria-hidden className="text-muted-foreground text-sm">

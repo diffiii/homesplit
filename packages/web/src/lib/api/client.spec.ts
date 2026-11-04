@@ -5,7 +5,7 @@ import { createApiClient } from "./client";
 
 const HOUSEHOLD_ID = "0b6f1f4e-3c1a-4b8e-9a59-1d2f3e4a5b6c";
 const CHORE_ID = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
-const FEATURES = { expenses: true, chores: false, shopping: true };
+const FEATURES = { expenses: true, chores: false, shopping: true, ai: false };
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
