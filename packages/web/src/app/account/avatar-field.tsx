@@ -62,12 +62,14 @@ export function AvatarField({ user, onChanged }: AvatarFieldProps) {
 
   const button = (
     <button
-      aria-label={user.imageUrl ? "Change profile photo" : "Add profile photo"}
       className="focus-visible:ring-ring/50 relative shrink-0 rounded-full outline-none hover:opacity-90 focus-visible:ring-3"
       onClick={user.imageUrl ? undefined : () => input.current?.click()}
       ref={trigger}
       type="button"
     >
+      <span className="sr-only">
+        {user.imageUrl ? "Change profile photo" : "Add profile photo"}
+      </span>
       <UserAvatar
         className="size-16 *:data-[slot=avatar-fallback]:text-lg"
         decorative
