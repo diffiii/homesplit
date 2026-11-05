@@ -47,11 +47,16 @@ export function ExpenseQueryState({
   listPath,
   children,
 }: ExpenseQueryStateProps) {
+  const notFound = isApiRequestError(query.error) && query.error.status === 404;
+  // A failed refetch keeps what loaded, so an open edit isn't lost.
+  if (query.data && !notFound) {
+    return children(query.data);
+  }
   switch (query.status) {
     case "pending":
       return <ListSkeleton label="Loading the expense" rows={4} />;
     case "error":
-      return isApiRequestError(query.error) && query.error.status === 404 ? (
+      return notFound ? (
         <EmptyState
           action={
             <Link className={buttonVariants()} href={listPath}>

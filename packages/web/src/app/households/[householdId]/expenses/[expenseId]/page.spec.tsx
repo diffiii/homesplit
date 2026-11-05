@@ -187,4 +187,22 @@ describe("ExpensePage", () => {
       expect(queryClient.getQueryState(queryKey)?.isInvalidated).toBe(true);
     }
   });
+
+  it("shows not found when deleting after the user was removed", async () => {
+    const householdId = flat().id;
+    const { user } = renderExpense(expenseId("Pizza night"));
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
+    const dialog = await screen.findByRole("alertdialog");
+
+    const alice = db.userByEmail("alice@example.com")?.id;
+    db.state.members = db.state.members.filter(
+      (member) =>
+        !(member.householdId === householdId && member.userId === alice)
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Household not found" })
+    ).toBeVisible();
+  });
 });

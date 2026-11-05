@@ -1,6 +1,7 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
+import type { CreateExpenseRequest } from "@homesplit/contracts";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -63,6 +64,10 @@ function NewExpenseForm() {
   const queryClient = useQueryClient();
   const members = useMemberSummaries();
 
+  const create = useMutation({
+    mutationFn: (body: CreateExpenseRequest) =>
+      api("createExpense", { params: { householdId }, body }),
+  });
   const [defaultValues] = useState(() =>
     initialExpenseValues({
       currency: readLastExpenseCurrency(householdId),
@@ -80,10 +85,7 @@ function NewExpenseForm() {
         if (!body) {
           return;
         }
-        const expense = await api("createExpense", {
-          params: { householdId },
-          body,
-        });
+        const expense = await create.mutateAsync(body);
         rememberExpenseCurrency(householdId, value.currency);
         queryClient.setQueryData(
           queryKeys.endpoint("getExpense", {

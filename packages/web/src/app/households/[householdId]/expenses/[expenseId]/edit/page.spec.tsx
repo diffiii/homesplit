@@ -1,7 +1,9 @@
 import type { UpdateExpenseRequest } from "@homesplit/contracts";
 import { screen, waitFor } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { HouseholdShell } from "@/components/shell/household-shell";
+import { queryKeys } from "@/lib/api/query-keys";
 import { STALE_EXPENSE_MESSAGE } from "@/lib/expense-form";
 import { expectNoAxeViolations } from "@/test/axe";
 import { db, server } from "@/test/mock-server";
@@ -67,6 +69,15 @@ const person = (list: string, name: string) =>
       name: (accessibleName) => accessibleName.startsWith(name),
     })
     .find((box) => box.closest("fieldset")?.textContent?.startsWith(list));
+
+/** Takes Alice out of the flat, as if removed while the page was open. */
+function removeAlice() {
+  const householdId = flat().id;
+  const alice = userId("alice@example.com");
+  db.state.members = db.state.members.filter(
+    (member) => !(member.householdId === householdId && member.userId === alice)
+  );
+}
 
 const DAWID = "Dawid Lewandowski";
 // jsdom sees both navs labelled "Household"; a browser shows one per screen size.
@@ -156,6 +167,42 @@ describe("EditExpensePage", () => {
 
     expect(await screen.findByText(STALE_EXPENSE_MESSAGE)).toBeVisible();
     expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it("keeps the draft when refetching the expense fails", async () => {
+    const { id } = expenseNamed("Pizza night");
+    const { user, queryClient } = renderEdit("Pizza night");
+    await user.type(await screen.findByLabelText("Name"), " and drinks");
+
+    server.use(
+      http.get("*/api/households/:householdId/expenses/:expenseId", () =>
+        HttpResponse.json(
+          { code: "INTERNAL", message: "Down" },
+          { status: 500 }
+        )
+      )
+    );
+    await queryClient.refetchQueries({
+      queryKey: queryKeys.endpoint("getExpense", {
+        params: { householdId: flat().id, expenseId: id },
+      }),
+    });
+    expect(
+      await screen.findByText("Something went wrong on our side. Try again.")
+    ).toBeVisible();
+
+    expect(screen.getByLabelText("Name")).toHaveValue("Pizza night and drinks");
+  });
+
+  it("shows not found when the user was removed before saving", async () => {
+    const { user } = renderEdit("Pizza night");
+    await user.type(await screen.findByLabelText("Name"), "!");
+    removeAlice();
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Household not found" })
+    ).toBeVisible();
   });
 
   it("tells a member they can't edit someone else's expense", async () => {

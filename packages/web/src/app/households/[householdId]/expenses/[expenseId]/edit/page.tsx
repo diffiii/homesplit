@@ -1,7 +1,7 @@
 "use client";
 
-import type { Expense } from "@homesplit/contracts";
-import { useQueryClient } from "@tanstack/react-query";
+import type { Expense, UpdateExpenseRequest } from "@homesplit/contracts";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeftIcon, LockIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -108,6 +108,14 @@ function EditExpenseForm({
     ).values(),
   ]);
 
+  const update = useMutation({
+    mutationFn: (body: UpdateExpenseRequest) =>
+      api("updateExpense", {
+        params: { householdId, expenseId: expense.id },
+        body,
+      }),
+  });
+
   return (
     <ExpenseForm
       defaultValues={defaultValues}
@@ -122,10 +130,7 @@ function EditExpenseForm({
           router.push(expensePath);
           return;
         }
-        const saved = await api("updateExpense", {
-          params: { householdId, expenseId: expense.id },
-          body,
-        });
+        const saved = await update.mutateAsync(body);
         queryClient.setQueryData(
           queryKeys.endpoint("getExpense", {
             params: { householdId, expenseId: saved.id },

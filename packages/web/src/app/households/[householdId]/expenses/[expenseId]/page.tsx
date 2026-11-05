@@ -1,7 +1,7 @@
 "use client";
 
 import type { Expense } from "@homesplit/contracts";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeftIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -71,15 +71,17 @@ function ExpenseActions({
   const permissions = usePermissions();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const del = useMutation({
+    mutationFn: () =>
+      api("deleteExpense", { params: { householdId, expenseId: expense.id } }),
+  });
   if (!enabled) {
     return null;
   }
 
   const remove = async () => {
     try {
-      await api("deleteExpense", {
-        params: { householdId, expenseId: expense.id },
-      });
+      await del.mutateAsync();
     } catch (error) {
       // Someone deleted it first, which is what the user wanted anyway.
       if (!(isApiRequestError(error) && error.status === 404)) {
