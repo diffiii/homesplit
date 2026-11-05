@@ -1,8 +1,11 @@
-import type {
-  FriendRequest,
-  Friendship,
-  FriendUser,
+import {
+  AVATAR_MIME_TYPES,
+  AVATAR_UPLOAD_FIELD,
+  type FriendRequest,
+  type Friendship,
+  type FriendUser,
 } from "@homesplit/contracts";
+import { AVATAR_MAX_BYTES, avatarTypeOf } from "@/lib/avatars";
 import {
   type MockDb,
   type MockFriendRequest,
@@ -12,7 +15,7 @@ import {
 import { badRequest, conflict, notFound } from "../errors";
 import type { MockRoutes } from "../routes";
 import { listMyBalances } from "./ledger";
-import { asc, desc, removeRow, sortBy } from "./shared";
+import { asc, desc, removeRow, sortBy, uploadedFile } from "./shared";
 
 function friendUser(db: MockDb, userId: string): FriendUser {
   return { ...db.summary(userId), email: db.user(userId).email };
@@ -81,6 +84,25 @@ export const meRoutes: MockRoutes = {
         user.image = body.imageUrl;
       }
       return db.summary(userId);
+    },
+  },
+
+  // The mocks keep the image as an object URL, which shows until the page reloads.
+  uploadAvatar: {
+    resolve: ({ db, userId, form }) => {
+      const { file } = uploadedFile(form, AVATAR_UPLOAD_FIELD, {
+        allowed: AVATAR_MIME_TYPES,
+        maxBytes: AVATAR_MAX_BYTES,
+        typeOf: avatarTypeOf,
+      });
+      db.user(userId).image = URL.createObjectURL(file);
+      return db.summary(userId);
+    },
+  },
+
+  deleteAvatar: {
+    resolve: ({ db, userId }) => {
+      db.user(userId).image = null;
     },
   },
 

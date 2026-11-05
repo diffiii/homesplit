@@ -32,6 +32,12 @@ export const AVATAR_MIME_TYPES = [
 export const AvatarMimeType = z.enum(AVATAR_MIME_TYPES);
 export type AvatarMimeType = z.infer<typeof AvatarMimeType>;
 
+/**
+ * Largest avatar upload when the backend's `AVATAR_MAX_BYTES` isn't set:
+ * 10 MiB. The web app checks images against the same limit before uploading.
+ */
+export const DEFAULT_AVATAR_MAX_BYTES = 10 * 1024 * 1024;
+
 /** Multipart form field that carries the image in an avatar upload. */
 export const AVATAR_UPLOAD_FIELD = "file";
 
