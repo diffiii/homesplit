@@ -3,6 +3,7 @@ import {
   formatIsoDate,
   formatIsoDateTime,
   formatLocalDate,
+  formatRelativeTime,
   isoToLocalDateTime,
   localDateTimeToIso,
   parseIsoDate,
@@ -68,5 +69,28 @@ describe("IsoDateTime", () => {
     expect(formatLocalDate(new Date("2026-03-02T03:30:00Z"))).toBe(
       "Mar 1, 2026"
     );
+  });
+});
+
+describe("formatRelativeTime", () => {
+  const now = new Date(2026, 2, 10, 12, 0);
+  const ago = (ms: number) => new Date(now.getTime() - ms).toISOString();
+
+  it("counts minutes and hours today, then calendar days", () => {
+    expect(formatRelativeTime(ago(30_000), now)).toBe("just now");
+    expect(formatRelativeTime(ago(5 * 60_000), now)).toBe("5 minutes ago");
+    expect(formatRelativeTime(ago(3 * 3_600_000), now)).toBe("3 hours ago");
+    expect(
+      formatRelativeTime(new Date(2026, 2, 9, 23, 0).toISOString(), now)
+    ).toBe("yesterday");
+    expect(
+      formatRelativeTime(new Date(2026, 2, 6, 9, 0).toISOString(), now)
+    ).toBe("4 days ago");
+  });
+
+  it("gives the date from a week back", () => {
+    expect(
+      formatRelativeTime(new Date(2026, 2, 3, 12, 0).toISOString(), now)
+    ).toBe("Mar 3, 2026");
   });
 });

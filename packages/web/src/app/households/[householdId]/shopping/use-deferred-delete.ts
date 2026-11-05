@@ -13,18 +13,32 @@ import { queryKeys } from "@/lib/api/query-keys";
 
 export const UNDO_DELETE_MS = 5000;
 
+const CLEAR_KEY = "clear-bought";
+
+const clearedMessage = (count: number) =>
+  `Cleared ${count} ${count === 1 ? "item" : "items"}`;
+
 export function useDeferredDelete() {
   const householdId = useHouseholdId();
   const queryClient = useQueryClient();
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
   const waiting = useRef(new Map<string, () => void>());
 
-  const show = (id: string) =>
+  const show = (ids: readonly string[]) =>
     setHidden((previous) => {
       const next = new Set(previous);
-      next.delete(id);
+      for (const id of ids) {
+        next.delete(id);
+      }
       return next;
     });
+
+  const settle = async (ids: readonly string[]) => {
+    await invalidate(queryClient, [
+      queryKeys.endpoint("listShoppingItems", { params: { householdId } }),
+    ]);
+    show(ids);
+  };
 
   const remove = useMutation({
     mutationFn: async (item: ShoppingItem) => {
@@ -39,17 +53,28 @@ export function useDeferredDelete() {
       }
     },
     onError: (error, item) => {
-      show(item.id);
       toast.error(`Couldn't delete “${item.name}”.`, {
         description: errorMessage(error),
       });
     },
-    onSettled: () =>
-      invalidate(queryClient, [
-        queryKeys.endpoint("listShoppingItems", { params: { householdId } }),
-      ]),
+    onSettled: (_data, _error, item) => settle([item.id]),
   });
-  const { mutate } = remove;
+
+  const clear = useMutation({
+    mutationFn: (_ids: readonly string[]) =>
+      api("clearPurchasedShoppingItems", { params: { householdId } }),
+    onSuccess: ({ deletedCount }, ids) => {
+      if (deletedCount !== ids.length) {
+        toast(clearedMessage(deletedCount));
+      }
+    },
+    onError: (error) => {
+      toast.error("Couldn't clear the bought items.", {
+        description: errorMessage(error),
+      });
+    },
+    onSettled: (_data, _error, ids) => settle(ids),
+  });
 
   useEffect(() => {
     const pending = waiting.current;
@@ -60,28 +85,44 @@ export function useDeferredDelete() {
     };
   }, []);
 
-  const deleteItem = (item: ShoppingItem) => {
-    setHidden((previous) => new Set(previous).add(item.id));
+  const defer = (
+    key: string,
+    ids: readonly string[],
+    message: string,
+    request: () => void
+  ) => {
+    setHidden((previous) => new Set([...previous, ...ids]));
     const send = () => {
-      if (waiting.current.delete(item.id)) {
+      if (waiting.current.delete(key)) {
         toast.dismiss(toastId);
-        mutate(item);
+        request();
       }
     };
-    waiting.current.set(item.id, send);
-    const toastId = toast(`Deleted “${item.name}”`, {
+    waiting.current.set(key, send);
+    const toastId = toast(message, {
       duration: UNDO_DELETE_MS,
       onAutoClose: send,
       onDismiss: send,
       action: {
         label: "Undo",
         onClick: () => {
-          waiting.current.delete(item.id);
-          show(item.id);
+          waiting.current.delete(key);
+          show(ids);
         },
       },
     });
   };
 
-  return { hidden, deleteItem };
+  const deleteItem = (item: ShoppingItem) =>
+    defer(item.id, [item.id], `Deleted “${item.name}”`, () =>
+      remove.mutate(item)
+    );
+
+  const clearBought = (items: readonly ShoppingItem[]) => {
+    waiting.current.get(CLEAR_KEY)?.();
+    const ids = items.map((item) => item.id);
+    defer(CLEAR_KEY, ids, clearedMessage(ids.length), () => clear.mutate(ids));
+  };
+
+  return { hidden, deleteItem, clearBought };
 }
