@@ -73,6 +73,24 @@ describe("ModuleSettings", () => {
     expect(household("Flat on Piękna").features.expenses).toBe(true);
   });
 
+  it("lets an owner opt in to AI after reading what it sends", async () => {
+    const flat = household("Flat on Piękna");
+    const { user } = renderSettings(flat.id);
+
+    const ai = await screen.findByRole("switch", { name: "AI" });
+    expect(ai).not.toBeChecked();
+    expect(ai).toHaveAccessibleDescription(
+      expect.stringContaining("sent to an AI provider")
+    );
+
+    await user.click(ai);
+
+    expect(
+      await screen.findByRole("switch", { name: "AI", checked: true })
+    ).toBeEnabled();
+    expect(household("Flat on Piękna").features.ai).toBe(true);
+  });
+
   it("shows members which modules are on without letting them change it", async () => {
     // Alice is a plain member of the cabin, which has chores turned off.
     renderSettings(household("Lake cabin").id);
@@ -85,7 +103,7 @@ describe("ModuleSettings", () => {
     const switches = screen.getAllByRole("switch");
     expect(
       switches.map((control) => control.getAttribute("aria-checked"))
-    ).toEqual(["true", "false", "true"]);
+    ).toEqual(["true", "false", "true", "false"]);
     for (const control of switches) {
       expect(control).toHaveAttribute("aria-disabled", "true");
     }

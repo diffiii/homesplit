@@ -16,7 +16,7 @@ export const HouseholdSummary = z.object({
 });
 export type HouseholdSummary = z.infer<typeof HouseholdSummary>;
 
-/** Per-household feature toggles; all three default to enabled at persistence time. */
+/** Per-household feature toggles; `ai` defaults to disabled at persistence time, the rest to enabled. */
 export const HouseholdFeatures = z.object(
   Object.fromEntries(FEATURE_IDS.map((id) => [id, z.boolean()])) as {
     [K in (typeof FEATURE_IDS)[number]]: z.ZodBoolean;

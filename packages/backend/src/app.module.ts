@@ -1,5 +1,6 @@
 import { type BeforeApplicationShutdown, Module } from "@nestjs/common";
 import { AuthModule } from "@thallesp/nestjs-better-auth";
+import { AiModule } from "./ai/ai.module";
 import { AppController } from "./app.controller";
 import { auth } from "./auth";
 import { closeDb } from "./db";
@@ -17,6 +18,7 @@ import { UsersModule } from "./features/users/users.module";
   imports: [
     // Browsers call the API through the frontend origin, never cross-origin.
     AuthModule.forRoot({ auth, disableTrustedOriginsCors: true }),
+    AiModule,
     HouseholdsModule,
     ExpenseCategoriesModule,
     ChoresModule,

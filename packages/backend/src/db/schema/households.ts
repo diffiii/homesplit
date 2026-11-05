@@ -35,4 +35,5 @@ export const householdFeatures = pgTable("household_features", {
   expensesEnabled: boolean("expenses_enabled").notNull().default(true),
   choresEnabled: boolean("chores_enabled").notNull().default(true),
   shoppingEnabled: boolean("shopping_enabled").notNull().default(true),
+  aiEnabled: boolean("ai_enabled").notNull().default(false),
 });

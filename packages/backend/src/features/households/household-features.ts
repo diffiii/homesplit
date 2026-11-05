@@ -8,13 +8,14 @@ import type { householdFeatures } from "@/db/schema";
 
 type FeatureFlagColumns = Pick<
   typeof householdFeatures.$inferSelect,
-  "expensesEnabled" | "choresEnabled" | "shoppingEnabled"
+  "expensesEnabled" | "choresEnabled" | "shoppingEnabled" | "aiEnabled"
 >;
 
 const FEATURE_COLUMNS = {
   expenses: "expensesEnabled",
   chores: "choresEnabled",
   shopping: "shoppingEnabled",
+  ai: "aiEnabled",
 } as const satisfies Record<FeatureId, keyof FeatureFlagColumns>;
 
 export function rowToHouseholdFeatures(
