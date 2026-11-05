@@ -282,6 +282,26 @@ describe("AccountPage", () => {
       expect(alice().image).toBeNull();
     });
 
+    it("cancels the upload when the page goes away", async () => {
+      stubCanvas();
+      server.use(http.put(AVATAR_URL, () => delay("infinite")));
+      const abort = vi.spyOn(XMLHttpRequest.prototype, "abort");
+      onTestFinished(() => abort.mockRestore());
+      const { user, unmount } = renderPage();
+
+      const dialog = await pickPhoto(user);
+      loadPhoto(dialog);
+      await user.click(
+        within(dialog).getByRole("button", { name: "Save photo" })
+      );
+      await within(dialog).findByRole("progressbar", {
+        name: "Uploading photo",
+      });
+      unmount();
+
+      expect(abort).toHaveBeenCalledOnce();
+    });
+
     it("uploads a photo the browser can't show whole, for the server to crop", async () => {
       const uploads = recordAvatarUploads();
       const { user } = renderPage();

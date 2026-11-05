@@ -35,6 +35,7 @@ export function AvatarCropDialog({
   onUploaded,
 }: AvatarCropDialogProps) {
   const controller = useRef<AbortController | null>(null);
+  useEffect(() => () => controller.current?.abort(), []);
   // The cropper measures its frame once, so it waits for the dialog to stop
   // scaling in.
   const [shown, setShown] = useState(false);
