@@ -1,17 +1,22 @@
+import type { Expense } from "@homesplit/contracts";
 import { describe, expect, it } from "vitest";
 import { ApiRequestError } from "@/lib/api/api-error";
 import {
   createExpenseServerErrors,
   type ExpenseFormValues,
+  expenseFormValues,
   fitsSimpleMode,
   formatPercentage,
   initialExpenseValues,
   payerAmountInputs,
   payersCheck,
   previewShares,
+  STALE_EXPENSE_MESSAGE,
   splitCheck,
   splitInputs,
   toCreateExpenseRequest,
+  toUpdateExpenseRequest,
+  updateExpenseServerErrors,
   validateExpense,
 } from "./expense-form";
 
@@ -639,5 +644,192 @@ describe("advanced createExpenseServerErrors", () => {
         [`payerAmounts.${B}`]: "Too small",
       },
     });
+  });
+});
+
+const user = (id: string) => ({ id, name: nameOf(id), imageUrl: null });
+
+/** A stored expense: A paid 90.00 for groceries, split equally between A, B, and C. */
+const stored = (overrides: Partial<Expense> = {}): Expense => ({
+  id: "00000000-0000-4000-8000-0000000000e1",
+  householdId: "00000000-0000-4000-8000-0000000000f1",
+  name: "Groceries",
+  description: null,
+  total: { amountCents: 9000, currency: "PLN" },
+  payers: [{ user: user(A), amountCents: 9000 }],
+  author: user(A),
+  category: {
+    id: "00000000-0000-4000-8000-0000000000c1",
+    householdId: "00000000-0000-4000-8000-0000000000f1",
+    name: "Groceries",
+    icon: null,
+  },
+  expenseDate: "2026-03-01",
+  allocation: {
+    method: "equal",
+    participants: [{ userId: A }, { userId: B }, { userId: C }],
+  },
+  splits: [A, B, C].map((id) => ({ user: user(id), amountCents: 3000 })),
+  attachments: [],
+  createdAt: "2026-03-01T12:00:00.000Z",
+  updatedAt: "2026-03-01T12:00:00.000Z",
+  ...overrides,
+});
+
+const conflict = (code: string, status = 409) =>
+  ApiRequestError.fromBody("api", status, { code, message: code });
+
+describe("expenseFormValues", () => {
+  it("opens what the user paid alone, split equally, in simple mode", () => {
+    expect(expenseFormValues(stored(), A)).toEqual({
+      name: "Groceries",
+      amount: "90.00",
+      currency: "PLN",
+      expenseDate: "2026-03-01",
+      categoryId: "00000000-0000-4000-8000-0000000000c1",
+      participantIds: [A, B, C],
+      advanced: false,
+      payerIds: [A],
+      payerAmounts: null,
+      method: "equal",
+      splits: { percentage: null, shares: {}, exact: null, adjustment: {} },
+    });
+  });
+
+  it("opens someone else's payment in the advanced section", () => {
+    const form = expenseFormValues(stored(), B);
+    expect(form.advanced).toBe(true);
+    expect(form.payerIds).toEqual([A]);
+    expect(form.payerAmounts).toEqual({ [A]: "90.00" });
+  });
+
+  it("fills in each method's stored inputs", () => {
+    const percentage = expenseFormValues(
+      stored({
+        allocation: {
+          method: "percentage",
+          participants: [
+            { userId: A, basisPoints: 5000 },
+            { userId: B, basisPoints: 1250 },
+            { userId: C, basisPoints: 3750 },
+          ],
+        },
+      }),
+      A
+    );
+    expect(percentage.advanced).toBe(true);
+    expect(percentage.splits.percentage).toEqual({
+      [A]: "50",
+      [B]: "12.5",
+      [C]: "37.5",
+    });
+    const adjustment = expenseFormValues(
+      stored({
+        allocation: {
+          method: "adjustment",
+          participants: [
+            { userId: A, adjustmentCents: 0 },
+            { userId: B, adjustmentCents: -1000 },
+          ],
+        },
+      }),
+      A
+    );
+    expect(adjustment.participantIds).toEqual([A, B]);
+    expect(adjustment.splits.adjustment).toEqual({ [A]: "", [B]: "-10.00" });
+  });
+});
+
+describe("toUpdateExpenseRequest", () => {
+  it("sends nothing while nothing changed, in either mode", () => {
+    expect(
+      toUpdateExpenseRequest(expenseFormValues(stored(), A), stored(), A)
+    ).toEqual({});
+    expect(
+      toUpdateExpenseRequest(expenseFormValues(stored(), B), stored(), B)
+    ).toEqual({});
+  });
+
+  it("sends only the descriptive fields that changed, with null for a cleared one", () => {
+    const form = {
+      ...expenseFormValues(stored(), A),
+      name: " Market ",
+      categoryId: null,
+    };
+    expect(toUpdateExpenseRequest(form, stored(), A)).toEqual({
+      name: "Market",
+      categoryId: null,
+    });
+  });
+
+  it("sends the whole financial spec once a money field changes", () => {
+    const form = { ...expenseFormValues(stored(), A), amount: "120" };
+    expect(toUpdateExpenseRequest(form, stored(), A)).toEqual({
+      financial: {
+        total: { amountCents: 12_000, currency: "PLN" },
+        payers: [{ userId: A, amountCents: 12_000 }],
+        allocation: {
+          method: "equal",
+          participants: [{ userId: A }, { userId: B }, { userId: C }],
+        },
+      },
+    });
+  });
+
+  it("doesn't count a new order of the same people as a change", () => {
+    const form = {
+      ...expenseFormValues(stored(), A),
+      participantIds: [C, A, B],
+    };
+    expect(toUpdateExpenseRequest(form, stored(), A)).toEqual({});
+  });
+});
+
+describe("updateExpenseServerErrors", () => {
+  const form = () => expenseFormValues(stored(), A);
+
+  it("puts a financial issue on its row, as for a create", () => {
+    const D = "00000000-0000-4000-8000-00000000000d";
+    expect(
+      updateExpenseServerErrors(
+        invalidReference([
+          ["financial", "allocation", "participants", 3, "userId"],
+        ]),
+        { ...form(), participantIds: [A, B, C, D] },
+        (id) => (id === D ? "Dawid" : nameOf(id)),
+        stored()
+      )
+    ).toEqual({
+      fields: {
+        participantIds: "Dawid left the household. Uncheck them to save.",
+      },
+    });
+  });
+
+  it("asks to reload when a departed person it kept was taken off meanwhile", () => {
+    expect(
+      updateExpenseServerErrors(
+        invalidReference([
+          ["financial", "allocation", "participants", 2, "userId"],
+        ]),
+        form(),
+        nameOf,
+        stored()
+      )
+    ).toEqual({ fields: {}, form: STALE_EXPENSE_MESSAGE });
+  });
+
+  it("asks to reload after a conflict, and says when the expense is gone", () => {
+    expect(
+      updateExpenseServerErrors(conflict("CONFLICT"), form(), nameOf, stored())
+    ).toEqual({ fields: {}, form: STALE_EXPENSE_MESSAGE });
+    expect(
+      updateExpenseServerErrors(
+        conflict("NOT_FOUND", 404),
+        form(),
+        nameOf,
+        stored()
+      ).form
+    ).toBe("This expense was deleted while you were editing it.");
   });
 });
