@@ -14,6 +14,11 @@ import { db } from "./db";
 import * as schema from "./db/schema/auth";
 import { seedDefaultCategories } from "./features/expense-categories/default-categories";
 import { hasUnsettledBalances } from "./features/expenses/balances/balances.repository";
+import {
+  INVITATION,
+  invitationEmail,
+  invitationLink,
+} from "./household-invitations";
 import { createMailer, loadMailConfig } from "./mail";
 
 const frontendUrl = process.env.FRONTEND_URL;
@@ -193,6 +198,33 @@ export const auth = betterAuth({
   },
   plugins: [
     organization({
+      invitationExpiresIn: INVITATION.expiresInSeconds,
+      // Inviting an address that already has a pending invitation cancels the
+      // earlier one, so only the newest link works. `resend: true` on
+      // `invite-member` sends the same invitation again instead.
+      cancelPendingInvitationsOnReInvite: true,
+      // The invitation row exists by now. A failed send is logged rather than
+      // thrown, so the invitation stays in `list-invitations` and the inviter
+      // can send it again; see "Better Auth endpoints" in docs/decisions.md.
+      sendInvitationEmail: async ({
+        id,
+        email,
+        organization: household,
+        inviter,
+      }) => {
+        try {
+          await mailer.send(
+            invitationEmail({
+              to: email,
+              household: household.name,
+              inviter: inviter.user.name,
+              link: invitationLink(frontendUrl, id),
+            })
+          );
+        } catch (error) {
+          logger.error(`Invitation email not sent for invitation ${id}`, error);
+        }
+      },
       organizationHooks: {
         // Runs after Better Auth has committed the household, outside any
         // transaction. Default categories are a convenience, so a failure
