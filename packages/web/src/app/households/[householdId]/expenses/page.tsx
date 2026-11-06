@@ -1,7 +1,7 @@
 "use client";
 
 import type { Expense, UserSummary } from "@homesplit/contracts";
-import { PlusIcon } from "lucide-react";
+import { PlusIcon, ScaleIcon } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
@@ -11,7 +11,7 @@ import {
   useFeatureEnabled,
   useHouseholdId,
 } from "@/components/shell/household-context";
-import { householdPath } from "@/components/shell/household-nav";
+import { balancesPath, householdPath } from "@/components/shell/household-nav";
 import { buttonVariants } from "@/components/ui/button";
 import { parseExpenseFilters } from "@/lib/expenses";
 import { ExpenseFiltersBar } from "./expense-filters";
@@ -45,7 +45,18 @@ export default function ExpensesPage() {
   return (
     <>
       <PageHeader
-        actions={enabled ? <NewExpenseLink householdId={householdId} /> : null}
+        actions={
+          <>
+            <Link
+              className={buttonVariants({ variant: "outline" })}
+              href={balancesPath(householdId)}
+            >
+              <ScaleIcon aria-hidden data-icon="inline-start" />
+              Balances
+            </Link>
+            {enabled ? <NewExpenseLink householdId={householdId} /> : null}
+          </>
+        }
         title="Expenses"
       />
       {enabled ? null : <ModuleDisabledAlert module="Expenses" />}

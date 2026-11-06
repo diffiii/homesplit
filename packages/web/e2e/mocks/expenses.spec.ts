@@ -15,6 +15,10 @@ const SUSHI = /^Sushi/u;
 const ALICE = /^Alice/u;
 const CELINA = /^Celina/u;
 const GROCERIES_RUN = /^Groceries run/u;
+const EUR_GROUP = /^EUR/u;
+const PLN_GROUP = /^PLN/u;
+const RECORD_CELINA_EUR = /^Record: Celina Wiśniewska pays you EUR/u;
+const SPLIT_DEBT = /^Split/u;
 
 test("scrolls, filters, and opens an expense", async ({ page }) => {
   test.slow();
@@ -257,4 +261,40 @@ test("keeps departed payers and weighted participants readable", async ({
     )
   );
   await expectNoAxeViolations(page);
+});
+
+test("reaches balances from expenses, settles a suggestion, and writes off a debt", async ({
+  page,
+}) => {
+  test.slow();
+  await page.goto("/households");
+  await page.getByRole("link", { name: "Flat on Piękna" }).click();
+  await expect(page).toHaveURL(HOUSEHOLD_URL);
+  await page.goto(`${new URL(page.url()).pathname}/expenses`);
+
+  await page.getByRole("link", { name: "Balances" }).click();
+  const euros = page.getByRole("region", { name: EUR_GROUP });
+  await expect(euros.getByText("EUR 90.00")).toBeVisible();
+  await expectNoAxeViolations(page);
+
+  await page.getByRole("button", { name: RECORD_CELINA_EUR }).click();
+  const payment = page.getByRole("dialog", { name: "Record a payment" });
+  await expect(payment.getByLabel("Amount")).toHaveValue("45.00");
+  await expectNoAxeViolations(page);
+  await payment.getByRole("button", { name: "Record payment" }).click();
+  await expect(euros.getByText("EUR 45.00").first()).toBeVisible();
+
+  await page
+    .getByRole("button", {
+      name: "Write off Dawid Lewandowski's balance in PLN",
+    })
+    .click();
+  await page.getByRole("menuitem", { name: SPLIT_DEBT }).click();
+  const writeOff = page.getByRole("alertdialog");
+  await expect(writeOff.getByRole("listitem")).toHaveCount(3);
+  await expectNoAxeViolations(page);
+  await writeOff.getByRole("button", { name: "Write off" }).click();
+  await expect(
+    page.getByRole("region", { name: PLN_GROUP }).getByText("Dawid Lewandowski")
+  ).toHaveCount(0);
 });

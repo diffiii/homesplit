@@ -53,6 +53,7 @@ describe("permissionsFor", () => {
       expect(can.cancelInvitation).toBe(adminPlus);
       expect(can.updateFeatures).toBe(adminPlus);
       expect(can.manageCategories).toBe(adminPlus);
+      expect(can.writeOff).toBe(adminPlus);
       expect(can.invite("member")).toBe(adminPlus);
       expect(can.invite("owner")).toBe(ownerOnly);
       expect(can.deleteHousehold).toBe(ownerOnly);

@@ -16,7 +16,7 @@ import {
   useHouseholdId,
   usePermissions,
 } from "@/components/shell/household-context";
-import { householdPath } from "@/components/shell/household-nav";
+import { balancesPath } from "@/components/shell/household-nav";
 import { Switch } from "@/components/ui/switch";
 import { isApiRequestError } from "@/lib/api/api-error";
 import { api } from "@/lib/api/client";
@@ -145,7 +145,7 @@ function ModuleRow({
               can still settle up.{" "}
               <Link
                 className="hover:text-foreground underline underline-offset-4"
-                href={householdPath(householdId, "expenses")}
+                href={balancesPath(householdId)}
               >
                 Settle the balances first
               </Link>

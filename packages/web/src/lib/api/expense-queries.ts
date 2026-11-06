@@ -43,3 +43,13 @@ export function ledgerQueryKeys(householdId: string) {
     queryKeys.endpoint("listSettlementSuggestions", input),
   ];
 }
+
+/** What recording a payment changes: the balances, the payments that would settle them, and the history. */
+export function settlementQueryKeys(householdId: string) {
+  const input = { params: { householdId } };
+  return [
+    queryKeys.endpoint("listBalances", input),
+    queryKeys.endpoint("listSettlementSuggestions", input),
+    queryKeys.endpoint("listSettlements", input),
+  ];
+}
