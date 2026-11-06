@@ -14,7 +14,7 @@ import { db } from "./db";
 import * as schema from "./db/schema/auth";
 import { seedDefaultCategories } from "./features/expense-categories/default-categories";
 import { hasUnsettledBalances } from "./features/expenses/balances/balances.repository";
-import { createMailer, loadMailConfig } from "./mail";
+import { createMailer, type Email, loadMailConfig } from "./mail";
 import {
   assertResetRequestAllowed,
   isPasswordResetRequest,
@@ -49,6 +49,20 @@ if (skipEmailVerification && mailConfig.driver !== "log") {
 const VERIFICATION_LINK_TTL_SECONDS = 24 * 60 * 60;
 
 const logger = new Logger("Auth");
+
+/**
+ * Sends an email without making the caller wait for the provider, and logs a
+ * failure instead of throwing it.
+ */
+function sendInBackground(build: () => Email, failure: string): void {
+  try {
+    mailer.send(build()).catch((error: unknown) => {
+      logger.error(failure, error);
+    });
+  } catch (error) {
+    logger.error(failure, error);
+  }
+}
 
 const previewOrigins = (process.env.FRONTEND_PREVIEW_ORIGINS ?? "")
   .split(",")
@@ -124,21 +138,21 @@ export const auth = betterAuth({
     resetPasswordTokenExpiresIn: PASSWORD_RESET.linkTtlSeconds,
     // A reset signs nobody in, so this ends every session of the user.
     revokeSessionsOnPasswordReset: true,
-    // Better Auth answers a reset request alike for known and unknown emails,
-    // so nothing here may fail the request: a send that failed or was held
-    // back by the per-email limit is logged and the answer stays the same.
-    sendResetPassword: async ({ user, url, token }) => {
-      if (!mayEmailResetLink(user.email)) {
-        logger.warn(`Password reset email held back for user ${user.id}`);
-        return;
-      }
-      try {
-        await mailer.send(
-          passwordResetEmail(user.email, resetLink(frontendUrl, token, url))
+    // The answer to a reset request must not depend on whether the email has
+    // an account, and a send takes far longer than the path for an unknown
+    // email, so the answer doesn't wait for it. A send that fails, or that the
+    // per-email limit holds back, is logged and the answer stays the same.
+    sendResetPassword: ({ user, url, token }) => {
+      if (mayEmailResetLink(user.email)) {
+        sendInBackground(
+          () =>
+            passwordResetEmail(user.email, resetLink(frontendUrl, token, url)),
+          `Password reset email not sent to user ${user.id}`
         );
-      } catch (error) {
-        logger.error(`Password reset email not sent to user ${user.id}`, error);
+      } else {
+        logger.warn(`Password reset email held back for user ${user.id}`);
       }
+      return Promise.resolve();
     },
   },
   emailVerification: {

@@ -16,10 +16,19 @@ import { createClient, createTestApp } from "./helpers/app";
 import { createUser, TEST_PASSWORD } from "./helpers/fixtures";
 import { passwordResetEmails, passwordResetLink } from "./helpers/mail";
 
+const REQUEST_PATH = "/api/auth/request-password-reset";
 const NEW_PASSWORD = "a-brand-new-horse-battery-staple";
 const MS_PER_SECOND = 1000;
 const LINK_TTL_MS = PASSWORD_RESET.linkTtlSeconds * MS_PER_SECOND;
 const WINDOW_MS = PASSWORD_RESET.windowSeconds * MS_PER_SECOND;
+
+/** Header values that give the limiter no single address to count. */
+const UNUSABLE_ADDRESSES: (string | undefined)[] = [
+  undefined,
+  "1.2.3.4, 5.6.7.8",
+  "not-an-ip",
+  "1.2.3.4:5678",
+];
 
 let nextHost = 0;
 
@@ -49,9 +58,16 @@ describe("password reset", () => {
 
   const requestReset = (email: string, ip = newIp(), redirectTo?: string) =>
     createClient(app)
-      .post("/api/auth/request-password-reset")
+      .post(REQUEST_PATH)
       .set("X-Forwarded-For", ip)
       .send({ email, redirectTo });
+
+  const requestResetFrom = (address: string | undefined) => {
+    const test = createClient(app)
+      .post(REQUEST_PATH)
+      .send({ email: unknownEmail() });
+    return address === undefined ? test : test.set("X-Forwarded-For", address);
+  };
 
   const resetPassword = (token: string, newPassword = NEW_PASSWORD) =>
     createClient(app)
@@ -61,8 +77,15 @@ describe("password reset", () => {
   const signIn = (email: string, password: string) =>
     createClient(app).post("/api/auth/sign-in/email").send({ email, password });
 
+  // The email goes out in the background, so wait for it instead of expecting
+  // it the moment the answer arrives.
+  const expectResetEmails = (email: string, count: number) =>
+    vi.waitFor(() => {
+      expect(passwordResetEmails(email)).toHaveLength(count);
+    });
+
   const tokenFor = (email: string) =>
-    passwordResetLink(email).searchParams.get("token") ?? "";
+    vi.waitFor(() => passwordResetLink(email).searchParams.get("token") ?? "");
 
   describe("the request", () => {
     it("sends one email with a link to /reset-password on the frontend origin", async () => {
@@ -70,7 +93,7 @@ describe("password reset", () => {
 
       await requestReset(alice.email).expect(200);
 
-      expect(passwordResetEmails(alice.email)).toHaveLength(1);
+      await expectResetEmails(alice.email, 1);
       const link = passwordResetLink(alice.email);
       expect(`${link.origin}${link.pathname}`).toBe(
         `${process.env.FRONTEND_URL}/reset-password`
@@ -84,6 +107,7 @@ describe("password reset", () => {
 
       await requestReset(alice.email, newIp(), "/households").expect(200);
 
+      await expectResetEmails(alice.email, 1);
       expect(
         passwordResetLink(alice.email).searchParams.get("redirectTo")
       ).toBe("/households");
@@ -97,7 +121,23 @@ describe("password reset", () => {
       const other = await requestReset(unknown).expect(200);
 
       expect(other.body).toEqual(known.body);
-      expect(passwordResetEmails(unknown)).toHaveLength(0);
+      await expectResetEmails(unknown, 0);
+    });
+
+    it("answers without waiting for the mail provider", async () => {
+      const alice = await createUser(app, "Alice");
+      let finishSending: (() => void) | undefined;
+      vi.spyOn(mailer, "send").mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finishSending = resolve;
+          })
+      );
+
+      // This would hang until the test times out if the answer waited.
+      await requestReset(alice.email).expect(200);
+
+      finishSending?.();
     });
 
     it("answers alike when sending fails, and sends on the next request", async () => {
@@ -107,11 +147,11 @@ describe("password reset", () => {
       );
 
       const failed = await requestReset(alice.email).expect(200);
-      expect(passwordResetEmails(alice.email)).toHaveLength(0);
+      await expectResetEmails(alice.email, 0);
 
       const retried = await requestReset(alice.email).expect(200);
       expect(retried.body).toEqual(failed.body);
-      expect(passwordResetEmails(alice.email)).toHaveLength(1);
+      await expectResetEmails(alice.email, 1);
     });
   });
 
@@ -122,7 +162,9 @@ describe("password reset", () => {
       const phone = createClient(app, sessionCookie(phoneSignIn));
       await requestReset(alice.email).expect(200);
 
-      const reset = await resetPassword(tokenFor(alice.email)).expect(200);
+      const reset = await resetPassword(await tokenFor(alice.email)).expect(
+        200
+      );
 
       expect(reset.headers["set-cookie"]).toBeUndefined();
       const own = await alice.client.get("/api/auth/get-session").expect(200);
@@ -137,7 +179,7 @@ describe("password reset", () => {
     it("works once", async () => {
       const alice = await createUser(app, "Alice");
       await requestReset(alice.email).expect(200);
-      const token = tokenFor(alice.email);
+      const token = await tokenFor(alice.email);
       await resetPassword(token).expect(200);
 
       const again = await resetPassword(
@@ -152,7 +194,7 @@ describe("password reset", () => {
     it("rejects an expired token and keeps the old password", async () => {
       const alice = await createUser(app, "Alice");
       await requestReset(alice.email).expect(200);
-      const token = tokenFor(alice.email);
+      const token = await tokenFor(alice.email);
 
       vi.useFakeTimers({
         toFake: ["Date"],
@@ -174,7 +216,7 @@ describe("password reset", () => {
     it("rejects a too short password without using up the token", async () => {
       const alice = await createUser(app, "Alice");
       await requestReset(alice.email).expect(200);
-      const token = tokenFor(alice.email);
+      const token = await tokenFor(alice.email);
 
       const short = await resetPassword(token, "short").expect(400);
 
@@ -198,6 +240,28 @@ describe("password reset", () => {
       await requestReset(unknownEmail(), newIp()).expect(200);
     });
 
+    it("limits requests without a usable address together", async () => {
+      await Promise.all(
+        Array.from(
+          { length: PASSWORD_RESET.maxRequestsWithoutAddress },
+          (_, i) =>
+            requestResetFrom(
+              UNUSABLE_ADDRESSES[i % UNUSABLE_ADDRESSES.length]
+            ).expect(200)
+        )
+      );
+
+      const limited = await Promise.all(
+        UNUSABLE_ADDRESSES.map((address) => requestResetFrom(address))
+      );
+
+      for (const response of limited) {
+        expect(response.status).toBe(429);
+        expect(response.body.code).toBe("RATE_LIMITED");
+      }
+      await requestReset(unknownEmail(), newIp()).expect(200);
+    });
+
     it("caps the emails to one address and answers the same", async () => {
       const alice = await createUser(app, "Alice");
 
@@ -207,9 +271,7 @@ describe("password reset", () => {
         )
       );
 
-      expect(passwordResetEmails(alice.email)).toHaveLength(
-        PASSWORD_RESET.maxEmailsPerAddress
-      );
+      await expectResetEmails(alice.email, PASSWORD_RESET.maxEmailsPerAddress);
       for (const response of responses) {
         expect(response.body).toEqual(responses[0]?.body);
       }
@@ -222,12 +284,14 @@ describe("password reset", () => {
           requestReset(alice.email).expect(200)
         )
       );
+      await expectResetEmails(alice.email, PASSWORD_RESET.maxEmailsPerAddress);
 
       vi.useFakeTimers({ toFake: ["Date"], now: Date.now() + WINDOW_MS });
       await requestReset(alice.email).expect(200);
       vi.useRealTimers();
 
-      expect(passwordResetEmails(alice.email)).toHaveLength(
+      await expectResetEmails(
+        alice.email,
         PASSWORD_RESET.maxEmailsPerAddress + 1
       );
     });

@@ -1,19 +1,34 @@
-const MAX_TRACKED_KEYS = 10_000;
-const SWEEP_INTERVAL_MS = 60_000;
+export interface RateLimiterOptions {
+  /** Attempts one key may make in a window. */
+  max: number;
+  /** The most keys remembered; the least recently used go first. */
+  maxKeys: number;
+  windowMs: number;
+}
 
 /**
- * Allows `max` attempts per key in any `windowMs`. The counts live in this
- * process: a restart resets them and separate instances don't share them.
+ * Allows `max` attempts per key in any `windowMs`, remembering at most
+ * `maxKeys` keys. The counts live in this process: a restart resets them and
+ * separate instances don't share them.
  */
 export class RateLimiter {
   private readonly attempts = new Map<string, number[]>();
   private readonly max: number;
+  private readonly maxKeys: number;
   private readonly windowMs: number;
-  private lastSweep = 0;
 
-  constructor(max: number, windowMs: number) {
+  constructor({ max, maxKeys, windowMs }: RateLimiterOptions) {
+    if (maxKeys < 1) {
+      throw new Error("maxKeys must be at least 1");
+    }
     this.max = max;
+    this.maxKeys = maxKeys;
     this.windowMs = windowMs;
+  }
+
+  /** How many keys are remembered. */
+  get size(): number {
+    return this.attempts.size;
   }
 
   /**
@@ -26,13 +41,13 @@ export class RateLimiter {
       return false;
     }
     recent.push(now);
-    this.attempts.set(key, recent);
-    if (
-      this.attempts.size > MAX_TRACKED_KEYS &&
-      now - this.lastSweep >= SWEEP_INTERVAL_MS
-    ) {
-      this.sweep(now);
+    // Re-inserting moves the key to the most recent end of the map.
+    this.attempts.delete(key);
+    while (this.attempts.size >= this.maxKeys) {
+      this.evictLeastRecentlyUsed();
     }
+    this.attempts.set(key, recent);
+
     return true;
   }
 
@@ -42,12 +57,10 @@ export class RateLimiter {
     );
   }
 
-  private sweep(now: number): void {
-    this.lastSweep = now;
-    for (const key of this.attempts.keys()) {
-      if (this.recent(key, now).length === 0) {
-        this.attempts.delete(key);
-      }
+  private evictLeastRecentlyUsed(): void {
+    const oldest = this.attempts.keys().next();
+    if (!oldest.done) {
+      this.attempts.delete(oldest.value);
     }
   }
 }

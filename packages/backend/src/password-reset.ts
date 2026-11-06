@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import { APIError } from "better-auth/api";
 import type { Email } from "./mail";
 import { RateLimiter } from "./rate-limiter";
@@ -11,26 +12,41 @@ export const PASSWORD_RESET_SUBJECT = "Reset your HomeSplit password";
 export const PASSWORD_RESET = {
   /** How long a reset link works. */
   linkTtlSeconds: 60 * 60,
-  /** The period the two limits below apply to. */
+  /** The period the limits below apply to. */
   windowSeconds: 60 * 60,
   /** Reset requests one visitor address may make. */
   maxRequestsPerIp: 10,
+  /** Reset requests without a usable visitor address may make, all together. */
+  maxRequestsWithoutAddress: 60,
   /** Reset emails one address may be sent. */
   maxEmailsPerAddress: 3,
+  /** Keys each limiter remembers; the least recently used go first. */
+  maxTrackedKeys: 10_000,
 } as const;
 
 const MS_PER_SECOND = 1000;
 const SECONDS_PER_HOUR = 3600;
 const WINDOW_MS = PASSWORD_RESET.windowSeconds * MS_PER_SECOND;
+const NO_ADDRESS = "no-address";
 
-const requestsByIp = new RateLimiter(
-  PASSWORD_RESET.maxRequestsPerIp,
-  WINDOW_MS
-);
-const emailsByAddress = new RateLimiter(
-  PASSWORD_RESET.maxEmailsPerAddress,
-  WINDOW_MS
-);
+const requestsByIp = new RateLimiter({
+  max: PASSWORD_RESET.maxRequestsPerIp,
+  maxKeys: PASSWORD_RESET.maxTrackedKeys,
+  windowMs: WINDOW_MS,
+});
+
+// One shared bucket, so a request can't escape the limit by hiding its address.
+const requestsWithoutAddress = new RateLimiter({
+  max: PASSWORD_RESET.maxRequestsWithoutAddress,
+  maxKeys: 1,
+  windowMs: WINDOW_MS,
+});
+
+const emailsByAddress = new RateLimiter({
+  max: PASSWORD_RESET.maxEmailsPerAddress,
+  maxKeys: PASSWORD_RESET.maxTrackedKeys,
+  windowMs: WINDOW_MS,
+});
 
 // `/forget-password` is the older name of the same endpoint.
 const REQUEST_PATHS = new Set(["/request-password-reset", "/forget-password"]);
@@ -40,22 +56,27 @@ export function isPasswordResetRequest(path: string): boolean {
 }
 
 /**
- * The visitor's address, or undefined when the header is missing or lists
- * several hops, which Better Auth ignores too.
+ * The visitor's address, or undefined when the header is missing, lists
+ * several hops, or isn't an IP address.
  */
 function visitorIp(headers: Headers | undefined): string | undefined {
   const value = headers?.get(VISITOR_IP_HEADER)?.trim();
-  return value && !value.includes(",") ? value : undefined;
+  return value && isIP(value) !== 0 ? value.toLowerCase() : undefined;
 }
 
 /**
  * Throws 429 `RATE_LIMITED` when this address has made too many reset
- * requests. It doesn't depend on the email, so it can't reveal which emails
- * have accounts. A request without a known address isn't limited.
+ * requests. Requests without a usable address share one limit instead of
+ * escaping it. The limit doesn't depend on the email, so it can't reveal which
+ * emails have accounts.
  */
 export function assertResetRequestAllowed(headers: Headers | undefined): void {
   const ip = visitorIp(headers);
-  if (ip && !requestsByIp.tryConsume(ip)) {
+  const allowed = ip
+    ? requestsByIp.tryConsume(ip)
+    : requestsWithoutAddress.tryConsume(NO_ADDRESS);
+
+  if (!allowed) {
     throw new APIError("TOO_MANY_REQUESTS", {
       code: "RATE_LIMITED",
       message: "Too many password reset requests. Try again later.",
