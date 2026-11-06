@@ -41,19 +41,10 @@ const rowOf = async (currency: string, name: string) =>
     .getByText(name, { exact: false })
     .closest("li") as HTMLElement;
 
-const namesOfPayments = (dialog: HTMLElement) =>
-  within(within(dialog).getByRole("list", { name: "Payments to record" }))
-    .getAllByRole("listitem")
-    .map((item) => item.textContent?.replace(/ /gu, " "));
-
-const WRITE_OFF_PLN = "Write off Dawid Lewandowski's balance in PLN";
-const FORGIVE = /^Forgive/u;
-const SPLIT = /^Split/u;
 const RECORD_CELINA_EUR = /^Record: Celina Wiśniewska pays you EUR/u;
 const RECORD_PAY_EWA = /^Record: You pay Ewa/u;
 const RECORD_BARTEK_EWA = /^Record: Bartek Kowalski pays Ewa/u;
 const WAITING_TO_BE_CONFIRMED = /waiting to be confirmed/u;
-const WAS_WRITTEN_OFF = /was written off/u;
 
 async function pick(
   user: ReturnType<typeof renderBalances>["user"],
@@ -117,9 +108,6 @@ describe("BalancesPage", () => {
     await screen.findByText("Suggested payments");
     expect(
       screen.queryByRole("button", { name: "Record payment" })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: WRITE_OFF_PLN })
     ).not.toBeInTheDocument();
   });
 
@@ -289,150 +277,78 @@ describe("BalancesPage", () => {
     });
   });
 
-  it("forgives a departed member's debt, the creditors taking the loss", async () => {
+  it("keeps the list and the dialog when a refetch fails", async () => {
     const { user } = renderBalances(flatId());
-
     await user.click(
-      await screen.findByRole("button", { name: WRITE_OFF_PLN })
+      await screen.findByRole("button", { name: RECORD_CELINA_EUR })
     );
-    await user.click(await screen.findByRole("menuitem", { name: FORGIVE }));
-    const dialog = await screen.findByRole("alertdialog");
-    expect(namesOfPayments(dialog)).toEqual([
-      "Dawid Lewandowski → Alice NowakPLN 1,057.50",
-    ]);
-    await expectNoAxeViolations(document.body, AXE_OPTIONS);
+    const dialog = await screen.findByRole("dialog");
 
-    await user.click(within(dialog).getByRole("button", { name: "Write off" }));
+    server.use(
+      http.get("*/api/households/:householdId/balances", () =>
+        HttpResponse.json(
+          { code: "INTERNAL", message: "Down" },
+          { status: 500 }
+        )
+      )
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Record payment" })
+    );
 
-    await screen.findByText(WAS_WRITTEN_OFF);
-    expect(db.state.settlements.at(-1)).toMatchObject({
-      note: "Write-off",
-      amount: { amountCents: 105_750, currency: "PLN" },
-    });
+    await screen.findByText("Payment recorded.");
+    expect(await group("EUR")).toBeVisible();
+    expect(screen.queryByText("Couldn't load this")).not.toBeInTheDocument();
+  });
+
+  it("moves focus to the record button when the suggestion's row is gone", async () => {
+    const { user } = renderBalances(flatId());
+    await user.click(
+      await screen.findByRole("button", { name: RECORD_CELINA_EUR })
+    );
+    await user.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Record payment",
+      })
+    );
+
     await waitFor(() =>
       expect(
-        screen.queryByRole("button", { name: WRITE_OFF_PLN })
+        screen.queryByRole("button", { name: RECORD_CELINA_EUR })
       ).not.toBeInTheDocument()
     );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Record payment" })
+      ).toHaveFocus()
+    );
   });
 
-  it("splits a departed member's debt equally among current members", async () => {
-    const before = db.state.settlements.length;
+  it("returns focus to the button when a payment is cancelled", async () => {
     const { user } = renderBalances(flatId());
-
+    const button = await screen.findByRole("button", {
+      name: RECORD_CELINA_EUR,
+    });
+    await user.click(button);
     await user.click(
-      await screen.findByRole("button", { name: WRITE_OFF_PLN })
-    );
-    await user.click(await screen.findByRole("menuitem", { name: SPLIT }));
-    const dialog = await screen.findByRole("alertdialog");
-    expect(namesOfPayments(dialog)).toEqual([
-      "Dawid Lewandowski → Alice NowakPLN 352.50",
-      "Dawid Lewandowski → Bartek KowalskiPLN 352.50",
-      "Dawid Lewandowski → Celina WiśniewskaPLN 352.50",
-    ]);
-    await user.click(within(dialog).getByRole("button", { name: "Write off" }));
-
-    await screen.findByText(WAS_WRITTEN_OFF);
-    const recorded = db.state.settlements.slice(before);
-    expect(recorded).toHaveLength(3);
-    for (const payment of recorded) {
-      expect(payment.note).toBe("Write-off");
-      expect(payment.confirmedAt).not.toBeNull();
-    }
-  });
-
-  /** Start splitting Dawid's debt, with the second payment failing. */
-  async function splitFailingOnSecondPayment() {
-    const rendered = renderBalances(flatId());
-    const { user } = rendered;
-    await user.click(
-      await screen.findByRole("button", { name: WRITE_OFF_PLN })
-    );
-    await user.click(await screen.findByRole("menuitem", { name: SPLIT }));
-    const dialog = await screen.findByRole("alertdialog");
-    let calls = 0;
-    server.use(
-      http.post("*/api/households/:householdId/settlements", () => {
-        calls += 1;
-        return calls === 2
-          ? HttpResponse.json(
-              { code: "INTERNAL", message: "Down" },
-              { status: 500 }
-            )
-          : undefined;
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Cancel",
       })
     );
-    await user.click(within(dialog).getByRole("button", { name: "Write off" }));
-    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
-      "1 of 3 payments were recorded"
-    );
-    return { ...rendered, dialog };
-  }
 
-  const REMAINING_SHARES = [
-    "Dawid Lewandowski → Bartek KowalskiPLN 352.50",
-    "Dawid Lewandowski → Celina WiśniewskaPLN 352.50",
-  ];
-
-  it("keeps a split equal when a failed write-off is tried again", async () => {
-    const before = db.state.settlements.length;
-    const { user, dialog } = await splitFailingOnSecondPayment();
-
-    // The balance has moved by now, and the shares still haven't.
-    expect(await screen.findByText("Owes PLN 705.00")).toBeInTheDocument();
-    expect(namesOfPayments(dialog)).toEqual(REMAINING_SHARES);
-
-    await user.click(within(dialog).getByRole("button", { name: "Write off" }));
-
-    await screen.findByText(WAS_WRITTEN_OFF);
-    const recorded = db.state.settlements.slice(before);
-    expect(recorded.map(({ amount }) => amount.amountCents)).toEqual([
-      35_250, 35_250, 35_250,
-    ]);
-    expect(new Set(recorded.map(({ payeeId }) => payeeId)).size).toBe(3);
+    await waitFor(() => expect(button).toHaveFocus());
   });
 
-  it("offers only the unfinished payments after closing a failed write-off", async () => {
-    const { user, dialog } = await splitFailingOnSecondPayment();
-
-    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+  it("asks for another admin when an admin pays someone who left", async () => {
+    const { user } = renderBalances(flatId());
     await user.click(
-      await screen.findByRole("button", { name: WRITE_OFF_PLN })
+      await screen.findByRole("button", { name: "Record payment" })
     );
+    const dialog = await screen.findByRole("dialog");
+    await pick(user, dialog, "Who got paid", "Dawid Lewandowski (left)");
 
-    expect(
-      screen.queryByRole("menuitem", { name: SPLIT })
-    ).not.toBeInTheDocument();
-    await user.click(
-      await screen.findByRole("menuitem", {
-        name: "Finish the write-off (2 left)",
-      })
+    expect(dialog).toHaveTextContent(
+      "stays pending until another admin confirms it"
     );
-    expect(namesOfPayments(await screen.findByRole("alertdialog"))).toEqual(
-      REMAINING_SHARES
-    );
-  });
-
-  it("doesn't offer write-offs to anyone but admins and owners", async () => {
-    const memberRow = (email: string) => {
-      const found = db.userByEmail(email);
-      return db.state.members.find(
-        (member) =>
-          member.householdId === flatId() && member.userId === found?.id
-      );
-    };
-    const alice = memberRow("alice@example.com");
-    const bartek = memberRow("bartek@example.com");
-    if (!(alice && bartek)) {
-      throw new Error("The scenario has no Alice or Bartek in the flat");
-    }
-    alice.role = "member";
-    bartek.role = "owner";
-    renderBalances(flatId());
-
-    await rowOf("PLN", "Dawid Lewandowski");
-    expect(
-      screen.queryByRole("button", { name: WRITE_OFF_PLN })
-    ).not.toBeInTheDocument();
   });
 });

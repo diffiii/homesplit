@@ -2,7 +2,7 @@
 
 import type { UserSummary } from "@homesplit/contracts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { type ReactElement, useState } from "react";
+import type { ComponentProps } from "react";
 import { toast } from "sonner";
 import { useAppForm } from "@/components/form";
 import {
@@ -14,7 +14,6 @@ import {
   ResponsiveDialogFooter,
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
-  ResponsiveDialogTrigger,
 } from "@/components/responsive-dialog";
 import {
   useHousehold,
@@ -68,19 +67,23 @@ export function useParties(): UserSummary[] {
 }
 
 export function PaymentDialog({
+  finalFocus,
+  onOpenChange,
+  onRecorded,
+  open,
   prefill,
-  trigger,
 }: {
+  finalFocus?: ComponentProps<typeof ResponsiveDialogContent>["finalFocus"];
+  onOpenChange: (open: boolean) => void;
+  onRecorded: () => void;
+  open: boolean;
   prefill?: PaymentPrefill;
-  trigger: ReactElement;
 }) {
-  const [open, setOpen] = useState(false);
   return (
-    <ResponsiveDialog onOpenChange={setOpen} open={open}>
-      <ResponsiveDialogTrigger render={trigger} />
-      <ResponsiveDialogContent>
+    <ResponsiveDialog onOpenChange={onOpenChange} open={open}>
+      <ResponsiveDialogContent finalFocus={finalFocus}>
         {/* Mounted only while open, so every opening starts from fresh values. */}
-        <PaymentForm onRecorded={() => setOpen(false)} prefill={prefill} />
+        <PaymentForm onRecorded={onRecorded} prefill={prefill} />
       </ResponsiveDialogContent>
     </ResponsiveDialog>
   );
@@ -93,7 +96,7 @@ function PaymentForm({
   onRecorded: () => void;
   prefill?: PaymentPrefill;
 }) {
-  const { household, userId } = useHousehold();
+  const { household, role, userId } = useHousehold();
   const householdId = household.id;
   const queryClient = useQueryClient();
   const can = usePermissions();
@@ -228,7 +231,8 @@ function PaymentForm({
                 {describeOutcome(
                   payerId === userId,
                   parties.find(({ id }) => id === payeeId),
-                  isDeparted
+                  isDeparted,
+                  role === "member" ? "an admin" : "another admin"
                 )}
               </p>
             )}
@@ -250,12 +254,13 @@ function PaymentForm({
 function describeOutcome(
   recordedByPayer: boolean,
   payee: UserSummary | undefined,
-  isDeparted: (user: UserSummary) => boolean
+  isDeparted: (user: UserSummary) => boolean,
+  admin: string
 ): string {
   if (!recordedByPayer) {
     return "It's confirmed right away, because you aren't the one who paid.";
   }
   const confirmer =
-    payee && !isDeparted(payee) ? `${payee.name} or an admin` : "an admin";
+    payee && !isDeparted(payee) ? `${payee.name} or ${admin}` : admin;
   return `It stays pending until ${confirmer} confirms it, and balances don't change until then.`;
 }

@@ -13,8 +13,10 @@ interface QueryStateProps<T> {
 }
 
 /**
- * The skeleton, the error with a retry, or the content, for one query. The
- * content decides its own empty state, since only it knows what empty means.
+ * The skeleton, the error with a retry, or the content, for one query. A
+ * refetch that fails keeps the data shown, along with any dialog or form open
+ * in it. The content decides its own empty state, since only it knows what
+ * empty means.
  */
 export function QueryState<T>({
   query,
@@ -22,19 +24,18 @@ export function QueryState<T>({
   errorTitle,
   children,
 }: QueryStateProps<T>) {
-  switch (query.status) {
-    case "pending":
-      return skeleton;
-    case "error":
-      return (
-        <ErrorState
-          error={query.error}
-          onRetry={query.refetch}
-          retrying={query.isRefetching}
-          title={errorTitle}
-        />
-      );
-    default:
-      return children(query.data);
+  if (query.isPending) {
+    return skeleton;
   }
+  if (query.isLoadingError) {
+    return (
+      <ErrorState
+        error={query.error}
+        onRetry={query.refetch}
+        retrying={query.isRefetching}
+        title={errorTitle}
+      />
+    );
+  }
+  return children(query.data);
 }

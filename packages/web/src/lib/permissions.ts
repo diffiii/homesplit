@@ -109,8 +109,6 @@ export function permissionsFor(caller: Caller, members: readonly MemberRef[]) {
     /** Withdraw or reject a payment while it's pending. */
     deletePayment: (payment: PaymentRef) =>
       payment.status === "pending" && (admin || isParty(payment)),
-    /** Settle a departed member's balance with payments marked as a write-off. */
-    writeOff: admin,
     /** Create, edit, delete, complete, and reopen chores. */
     manageChores: true,
     /** Add, edit, delete, purchase, and clear shopping items. */

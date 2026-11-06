@@ -1,4 +1,5 @@
 import { expect, type Locator } from "@playwright/test";
+import { DEFAULT_SCENARIO, SCENARIOS } from "../../src/mocks/scenarios";
 import { expectNoAxeViolations } from "../axe";
 import { test } from "./fixtures";
 
@@ -16,9 +17,7 @@ const ALICE = /^Alice/u;
 const CELINA = /^Celina/u;
 const GROCERIES_RUN = /^Groceries run/u;
 const EUR_GROUP = /^EUR/u;
-const PLN_GROUP = /^PLN/u;
 const RECORD_CELINA_EUR = /^Record: Celina Wiśniewska pays you EUR/u;
-const SPLIT_DEBT = /^Split/u;
 
 test("scrolls, filters, and opens an expense", async ({ page }) => {
   test.slow();
@@ -263,7 +262,7 @@ test("keeps departed payers and weighted participants readable", async ({
   await expectNoAxeViolations(page);
 });
 
-test("reaches balances from expenses, settles a suggestion, and writes off a debt", async ({
+test("reaches balances from expenses and settles a suggestion", async ({
   page,
 }) => {
   test.slow();
@@ -284,17 +283,10 @@ test("reaches balances from expenses, settles a suggestion, and writes off a deb
   await payment.getByRole("button", { name: "Record payment" }).click();
   await expect(euros.getByText("EUR 45.00").first()).toBeVisible();
 
-  await page
-    .getByRole("button", {
-      name: "Write off Dawid Lewandowski's balance in PLN",
-    })
-    .click();
-  await page.getByRole("menuitem", { name: SPLIT_DEBT }).click();
-  const writeOff = page.getByRole("alertdialog");
-  await expect(writeOff.getByRole("listitem")).toHaveCount(3);
+  // Alice owes money in the cabin, so her highlighted row shows a debt.
+  const { households } = SCENARIOS[DEFAULT_SCENARIO].build();
+  const cabin = households.find(({ name }) => name === "Lake cabin");
+  await page.goto(`/households/${cabin?.id}/expenses/balances`);
+  await expect(page.getByText("You owe EUR 320.00")).toBeVisible();
   await expectNoAxeViolations(page);
-  await writeOff.getByRole("button", { name: "Write off" }).click();
-  await expect(
-    page.getByRole("region", { name: PLN_GROUP }).getByText("Dawid Lewandowski")
-  ).toHaveCount(0);
 });

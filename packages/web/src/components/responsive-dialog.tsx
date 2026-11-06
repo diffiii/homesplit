@@ -1,7 +1,13 @@
 "use client";
 
 import { cn } from "cn";
-import { createContext, type ReactElement, type ReactNode, use } from "react";
+import {
+  type ComponentProps,
+  createContext,
+  type ReactElement,
+  type ReactNode,
+  use,
+} from "react";
 import {
   Dialog,
   DialogClose,
@@ -80,17 +86,29 @@ export function ResponsiveDialogClose({
   return <Close render={render}>{children}</Close>;
 }
 
-export function ResponsiveDialogContent({ children, className }: PartProps) {
+export function ResponsiveDialogContent({
+  children,
+  className,
+  finalFocus,
+}: PartProps & {
+  /** Where focus goes on close, when the element that opened the dialog may be gone. */
+  finalFocus?: ComponentProps<typeof DialogContent>["finalFocus"];
+}) {
   if (use(SheetContext)) {
     return (
       <DrawerContent
         className={cn("pb-[env(safe-area-inset-bottom)]", className)}
+        finalFocus={finalFocus}
       >
         {children}
       </DrawerContent>
     );
   }
-  return <DialogContent className={className}>{children}</DialogContent>;
+  return (
+    <DialogContent className={className} finalFocus={finalFocus}>
+      {children}
+    </DialogContent>
+  );
 }
 
 export function ResponsiveDialogHeader({ children, className }: PartProps) {

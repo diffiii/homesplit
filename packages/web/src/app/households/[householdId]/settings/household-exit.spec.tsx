@@ -132,6 +132,28 @@ describe("LeaveHousehold", () => {
   });
 });
 
+describe("LeaveHousehold after the other owner stepped down", () => {
+  it("explains the server's refusal", async () => {
+    settle("Flat on Piękna");
+    const bartek = memberOf("Flat on Piękna", "bartek@example.com");
+    if (!bartek) {
+      throw new Error("The scenario has no Bartek in the flat");
+    }
+    bartek.role = "owner";
+    const { user } = renderSettings(household("Flat on Piękna").id);
+
+    await user.click(await leaveButton());
+    bartek.role = "admin";
+    const dialog = await screen.findByRole("alertdialog");
+    await user.click(within(dialog).getByRole("button", { name: "Leave" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Make someone else an owner first"
+    );
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+});
+
 describe("DeleteHousehold", () => {
   it("isn't offered to anyone but owners", async () => {
     renderSettings(household("Lake cabin").id);

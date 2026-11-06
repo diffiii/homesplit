@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { cn } from "cn";
 import { ArrowLeftIcon, CircleCheckIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
+import { type MouseEvent, useRef, useState } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { ListSkeleton } from "@/components/list-skeleton";
 import { ModuleDisabledAlert } from "@/components/module-disabled-alert";
@@ -28,8 +29,16 @@ import { UserLabel } from "@/components/user-avatar";
 import { endpointQuery } from "@/lib/api/queries";
 import { currencyName, formatMoney } from "@/lib/money";
 import { describeBalance, describeTransfer } from "@/lib/settlements";
-import { PaymentDialog, useParties } from "./payment-dialog";
-import { WriteOffMenu } from "./write-off-menu";
+import {
+  PaymentDialog,
+  type PaymentPrefill,
+  useParties,
+} from "./payment-dialog";
+
+type StartPayment = (
+  event: MouseEvent<HTMLElement>,
+  prefill?: PaymentPrefill
+) => void;
 
 /** Who owes whom in each currency, and the payments that would settle it. */
 export default function BalancesPage() {
@@ -40,6 +49,21 @@ export default function BalancesPage() {
   );
   const parties = useParties();
   const open = balances.data?.items.filter(isOpen);
+
+  // One dialog for the whole page: recording a suggestion refetches the list
+  // and may remove the row it was opened from, which mustn't take the dialog
+  // with it. Cancelling returns focus to the button that opened it; recording
+  // sends it to the header's button, since a suggestion's may be about to go.
+  const [payment, setPayment] = useState<{
+    open: boolean;
+    prefill?: PaymentPrefill;
+  }>({ open: false });
+  const opener = useRef<HTMLElement | null>(null);
+  const recordButton = useRef<HTMLButtonElement>(null);
+  const startPayment: StartPayment = (event, prefill) => {
+    opener.current = event.currentTarget;
+    setPayment({ open: true, prefill });
+  };
 
   return (
     <>
@@ -57,14 +81,10 @@ export default function BalancesPage() {
       <PageHeader
         actions={
           enabled && parties.length > 1 ? (
-            <PaymentDialog
-              trigger={
-                <Button>
-                  <PlusIcon aria-hidden data-icon="inline-start" />
-                  Record payment
-                </Button>
-              }
-            />
+            <Button onClick={(event) => startPayment(event)} ref={recordButton}>
+              <PlusIcon aria-hidden data-icon="inline-start" />
+              Record payment
+            </Button>
           ) : null
         }
         description="Each currency is settled on its own: amounts are never converted or added together."
@@ -89,7 +109,21 @@ export default function BalancesPage() {
           )
         }
       </QueryState>
-      {open?.length ? <Suggestions /> : null}
+      {open?.length ? <Suggestions onRecord={startPayment} /> : null}
+      <PaymentDialog
+        finalFocus={() =>
+          opener.current?.isConnected ? opener.current : recordButton.current
+        }
+        onOpenChange={(next) =>
+          setPayment((current) => ({ ...current, open: next }))
+        }
+        onRecorded={() => {
+          opener.current = null;
+          setPayment((current) => ({ ...current, open: false }));
+        }}
+        open={payment.open}
+        prefill={payment.prefill}
+      />
     </>
   );
 }
@@ -100,8 +134,6 @@ const isOpen = ({ balances }: CurrencyBalances) =>
 function CurrencyGroup({ group }: { group: CurrencyBalances }) {
   const { userId } = useHousehold();
   const isDeparted = useIsDeparted();
-  const can = usePermissions();
-  const enabled = useFeatureEnabled("expenses");
   const { currency, balances } = group;
   const headingId = `balances-${currency}`;
   return (
@@ -113,8 +145,7 @@ function CurrencyGroup({ group }: { group: CurrencyBalances }) {
         </span>
       </h2>
       <ul className="flex flex-col divide-y overflow-hidden rounded-xl border">
-        {balances.map((balance) => {
-          const { user, amountCents } = balance;
+        {balances.map(({ user, amountCents }) => {
           const you = user.id === userId;
           const departed = isDeparted(user);
           return (
@@ -126,24 +157,13 @@ function CurrencyGroup({ group }: { group: CurrencyBalances }) {
               key={user.id}
             >
               <UserLabel departed={departed} user={user} you={you} />
-              <span className="ml-auto flex items-center gap-3">
-                <span
-                  className={cn(
-                    "text-sm tabular-nums",
-                    you && "font-medium",
-                    amountCents < 0 && "text-destructive",
-                    amountCents === 0 && "text-muted-foreground"
-                  )}
-                >
-                  {describeBalance(amountCents, currency, { you })}
-                </span>
-                {enabled && can.writeOff && departed && amountCents !== 0 ? (
-                  <WriteOffMenu
-                    balances={balances}
-                    currency={currency}
-                    subject={balance}
-                  />
-                ) : null}
+              <span
+                className={cn(
+                  "ml-auto text-sm tabular-nums",
+                  you ? ownRowColor(amountCents) : otherRowColor(amountCents)
+                )}
+              >
+                {describeBalance(amountCents, currency, { you })}
               </span>
             </li>
           );
@@ -153,7 +173,22 @@ function CurrencyGroup({ group }: { group: CurrencyBalances }) {
   );
 }
 
-function Suggestions() {
+const otherRowColor = (amountCents: number) => {
+  if (amountCents < 0) {
+    return "text-destructive";
+  }
+  return amountCents === 0 ? "text-muted-foreground" : undefined;
+};
+
+/** The highlighted row's background needs stronger colors to keep 4.5:1. */
+const ownRowColor = (amountCents: number) =>
+  cn(
+    "font-medium",
+    amountCents < 0 &&
+      "dark:text-destructive text-[color-mix(in_oklch,var(--destructive),black_20%)]"
+  );
+
+function Suggestions({ onRecord }: { onRecord: StartPayment }) {
   const householdId = useHouseholdId();
   const suggestions = useQuery(
     endpointQuery("listSettlementSuggestions", { params: { householdId } })
@@ -178,7 +213,11 @@ function Suggestions() {
       >
         {({ items }) =>
           items.map((group) => (
-            <CurrencySuggestions group={group} key={group.currency} />
+            <CurrencySuggestions
+              group={group}
+              key={group.currency}
+              onRecord={onRecord}
+            />
           ))
         }
       </QueryState>
@@ -188,8 +227,10 @@ function Suggestions() {
 
 function CurrencySuggestions({
   group: { currency, suggestions },
+  onRecord,
 }: {
   group: CurrencySettlementSuggestions;
+  onRecord: StartPayment;
 }) {
   const { userId } = useHousehold();
   const mine = ({ payer, payee }: SettlementSuggestion) =>
@@ -206,6 +247,7 @@ function CurrencySuggestions({
         <SuggestionRow
           currency={currency}
           key={`${suggestion.payer.id}-${suggestion.payee.id}`}
+          onRecord={onRecord}
           suggestion={suggestion}
         />
       ))}
@@ -215,9 +257,11 @@ function CurrencySuggestions({
 
 function SuggestionRow({
   currency,
+  onRecord,
   suggestion,
 }: {
   currency: string;
+  onRecord: StartPayment;
   suggestion: SettlementSuggestion;
 }) {
   const { userId } = useHousehold();
@@ -241,23 +285,21 @@ function SuggestionRow({
         </span>
       </div>
       {enabled && can.recordPayment(suggestion) ? (
-        <PaymentDialog
-          prefill={{
-            payerId: payer.id,
-            payeeId: payee.id,
-            amountCents,
-            currency,
-          }}
-          trigger={
-            <Button
-              aria-label={`Record: ${transfer} ${amount}`}
-              size="sm"
-              variant="outline"
-            >
-              Record
-            </Button>
+        <Button
+          aria-label={`Record: ${transfer} ${amount}`}
+          onClick={(event) =>
+            onRecord(event, {
+              payerId: payer.id,
+              payeeId: payee.id,
+              amountCents,
+              currency,
+            })
           }
-        />
+          size="sm"
+          variant="outline"
+        >
+          Record
+        </Button>
       ) : null}
     </li>
   );
