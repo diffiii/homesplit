@@ -30,3 +30,16 @@ export function expenseListQuery(householdId: string, filters: ExpenseFilters) {
       page * pageSize < totalItems ? page + 1 : undefined,
   });
 }
+
+/**
+ * What adding, editing, or deleting an expense changes: every page and filter
+ * of the list, the balances, and the payments that would settle them.
+ */
+export function ledgerQueryKeys(householdId: string) {
+  const input = { params: { householdId } };
+  return [
+    queryKeys.endpoint("listExpenses", input),
+    queryKeys.endpoint("listBalances", input),
+    queryKeys.endpoint("listSettlementSuggestions", input),
+  ];
+}

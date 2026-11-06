@@ -3,12 +3,15 @@ import {
   AllocationError,
   allocate,
   CreateExpenseRequest,
+  type Expense,
   type ExpenseAllocationInput,
+  type ExpenseFinancialSpec,
   FULL_PERCENTAGE_BASIS_POINTS,
   MAX_AMOUNT_CENTS,
   type SplitMethod,
+  type UpdateExpenseRequest,
 } from "@homesplit/contracts";
-import { issuesOf } from "@/lib/api/api-error";
+import { type Issue, isApiRequestError, issuesOf } from "@/lib/api/api-error";
 import { errorMessage } from "@/lib/api/error-message";
 import type { ServerErrors } from "@/lib/form";
 import {
@@ -681,11 +684,31 @@ export function validateExpense(
 }
 
 /**
- * Where the server's answer to a create goes. A payer or participant who
- * left the household meanwhile is named on their list, and a deleted
- * category on the category; anything else goes to its row or the form.
+ * The payer or participant an issue at `path` rejects, by user ID: one who
+ * left the household meanwhile, or one an edit may no longer keep.
  */
-export function createExpenseServerErrors(
+function rejectedUser(
+  path: readonly PropertyKey[],
+  values: Pick<
+    ExpenseFormValues,
+    "advanced" | "method" | "participantIds" | "payerIds"
+  >
+): { field: "participantIds" | "payerIds"; userId: string } | undefined {
+  const field = fieldForPath(path, values);
+  const index = path.at(-2);
+  if (
+    (field !== "payerIds" && field !== "participantIds") ||
+    typeof index !== "number" ||
+    path.at(-1) !== "userId"
+  ) {
+    return;
+  }
+  const userId = values[field][index];
+  return userId ? { field, userId } : undefined;
+}
+
+function expenseServerErrors(
+  issues: readonly Issue[],
   error: unknown,
   values: Pick<
     ExpenseFormValues,
@@ -696,17 +719,11 @@ export function createExpenseServerErrors(
   const fields: Record<string, string> = {};
   const departed = { payerIds: [] as string[], participantIds: [] as string[] };
   const unplaced: string[] = [];
-  for (const { path, message } of issuesOf(error)) {
+  for (const { path, message } of issues) {
     const field = fieldForPath(path, values);
-    const index = path.at(-2);
-    const list = field === "payerIds" ? values.payerIds : values.participantIds;
-    if (
-      (field === "payerIds" || field === "participantIds") &&
-      typeof index === "number" &&
-      path.at(-1) === "userId" &&
-      list[index]
-    ) {
-      departed[field].push(nameOf(list[index]));
+    const rejected = rejectedUser(path, values);
+    if (rejected) {
+      departed[rejected.field].push(nameOf(rejected.userId));
     } else if (field === "categoryId") {
       fields.categoryId ??= "This category was deleted. Pick another one.";
     } else if (field) {
@@ -728,4 +745,210 @@ export function createExpenseServerErrors(
     return { fields };
   }
   return { fields, form: errorMessage(error) };
+}
+
+/**
+ * Where the server's answer to a create goes. A payer or participant who
+ * left the household meanwhile is named on their list, and a deleted
+ * category on the category; anything else goes to its row or the form.
+ */
+export function createExpenseServerErrors(
+  error: unknown,
+  values: Pick<
+    ExpenseFormValues,
+    "advanced" | "method" | "participantIds" | "payerIds"
+  >,
+  nameOf: (userId: string) => string
+): ServerErrors {
+  return expenseServerErrors(issuesOf(error), error, values, nameOf);
+}
+
+/** The edit form's start: the stored expense, in simple mode if it fits. */
+export function expenseFormValues(
+  expense: Expense,
+  userId: string
+): ExpenseFormValues {
+  const { currency } = expense.total;
+  const money = (cents: number) => toDecimalString(cents, currency);
+  const { allocation } = expense;
+  const splits: SplitInputs = {
+    percentage: null,
+    shares: {},
+    exact: null,
+    adjustment: {},
+  };
+  switch (allocation.method) {
+    case "percentage":
+      splits.percentage = Object.fromEntries(
+        allocation.participants.map((p) => [
+          p.userId,
+          formatPercentage(p.basisPoints),
+        ])
+      );
+      break;
+    case "shares":
+      splits.shares = Object.fromEntries(
+        allocation.participants.map((p) => [p.userId, String(p.shares)])
+      );
+      break;
+    case "exact":
+      splits.exact = Object.fromEntries(
+        allocation.participants.map((p) => [p.userId, money(p.amountCents)])
+      );
+      break;
+    case "adjustment":
+      // No adjustment shows as an empty input, as in a new expense.
+      splits.adjustment = Object.fromEntries(
+        allocation.participants.map((p) => [
+          p.userId,
+          p.adjustmentCents === 0 ? "" : money(p.adjustmentCents),
+        ])
+      );
+      break;
+    default:
+      break;
+  }
+  const values: ExpenseFormValues = {
+    name: expense.name,
+    amount: money(expense.total.amountCents),
+    currency,
+    expenseDate: expense.expenseDate,
+    categoryId: expense.category?.id ?? null,
+    participantIds: allocation.participants.map((p) => p.userId),
+    advanced: true,
+    payerIds: expense.payers.map(({ user }) => user.id),
+    payerAmounts: Object.fromEntries(
+      expense.payers.map(({ user, amountCents }) => [
+        user.id,
+        money(amountCents),
+      ])
+    ),
+    method: allocation.method,
+    splits,
+  };
+  return fitsSimpleMode(values, userId)
+    ? { ...values, advanced: false, payerAmounts: null }
+    : values;
+}
+
+/**
+ * The spec as JSON that doesn't depend on order: payers and participants by
+ * user, keys sorted. Rounding goes by user ID, never by order (see
+ * docs/money.md), so specs with the same key give the same splits.
+ */
+function financialKey({
+  total,
+  payers,
+  allocation,
+}: ExpenseFinancialSpec): string {
+  const byUser = <T extends { userId: string }>(list: readonly T[]) =>
+    [...list].sort((a, b) => a.userId.localeCompare(b.userId));
+  return JSON.stringify(
+    {
+      total,
+      payers: byUser(payers),
+      allocation: {
+        ...allocation,
+        participants: byUser(allocation.participants),
+      },
+    },
+    (_key, value: unknown) =>
+      typeof value === "object" && value !== null && !Array.isArray(value)
+        ? Object.fromEntries(
+            Object.entries(value).sort(([a], [b]) => a.localeCompare(b))
+          )
+        : value
+  );
+}
+
+/**
+ * The patch that turns `expense` into `values`: each descriptive field that
+ * changed, `null` where it was cleared, and `financial` as a whole only if
+ * the amount, currency, payers, or split changed. Empty when nothing did,
+ * and `null` while an input doesn't parse.
+ */
+export function toUpdateExpenseRequest(
+  values: ExpenseFormValues,
+  expense: Expense,
+  payerId: string
+): UpdateExpenseRequest | null {
+  const request = toCreateExpenseRequest(values, payerId);
+  if (!request) {
+    return null;
+  }
+  const { total, payers, allocation } = request;
+  const patch: UpdateExpenseRequest = {};
+  if (request.name !== expense.name) {
+    patch.name = request.name;
+  }
+  if (request.expenseDate !== expense.expenseDate) {
+    patch.expenseDate = request.expenseDate;
+  }
+  const categoryId = request.categoryId ?? null;
+  if (categoryId !== (expense.category?.id ?? null)) {
+    patch.categoryId = categoryId;
+  }
+  const financial = { total, payers, allocation };
+  const stored: ExpenseFinancialSpec = {
+    total: expense.total,
+    payers: expense.payers.map(({ user, amountCents }) => ({
+      userId: user.id,
+      amountCents,
+    })),
+    allocation: expense.allocation,
+  };
+  if (financialKey(financial) !== financialKey(stored)) {
+    patch.financial = financial;
+  }
+  return patch;
+}
+
+export const STALE_EXPENSE_MESSAGE =
+  "This expense changed while you were editing it. Reload the page to see the latest version, then make your change again.";
+
+/**
+ * Where the server's answer to an edit goes. The last write wins, so only an
+ * edit another one made impossible asks the user to reload: the expense is
+ * gone, a departed person it kept was taken off, or a write raced it.
+ */
+export function updateExpenseServerErrors(
+  error: unknown,
+  values: Pick<
+    ExpenseFormValues,
+    "advanced" | "method" | "participantIds" | "payerIds"
+  >,
+  nameOf: (userId: string) => string,
+  /** The expense as it was when the form opened. */
+  expense: Expense
+): ServerErrors {
+  if (isApiRequestError(error) && error.status === 404) {
+    return {
+      fields: {},
+      form: "This expense was deleted while you were editing it.",
+    };
+  }
+  if (isApiRequestError(error) && error.code === "CONFLICT") {
+    return { fields: {}, form: STALE_EXPENSE_MESSAGE };
+  }
+  // A financial replacement's issues sit under `financial`, a create's at the top.
+  const issues = issuesOf(error).map(({ path, message }) => ({
+    message,
+    path: path[0] === "financial" ? path.slice(1) : path,
+  }));
+  const onExpense = new Set([
+    ...expense.payers.map(({ user }) => user.id),
+    ...expense.allocation.participants.map(({ userId }) => userId),
+  ]);
+  const keptButRemoved = issues.some(({ path }) => {
+    const rejected = rejectedUser(path, values);
+    return rejected !== undefined && onExpense.has(rejected.userId);
+  });
+  if (
+    isApiRequestError(error) &&
+    error.code === "INVALID_REFERENCE" &&
+    keptButRemoved
+  ) {
+    return { fields: {}, form: STALE_EXPENSE_MESSAGE };
+  }
+  return expenseServerErrors(issues, error, values, nameOf);
 }
