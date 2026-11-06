@@ -22,10 +22,11 @@ import {
   usePermissions,
 } from "@/components/shell/household-context";
 import { Button } from "@/components/ui/button";
+import { isApiRequestError, NO_STATUS } from "@/lib/api/api-error";
 import { api } from "@/lib/api/client";
 import { settlementQueryKeys } from "@/lib/api/expense-queries";
 import { endpointQuery, invalidate } from "@/lib/api/queries";
-import { applyServerErrors } from "@/lib/form";
+import { applyServerErrors, showServerErrors } from "@/lib/form";
 import { toDecimalString } from "@/lib/money";
 import { readLastExpenseCurrency } from "@/lib/recent-currencies";
 import { PaymentFormValues, toPaymentRequest } from "@/lib/settlements";
@@ -144,7 +145,17 @@ function PaymentForm({
           body: toPaymentRequest(value),
         });
       } catch (error) {
-        applyServerErrors(formApi, error);
+        if (isApiRequestError(error) && error.status === NO_STATUS) {
+          // It may have been saved, and the server can't tell a retry from a
+          // second payment (docs/api/expenses.md, "Repeated requests").
+          showServerErrors(formApi, {
+            fields: {},
+            form: "HomeSplit didn't get an answer, so this payment may have gone through. Close this and check before recording it again.",
+          });
+          invalidate(queryClient, settlementQueryKeys(householdId));
+        } else {
+          applyServerErrors(formApi, error);
+        }
         return;
       }
       await invalidate(queryClient, settlementQueryKeys(householdId));

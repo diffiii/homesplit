@@ -7,9 +7,14 @@ import type {
 } from "@homesplit/contracts";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "cn";
-import { ArrowLeftIcon, CircleCheckIcon, PlusIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  CircleCheckIcon,
+  PlusIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import Link from "next/link";
-import { type MouseEvent, useRef, useState } from "react";
+import { type MouseEvent, type ReactNode, useRef, useState } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { ListSkeleton } from "@/components/list-skeleton";
 import { ModuleDisabledAlert } from "@/components/module-disabled-alert";
@@ -23,8 +28,10 @@ import {
   usePermissions,
 } from "@/components/shell/household-context";
 import { householdPath } from "@/components/shell/household-nav";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { UserLabel } from "@/components/user-avatar";
 import { endpointQuery } from "@/lib/api/queries";
 import { currencyName, formatMoney } from "@/lib/money";
@@ -91,6 +98,14 @@ export default function BalancesPage() {
         title="Balances"
       />
       {enabled ? null : <ModuleDisabledAlert module="Expenses" />}
+      {balances.isRefetchError ? (
+        <RefreshFailed
+          onRetry={balances.refetch}
+          retrying={balances.isRefetching}
+        >
+          Couldn't refresh the balances, so these may be out of date.
+        </RefreshFailed>
+      ) : null}
       <QueryState
         query={balances}
         skeleton={<ListSkeleton label="Loading balances" rows={3} />}
@@ -125,6 +140,35 @@ export default function BalancesPage() {
         prefill={payment.prefill}
       />
     </>
+  );
+}
+
+/** A refetch failed, so what's on screen stays, marked as possibly out of date. */
+function RefreshFailed({
+  children,
+  onRetry,
+  retrying,
+}: {
+  children: ReactNode;
+  onRetry: () => unknown;
+  retrying: boolean;
+}) {
+  return (
+    <Alert role="alert">
+      <TriangleAlertIcon aria-hidden />
+      <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+        <span>{children}</span>
+        <Button
+          disabled={retrying}
+          onClick={() => onRetry()}
+          size="sm"
+          variant="outline"
+        >
+          {retrying ? <Spinner data-icon="inline-start" /> : null}
+          Try again
+        </Button>
+      </AlertDescription>
+    </Alert>
   );
 }
 
@@ -207,6 +251,17 @@ function Suggestions({ onRecord }: { onRecord: StartPayment }) {
           has changed hands, record it here.
         </p>
       </div>
+      {/* A stale suggestion may already be recorded, and recording it again
+          could add a confirmed payment nobody can delete. */}
+      {suggestions.isRefetchError ? (
+        <RefreshFailed
+          onRetry={suggestions.refetch}
+          retrying={suggestions.isRefetching}
+        >
+          Couldn't refresh these, so they may already be paid. Try again before
+          recording one.
+        </RefreshFailed>
+      ) : null}
       <QueryState
         query={suggestions}
         skeleton={<ListSkeleton label="Loading suggested payments" rows={2} />}
@@ -216,7 +271,7 @@ function Suggestions({ onRecord }: { onRecord: StartPayment }) {
             <CurrencySuggestions
               group={group}
               key={group.currency}
-              onRecord={onRecord}
+              onRecord={suggestions.isRefetchError ? undefined : onRecord}
             />
           ))
         }
@@ -230,7 +285,8 @@ function CurrencySuggestions({
   onRecord,
 }: {
   group: CurrencySettlementSuggestions;
-  onRecord: StartPayment;
+  /** Left out while the suggestions may be out of date. */
+  onRecord?: StartPayment;
 }) {
   const { userId } = useHousehold();
   const mine = ({ payer, payee }: SettlementSuggestion) =>
@@ -261,7 +317,7 @@ function SuggestionRow({
   suggestion,
 }: {
   currency: string;
-  onRecord: StartPayment;
+  onRecord?: StartPayment;
   suggestion: SettlementSuggestion;
 }) {
   const { userId } = useHousehold();
@@ -284,7 +340,7 @@ function SuggestionRow({
           {amount}
         </span>
       </div>
-      {enabled && can.recordPayment(suggestion) ? (
+      {onRecord && enabled && can.recordPayment(suggestion) ? (
         <Button
           aria-label={`Record: ${transfer} ${amount}`}
           onClick={(event) =>

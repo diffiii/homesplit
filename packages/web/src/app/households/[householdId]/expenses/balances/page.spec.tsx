@@ -41,6 +41,9 @@ const rowOf = async (currency: string, name: string) =>
     .getByText(name, { exact: false })
     .closest("li") as HTMLElement;
 
+const MAY_BE_PAID = /may already be paid/u;
+const MAY_HAVE_GONE_THROUGH = /may have gone through/u;
+const RECORD_BARTEK_EUR = /^Record: Bartek Kowalski pays you EUR/u;
 const RECORD_CELINA_EUR = /^Record: Celina Wiśniewska pays you EUR/u;
 const RECORD_PAY_EWA = /^Record: You pay Ewa/u;
 const RECORD_BARTEK_EWA = /^Record: Bartek Kowalski pays Ewa/u;
@@ -277,7 +280,98 @@ describe("BalancesPage", () => {
     });
   });
 
-  it("keeps the list and the dialog when a refetch fails", async () => {
+  const failing = (path: string) =>
+    http.get(`*/api/households/:householdId/${path}`, () =>
+      HttpResponse.json({ code: "INTERNAL", message: "Down" }, { status: 500 })
+    );
+
+  it("keeps the list and flags it when refreshing the balances fails", async () => {
+    const { user } = renderBalances(flatId());
+    await user.click(
+      await screen.findByRole("button", { name: RECORD_CELINA_EUR })
+    );
+    const dialog = await screen.findByRole("dialog");
+
+    server.use(failing("balances"));
+    await user.click(
+      within(dialog).getByRole("button", { name: "Record payment" })
+    );
+
+    await screen.findByText("Payment recorded.");
+    expect(await group("EUR")).toBeVisible();
+    expect(
+      await screen.findByText(
+        "Couldn't refresh the balances, so these may be out of date."
+      )
+    ).toBeVisible();
+  });
+
+  it("keeps an open form and what's typed in it when a refetch fails", async () => {
+    server.use(failing("balances"));
+    const { user, queryClient } = renderBalances(flatId());
+    server.resetHandlers();
+    await user.click(
+      await screen.findByRole("button", { name: "Record payment" })
+    );
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText("Amount"), "12,50");
+
+    server.use(failing("balances"));
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.endpoint("listBalances", {
+        params: { householdId: flatId() },
+      }),
+    });
+
+    expect(screen.getByRole("dialog")).toBe(dialog);
+    expect(within(dialog).getByLabelText("Amount")).toHaveValue("12,50");
+  });
+
+  it("won't record a suggestion that may already be paid until it's refreshed", async () => {
+    const before = db.state.settlements.length;
+    const { user } = renderBalances(flatId());
+    await user.click(
+      await screen.findByRole("button", { name: RECORD_CELINA_EUR })
+    );
+    const dialog = await screen.findByRole("dialog");
+
+    server.use(failing("settlement-suggestions"));
+    await user.click(
+      within(dialog).getByRole("button", { name: "Record payment" })
+    );
+    await screen.findByText("Payment recorded.");
+
+    // Still listed, as the refresh failed, but no longer recordable.
+    expect(await screen.findByText(MAY_BE_PAID)).toBeVisible();
+    const list = screen.getByRole("list", {
+      name: "Suggested payments in EUR",
+    });
+    expect(within(list).getByText("Celina Wiśniewska pays you")).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: RECORD_CELINA_EUR })
+    ).not.toBeInTheDocument();
+    expect(db.state.settlements).toHaveLength(before + 1);
+
+    server.resetHandlers();
+    const banner = screen
+      .getByText(MAY_BE_PAID)
+      .closest("[role=alert]") as HTMLElement;
+    await user.click(within(banner).getByRole("button", { name: "Try again" }));
+
+    await waitFor(() =>
+      expect(screen.queryByText(MAY_BE_PAID)).not.toBeInTheDocument()
+    );
+    expect(
+      within(
+        screen.getByRole("list", { name: "Suggested payments in EUR" })
+      ).queryByText("Celina Wiśniewska pays you")
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: RECORD_BARTEK_EUR })
+    ).toBeVisible();
+  });
+
+  it("warns against resending a payment whose answer never came", async () => {
     const { user } = renderBalances(flatId());
     await user.click(
       await screen.findByRole("button", { name: RECORD_CELINA_EUR })
@@ -285,20 +379,17 @@ describe("BalancesPage", () => {
     const dialog = await screen.findByRole("dialog");
 
     server.use(
-      http.get("*/api/households/:householdId/balances", () =>
-        HttpResponse.json(
-          { code: "INTERNAL", message: "Down" },
-          { status: 500 }
-        )
+      http.post("*/api/households/:householdId/settlements", () =>
+        HttpResponse.error()
       )
     );
     await user.click(
       within(dialog).getByRole("button", { name: "Record payment" })
     );
 
-    await screen.findByText("Payment recorded.");
-    expect(await group("EUR")).toBeVisible();
-    expect(screen.queryByText("Couldn't load this")).not.toBeInTheDocument();
+    expect(
+      await within(dialog).findByText(MAY_HAVE_GONE_THROUGH)
+    ).toBeVisible();
   });
 
   it("moves focus to the record button when the suggestion's row is gone", async () => {
