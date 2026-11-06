@@ -1,39 +1,35 @@
 "use client";
 
 import type { Expense } from "@homesplit/contracts";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeftIcon, SearchXIcon } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeftIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { CategoryIcon } from "@/components/category-icon";
-import { EmptyState } from "@/components/empty-state";
-import { ErrorState } from "@/components/error-state";
-import { ListSkeleton } from "@/components/list-skeleton";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PageHeader } from "@/components/page-header";
 import {
+  useFeatureEnabled,
   useHouseholdId,
   useIsDeparted,
+  usePermissions,
 } from "@/components/shell/household-context";
-import { householdPath } from "@/components/shell/household-nav";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { UserLabel } from "@/components/user-avatar";
 import { isApiRequestError } from "@/lib/api/api-error";
-import { endpointQuery } from "@/lib/api/queries";
+import { api } from "@/lib/api/client";
+import { ledgerQueryKeys } from "@/lib/api/expense-queries";
+import { invalidate } from "@/lib/api/queries";
+import { queryKeys } from "@/lib/api/query-keys";
 import { formatIsoDate, formatIsoDateTime } from "@/lib/dates";
 import { allocationInput, SPLIT_METHOD_LABELS } from "@/lib/expenses";
 import { formatMoney } from "@/lib/money";
+import { ExpenseQueryState, useExpenseRoute } from "./expense-query";
 
 /** One expense: who paid, how it was split and with what inputs, and its details. */
 export default function ExpensePage() {
-  const householdId = useHouseholdId();
-  const { expenseId } = useParams<{ expenseId: string }>();
-  const expense = useQuery(
-    endpointQuery("getExpense", { params: { householdId, expenseId } })
-  );
-  // The list's filters come along in the query, so going back keeps them.
-  const search = useSearchParams().toString();
-  const listPath = `${householdPath(householdId, "expenses")}${search && `?${search}`}`;
+  const { query, listPath, editPath } = useExpenseRoute();
 
   return (
     <>
@@ -48,40 +44,98 @@ export default function ExpensePage() {
         <ArrowLeftIcon aria-hidden data-icon="inline-start" />
         All expenses
       </Link>
-      {expense.status === "pending" ? (
-        <ListSkeleton label="Loading the expense" rows={4} />
+      <ExpenseQueryState listPath={listPath} query={query}>
+        {(expense) => (
+          <ExpenseDetails
+            editPath={editPath}
+            expense={expense}
+            listPath={listPath}
+          />
+        )}
+      </ExpenseQueryState>
+    </>
+  );
+}
+
+function ExpenseActions({
+  expense,
+  editPath,
+  listPath,
+}: {
+  editPath: string;
+  expense: Expense;
+  listPath: string;
+}) {
+  const householdId = useHouseholdId();
+  const enabled = useFeatureEnabled("expenses");
+  const permissions = usePermissions();
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  const del = useMutation({
+    mutationFn: () =>
+      api("deleteExpense", { params: { householdId, expenseId: expense.id } }),
+  });
+  if (!enabled) {
+    return null;
+  }
+
+  const remove = async () => {
+    try {
+      await del.mutateAsync();
+    } catch (error) {
+      // Someone deleted it first, which is what the user wanted anyway.
+      if (!(isApiRequestError(error) && error.status === 404)) {
+        throw error;
+      }
+    }
+    await invalidate(queryClient, ledgerQueryKeys(householdId));
+    router.replace(listPath);
+    queryClient.removeQueries({
+      queryKey: queryKeys.endpoint("getExpense", {
+        params: { householdId, expenseId: expense.id },
+      }),
+    });
+  };
+
+  return (
+    <>
+      {permissions.editExpense(expense) ? (
+        <Link
+          className={buttonVariants({ variant: "outline" })}
+          href={editPath}
+        >
+          <PencilIcon aria-hidden data-icon="inline-start" />
+          Edit
+        </Link>
       ) : null}
-      {expense.status === "error" &&
-      isApiRequestError(expense.error) &&
-      expense.error.status === 404 ? (
-        <EmptyState
-          action={
-            <Link className={buttonVariants()} href={listPath}>
-              All expenses
-            </Link>
+      {permissions.deleteExpense(expense) ? (
+        <ConfirmDialog
+          confirmLabel="Delete"
+          description="Everyone's balances will be recalculated without it. Recorded payments stay as they are. This can't be undone."
+          destructive
+          onConfirm={remove}
+          title={`Delete “${expense.name}”?`}
+          trigger={
+            <Button variant="outline">
+              <Trash2Icon aria-hidden data-icon="inline-start" />
+              Delete
+            </Button>
           }
-          description="It may have been deleted, or the link is wrong."
-          icon={SearchXIcon}
-          title="Expense not found"
         />
-      ) : null}
-      {expense.status === "error" &&
-      !(isApiRequestError(expense.error) && expense.error.status === 404) ? (
-        <ErrorState
-          error={expense.error}
-          onRetry={expense.refetch}
-          retrying={expense.isRefetching}
-          title="Couldn't load this expense"
-        />
-      ) : null}
-      {expense.status === "success" ? (
-        <ExpenseDetails expense={expense.data} />
       ) : null}
     </>
   );
 }
 
-function ExpenseDetails({ expense }: { expense: Expense }) {
+function ExpenseDetails({
+  expense,
+  editPath,
+  listPath,
+}: {
+  editPath: string;
+  expense: Expense;
+  listPath: string;
+}) {
   const isDeparted = useIsDeparted();
   const { currency } = expense.total;
   const participantIds = expense.allocation.participants.map((p) => p.userId);
@@ -94,6 +148,13 @@ function ExpenseDetails({ expense }: { expense: Expense }) {
   return (
     <>
       <PageHeader
+        actions={
+          <ExpenseActions
+            editPath={editPath}
+            expense={expense}
+            listPath={listPath}
+          />
+        }
         description={
           <span className="text-foreground text-xl font-medium tabular-nums">
             {formatMoney(expense.total)}

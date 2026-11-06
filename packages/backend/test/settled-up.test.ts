@@ -217,6 +217,7 @@ describe("settled-up checks", () => {
         expenses: false,
         chores: false,
         shopping: true,
+        ai: false,
       });
     });
   });

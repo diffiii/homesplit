@@ -129,6 +129,7 @@ Better Auth's generated tables keep their own `CASCADE` keys. A task that stores
 ### Disabled modules
 
 - `expenses` covers categories, expenses, payments, balances, suggestions, and attachment links. `chores` and `shopping` cover their own routes.
+- `ai` covers every call to an AI provider, on any method; see [AI provider](#ai-provider).
 - While a module is off, its `GET` routes keep working, and every other method answers 403 `MODULE_DISABLED`. Nothing is deleted or hidden, and turning the module back on restores everything.
 - Better Auth's membership actions are never blocked. Changing flags isn't either, except that `expenses` stays on while any balance in the household isn't zero, so members can always settle up: turning it off then answers 409 `HOUSEHOLD_HAS_UNSETTLED_BALANCES`. #40 adds this check together with the one for deleting households, serialized against ledger writes the same way (see [Deleting households](#deleting-households)).
 
@@ -326,6 +327,17 @@ What the pages can tell apart in 1.7.7:
 
 - Verification tokens are signed JWTs, not stored rows. An expired one answers `TOKEN_EXPIRED`, and a malformed or tampered one `INVALID_TOKEN`. Reusing a token for an address that's already verified succeeds again, so `/verify-email` can't show "already used" (#85) and shows success instead. The token doesn't depend on a session, so verifying works on another device.
 - Reset tokens are stored and deleted when used, so an expired token and a used one both answer `INVALID_TOKEN`.
+
+## AI provider
+
+Applies to #53 and the AI features after it (#54 to #57). AI only proposes: a member reviews everything it returns before anything is saved.
+
+- **Interface.** Features call `AiService` in `packages/backend/src/ai`, which uses the `openai` SDK with any OpenAI-compatible `/chat/completions` API; the default is OpenRouter. A request with an image goes to `AI_VISION_MODEL`, any other to `AI_TEXT_MODEL`. Receipts are read by the vision model directly, without a separate OCR step.
+- **Output.** Every request carries a Zod schema, sent as a strict JSON schema and checked against the reply. A reply that isn't JSON, fails the schema, was cut off, or is a refusal answers 502 `AI_INVALID_OUTPUT`, never a partial result. Schemas use `.nullable()` rather than `.optional()`, and no transforms. Output is untrusted: IDs it returns are checked against the household's own rows.
+- **Privacy.** `ai` defaults to off, and only an admin+ turns it on. Only what the task needs is sent (receipt images, expense text, category and shopping-item names), never user names, emails, or IDs; the settings screen says so next to the switch. A provider must not train on or keep the data: on OpenRouter, every request sets `provider.data_collection: "deny"`, `zdr: true`, and `require_parameters: true`. Prompts and replies are neither stored nor logged.
+- **Configuration.** AI runs only with `AI_BASE_URL`, `AI_API_KEY`, `AI_TEXT_MODEL`, and `AI_VISION_MODEL` set; otherwise requests answer 503 `AI_UNAVAILABLE`, and startup still succeeds. `AI_TIMEOUT_MS` bounds a whole request (504 `AI_TIMEOUT`). The SDK retries 408, 409, 429, 5xx, and network errors up to `AI_MAX_RETRIES` times, then the request answers 502 `AI_PROVIDER_ERROR`. Tests use `AI_DRIVER=fake`.
+- **Limit.** A household may make `AI_DAILY_REQUEST_LIMIT` (default 50) requests per UTC day, counted in `ai_usage` before the call, so failed requests count too. Over it, requests answer 429 `AI_LIMIT_EXCEEDED` with `details.limit` and `details.resetsAt`.
+- **Order.** After the route's own checks, `AiService` checks that `ai` is enabled (403 `MODULE_DISABLED`), that AI is configured (503), and the limit (429), then calls the provider. It checks the flag itself, so even a `GET` route can't send data while `ai` is off.
 
 ## Route doc template
 

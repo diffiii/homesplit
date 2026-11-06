@@ -1,6 +1,7 @@
 import type { UserSummary } from "@homesplit/contracts";
 import { cn } from "cn";
 import { LogOutIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import {
   Avatar,
   AvatarBadge,
@@ -55,23 +56,47 @@ export function UserAvatar({
 
 interface UserLabelProps {
   departed?: boolean;
+  /** Shown under the name, with the avatar centred beside both. */
+  detail?: ReactNode;
   size?: UserAvatarProps["size"];
   user: AvatarUser;
+  /** Adds "(you)" after the name, but not to the initials. */
+  you?: boolean;
 }
 
 /** Avatar and name, as payers, assignees, and members are listed. */
-export function UserLabel({ user, departed = false, size }: UserLabelProps) {
-  return (
-    <span className="inline-flex min-w-0 flex-wrap items-center gap-2">
-      <UserAvatar decorative departed={departed} size={size} user={user} />
+export function UserLabel({
+  user,
+  departed = false,
+  size,
+  you = false,
+  detail,
+}: UserLabelProps) {
+  const name = (
+    <>
       <span className={cn("truncate", departed && "text-muted-foreground")}>
-        {user.name}
+        {you ? `${user.name} (you)` : user.name}
       </span>
       {departed ? (
         <Badge className="shrink-0" variant="outline">
           Left the household
         </Badge>
       ) : null}
+    </>
+  );
+  return (
+    <span className="inline-flex min-w-0 flex-wrap items-center gap-2">
+      <UserAvatar decorative departed={departed} size={size} user={user} />
+      {detail ? (
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="flex min-w-0 flex-wrap items-center gap-2">
+            {name}
+          </span>
+          {detail}
+        </span>
+      ) : (
+        name
+      )}
     </span>
   );
 }

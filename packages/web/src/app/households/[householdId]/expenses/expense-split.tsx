@@ -28,6 +28,7 @@ import { SPLIT_METHOD_LABELS } from "@/lib/expenses";
 import { formatMoney } from "@/lib/money";
 
 interface SplitProps {
+  kept: readonly UserSummary[];
   /** Current members, the user first. */
   members: readonly UserSummary[];
   nameOf: (userId: string) => string;
@@ -61,13 +62,17 @@ const INPUT_NAMES: Record<WeightedMethod, string> = {
   adjustment: "adjustment",
 };
 
-/** Current members, then anyone in `ids` who has left, each flagged. */
+/**
+ * Current members, then anyone who has left and is kept or in `ids`, each
+ * flagged. Someone who left while a new expense was open has a row only
+ * while checked, so it's there to uncheck.
+ */
 function rows(
   ids: readonly string[],
-  { members, seen }: Pick<SplitProps, "members" | "seen">
+  { kept, members, seen }: Pick<SplitProps, "kept" | "members" | "seen">
 ): { departed: boolean; user: UserSummary }[] {
   const current = new Set(members.map(({ id }) => id));
-  const departed = ids
+  const departed = [...new Set([...kept.map(({ id }) => id), ...ids])]
     .filter((id) => !current.has(id))
     .map((id) => seen.get(id) ?? { id, name: "Someone", imageUrl: null });
   return [
@@ -87,21 +92,14 @@ function PersonLabel({
   user: UserSummary;
   userId: string;
 }) {
-  const label = (
+  return (
     <UserLabel
       departed={departed}
+      detail={children}
       size="sm"
-      user={user.id === userId ? { ...user, name: `${user.name} (you)` } : user}
+      user={user}
+      you={user.id === userId}
     />
-  );
-  if (!children) {
-    return label;
-  }
-  return (
-    <span className="flex min-w-0 flex-col gap-0.5">
-      {label}
-      {children}
-    </span>
   );
 }
 
@@ -138,7 +136,7 @@ function CheckLine({ check }: { check: RunningCheck | null }) {
 export const SimpleSplit = withForm({
   defaultValues: {} as ExpenseFormValues,
   props: splitProps,
-  render({ form, members, seen, userId }) {
+  render({ form, kept, members, seen, userId }) {
     return (
       <>
         <form.Subscribe selector={(state) => state.values}>
@@ -151,6 +149,7 @@ export const SimpleSplit = withForm({
                     description="You paid. It's split equally between everyone checked."
                     label="Split between"
                     options={rows(values.participantIds, {
+                      kept,
                       members,
                       seen,
                     }).map(
@@ -205,7 +204,7 @@ export const SimpleSplit = withForm({
 export const AdvancedSplit = withForm({
   defaultValues: {} as ExpenseFormValues,
   props: splitProps,
-  render({ form, members, seen, nameOf, userId }) {
+  render({ form, kept, members, seen, nameOf, userId }) {
     return (
       <form.Subscribe selector={(state) => state.values}>
         {(values) => {
@@ -222,7 +221,7 @@ export const AdvancedSplit = withForm({
                   <field.ChecklistField
                     footer={<CheckLine check={payersCheck(values)} />}
                     label="Paid by"
-                    options={rows(values.payerIds, { members, seen }).map(
+                    options={rows(values.payerIds, { kept, members, seen }).map(
                       ({ user, departed }): ChecklistOption => ({
                         value: user.id,
                         label: (
@@ -275,6 +274,7 @@ export const AdvancedSplit = withForm({
                     footer={<CheckLine check={splitCheck(values, nameOf)} />}
                     label="Split between"
                     options={rows(values.participantIds, {
+                      kept,
                       members,
                       seen,
                     }).map(({ user, departed }): ChecklistOption => {
@@ -301,7 +301,7 @@ export const AdvancedSplit = withForm({
                             userId={userId}
                           >
                             {share ? (
-                              <span className="text-muted-foreground pl-8 text-xs tabular-nums">
+                              <span className="text-muted-foreground text-xs tabular-nums">
                                 {share}
                               </span>
                             ) : null}

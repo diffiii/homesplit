@@ -69,7 +69,7 @@ describe("expenses", () => {
 });
 ```
 
-Create fixtures inside each test or in `beforeEach`, not in `beforeAll`: tables are truncated before every test, so anything made in `beforeAll` is gone by the second test. To check what reached the database, query it with `db` from `src/db`. Tests run with `STORAGE_DRIVER=memory`, so `app.get(ObjectStorage)` returns an `InMemoryObjectStorage`, whose `objects` map holds what was uploaded.
+Create fixtures inside each test or in `beforeEach`, not in `beforeAll`: tables are truncated before every test, so anything made in `beforeAll` is gone by the second test. To check what reached the database, query it with `db` from `src/db`. Tests run with `STORAGE_DRIVER=memory`, so `app.get(ObjectStorage)` returns an `InMemoryObjectStorage`, whose `objects` map holds what was uploaded. Tests also run with `AI_DRIVER=fake` and `AI_DAILY_REQUEST_LIMIT=3`, so `app.get(AiClient)` returns a `FakeAiClient`: script replies with `on(task, handler)`, where a handler returns the raw reply or throws an error such as `aiTimeout()`, read what was sent in `requests`, and call `reset()` in `beforeEach`. `AiProbeModule` in `test/helpers/ai-probe.ts` adds a probe route that makes one `AiService` call. No test calls a real provider.
 
 ## Migrations
 

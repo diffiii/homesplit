@@ -375,7 +375,7 @@ export function createAuthHandlers(
         name,
         slug: text(input, "slug") || crypto.randomUUID(),
         createdAt: time,
-        features: { expenses: true, chores: true, shopping: true },
+        features: { expenses: true, chores: true, shopping: true, ai: false },
       };
       const member: MockMember = {
         id: crypto.randomUUID(),
