@@ -35,6 +35,17 @@ export function describeTransfer(
   return `${payer.name} pays ${payee.id === userId ? "you" : payee.name}`;
 }
 
+/** `Bartek paid you`, the recorded counterpart of `describeTransfer`. */
+export function describePayment(
+  { payer, payee }: { payee: UserSummary; payer: UserSummary },
+  userId: string
+): string {
+  if (payer.id === userId) {
+    return `You paid ${payee.name}`;
+  }
+  return `${payer.name} paid ${payee.id === userId ? "you" : payee.name}`;
+}
+
 /**
  * The payment form's rules, on what was typed. The server has the last word on
  * who may record what; the form only offers what it allows.

@@ -6,7 +6,7 @@ import { cn } from "cn";
 import { ReceiptIcon, SearchXIcon } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { type ReactNode, useEffect, useMemo, useRef } from "react";
+import { type ReactNode, useEffect, useMemo } from "react";
 import { CategoryIcon } from "@/components/category-icon";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
@@ -15,6 +15,7 @@ import { useHousehold } from "@/components/shell/household-context";
 import { householdPath } from "@/components/shell/household-nav";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { useLoadMoreOnScroll } from "@/hooks/use-load-more-on-scroll";
 import { expenseListQuery } from "@/lib/api/expense-queries";
 import {
   type ExpenseFilters,
@@ -26,9 +27,6 @@ import {
 } from "@/lib/expenses";
 import { formatMoney } from "@/lib/money";
 import { useSetExpenseFilters } from "./expense-filters";
-
-/** Load the next page this far before the end of the list comes into view. */
-const PRELOAD_MARGIN = "400px";
 
 interface ExpenseListProps {
   /** Shown in the empty state, such as a link to add the first expense. */
@@ -62,26 +60,7 @@ export function ExpenseList({
   }, [expenses, onLoaded]);
 
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = list;
-  const loadMore = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    const button = loadMore.current;
-    if (
-      !(button && hasNextPage) ||
-      typeof IntersectionObserver === "undefined"
-    ) {
-      return;
-    }
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      },
-      { rootMargin: PRELOAD_MARGIN }
-    );
-    observer.observe(button);
-    return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  const loadMore = useLoadMoreOnScroll(list);
 
   if (list.status === "pending") {
     return <ListSkeleton label="Loading expenses" rows={6} />;

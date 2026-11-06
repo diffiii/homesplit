@@ -106,6 +106,15 @@ export function permissionsFor(caller: Caller, members: readonly MemberRef[]) {
       payment.status === "pending" &&
       !self(payment.payer) &&
       (admin || self(payment.payee)),
+    /**
+     * A pending payment that needs this user: they're the payee, or the payee
+     * has left and they're an admin+. Admins can also confirm others' payments
+     * (`confirmPayment`), but those aren't waiting on them.
+     */
+    awaitsConfirmation: (payment: PaymentRef) =>
+      payment.status === "pending" &&
+      !self(payment.payer) &&
+      (self(payment.payee) || (admin && isDeparted(payment.payee, members))),
     /** Withdraw or reject a payment while it's pending. */
     deletePayment: (payment: PaymentRef) =>
       payment.status === "pending" && (admin || isParty(payment)),

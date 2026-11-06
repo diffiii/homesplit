@@ -41,6 +41,39 @@ describe("isDeparted", () => {
 });
 
 describe("permissionsFor", () => {
+  it("counts only payments that need the caller to confirm them", () => {
+    const left = user("left");
+    const pending = (payer: string, payee: { id: string }) => ({
+      payer: user(payer),
+      payee,
+      status: "pending" as const,
+    });
+    const can = (caller: typeof owner) => as(caller);
+    // The payee is waited on, whatever their role.
+    expect(
+      can(member).awaitsConfirmation(pending("someone", user(member.userId)))
+    ).toBe(true);
+    // Admins can confirm between members, but it isn't waiting on them.
+    expect(
+      can(admin).awaitsConfirmation(pending("someone", user(member.userId)))
+    ).toBe(false);
+    // Only an admin+ can confirm for a payee who left.
+    expect(can(admin).awaitsConfirmation(pending("someone", left))).toBe(true);
+    expect(can(member).awaitsConfirmation(pending("someone", left))).toBe(
+      false
+    );
+    // Nobody confirms their own payment.
+    expect(can(admin).awaitsConfirmation(pending(admin.userId, left))).toBe(
+      false
+    );
+    expect(
+      can(member).awaitsConfirmation({
+        ...pending("someone", user(member.userId)),
+        status: "confirmed",
+      })
+    ).toBe(false);
+  });
+
   it.each([
     [owner, true, true],
     [admin, true, false],

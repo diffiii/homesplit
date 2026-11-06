@@ -41,6 +41,11 @@ import {
   type PaymentPrefill,
   useParties,
 } from "./payment-dialog";
+import {
+  PaymentHistory,
+  usePaymentActions,
+  WaitingPayments,
+} from "./payment-history";
 
 type StartPayment = (
   event: MouseEvent<HTMLElement>,
@@ -67,6 +72,7 @@ export default function BalancesPage() {
   }>({ open: false });
   const opener = useRef<HTMLElement | null>(null);
   const recordButton = useRef<HTMLButtonElement>(null);
+  const actions = usePaymentActions(recordButton);
   const startPayment: StartPayment = (event, prefill) => {
     opener.current = event.currentTarget;
     setPayment({ open: true, prefill });
@@ -98,6 +104,7 @@ export default function BalancesPage() {
         title="Balances"
       />
       {enabled ? null : <ModuleDisabledAlert module="Expenses" />}
+      <WaitingPayments onAction={actions.start} />
       {balances.isRefetchError ? (
         <RefreshFailed
           onRetry={balances.refetch}
@@ -125,6 +132,8 @@ export default function BalancesPage() {
         }
       </QueryState>
       {open?.length ? <Suggestions onRecord={startPayment} /> : null}
+      <PaymentHistory onAction={actions.start} />
+      {actions.dialog}
       <PaymentDialog
         finalFocus={() =>
           opener.current?.isConnected ? opener.current : recordButton.current

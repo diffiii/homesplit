@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   describeBalance,
+  describePayment,
   describeTransfer,
   PaymentFormValues,
   toPaymentRequest,
@@ -29,6 +30,14 @@ describe("describeTransfer", () => {
     expect(describeTransfer({ payer: a, payee: b }, "a")).toBe("You pay b");
     expect(describeTransfer({ payer: a, payee: b }, "b")).toBe("a pays you");
     expect(describeTransfer({ payer: a, payee: b }, "c")).toBe("a pays b");
+  });
+});
+
+describe("describePayment", () => {
+  it("speaks to the reader", () => {
+    expect(describePayment({ payer: a, payee: b }, "a")).toBe("You paid b");
+    expect(describePayment({ payer: a, payee: b }, "b")).toBe("a paid you");
+    expect(describePayment({ payer: a, payee: b }, "c")).toBe("a paid b");
   });
 });
 
