@@ -17,6 +17,7 @@ const ALICE = /^Alice/u;
 const CELINA = /^Celina/u;
 const GROCERIES_RUN = /^Groceries run/u;
 const EUR_GROUP = /^EUR/u;
+const CONFIRM_PAYMENT = /^Confirm: Celina/u;
 const RECORD_CELINA_EUR = /^Record: Celina Wiśniewska pays you EUR/u;
 
 test("scrolls, filters, and opens an expense", async ({ page }) => {
@@ -282,6 +283,21 @@ test("reaches balances from expenses and settles a suggestion", async ({
   await expectNoAxeViolations(page);
   await payment.getByRole("button", { name: "Record payment" }).click();
   await expect(euros.getByText("EUR 45.00").first()).toBeVisible();
+
+  // Celina's BLIK payment waits for Alice, the payee.
+  const waiting = page.getByRole("region", { name: "Waiting for you" });
+  await expect(waiting.getByText("BLIK")).toBeVisible();
+  await expectNoAxeViolations(page);
+  await waiting.getByRole("button", { name: CONFIRM_PAYMENT }).click();
+  const confirmation = page.getByRole("alertdialog");
+  await expectNoAxeViolations(page);
+  await confirmation.getByRole("button", { name: "Confirm" }).click();
+  await expect(waiting).toHaveCount(0);
+  await expect(
+    page
+      .getByRole("link", { name: "Expenses" })
+      .filter({ hasText: "to confirm" })
+  ).toHaveCount(0);
 
   // Alice owes money in the cabin, so her highlighted row shows a debt.
   const { households } = SCENARIOS[DEFAULT_SCENARIO].build();

@@ -173,8 +173,13 @@ export const ProcessSettlementRequest = z
   );
 export type ProcessSettlementRequest = z.infer<typeof ProcessSettlementRequest>;
 
-/** List settlement history with offset pagination. */
-export const ListSettlementHistoryQuery = Pagination;
+/**
+ * List settlement history with offset pagination. `status` keeps only payments
+ * in that state, so screens can show what's pending without paging through it all.
+ */
+export const ListSettlementHistoryQuery = Pagination.extend({
+  status: SettlementStatus.optional(),
+});
 export type ListSettlementHistoryQuery = z.infer<
   typeof ListSettlementHistoryQuery
 >;

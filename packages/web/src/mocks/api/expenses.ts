@@ -318,7 +318,10 @@ export const expenseRoutes: MockRoutes = {
       paginate(
         sortBy(
           db.state.settlements.filter(
-            ({ householdId }) => householdId === household.id
+            ({ householdId, confirmedAt }) =>
+              householdId === household.id &&
+              (query.status === undefined ||
+                (query.status === "pending") === (confirmedAt === null))
           ),
           desc((settlement) => settlement.createdAt),
           desc((settlement) => settlement.id)

@@ -274,6 +274,41 @@ describe("settlements", () => {
       });
     });
 
+    it("filters the history by status, counting only what matches", async () => {
+      const { alice, carol, household } = await setup();
+      const pending = await record(carol, household, payment(carol, alice));
+      const confirmed = await record(alice, household, payment(carol, alice));
+      expect(pending.status).toBe("pending");
+      expect(confirmed.status).toBe("confirmed");
+
+      const list = async (status: string) =>
+        SettlementListResponse.parse(
+          (
+            await alice.client
+              .get(settlementsPath(household.id))
+              .query({ status })
+              .expect(200)
+          ).body
+        );
+
+      expect(await list("pending")).toMatchObject({
+        items: [{ id: pending.id }],
+        totalItems: 1,
+      });
+      expect(await list("confirmed")).toMatchObject({
+        items: [{ id: confirmed.id }],
+        totalItems: 1,
+      });
+      expect((await history(alice, household)).totalItems).toBe(2);
+      expectApiError(
+        await alice.client
+          .get(settlementsPath(household.id))
+          .query({ status: "lost" })
+          .expect(400),
+        "VALIDATION_ERROR"
+      );
+    });
+
     it("hides a household's payments from other households", async () => {
       const { alice, bob, carol, household } = await setup();
       const settlement = await record(carol, household, payment(carol, alice));

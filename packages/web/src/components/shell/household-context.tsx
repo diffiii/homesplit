@@ -3,10 +3,13 @@
 import type {
   FeatureId,
   HouseholdFeatures,
+  Settlement,
   UserSummary,
 } from "@homesplit/contracts";
+import { useQuery } from "@tanstack/react-query";
 import { createContext, use, useMemo } from "react";
 import type { HouseholdRole } from "@/lib/api/auth-client";
+import { pendingSettlementsQuery } from "@/lib/api/expense-queries";
 import type {
   HouseholdDetails,
   HouseholdMember,
@@ -62,6 +65,18 @@ export function usePermissions(): Permissions {
     () => permissionsFor({ userId, role }, members),
     [userId, role, members]
   );
+}
+
+/** Pending payments waiting for the caller; none while the expenses module is off. */
+export function useWaitingPayments(): Settlement[] {
+  const householdId = useHouseholdId();
+  const enabled = useFeatureEnabled("expenses");
+  const can = usePermissions();
+  const { data } = useQuery({
+    ...pendingSettlementsQuery(householdId),
+    enabled,
+  });
+  return enabled ? (data?.items ?? []).filter(can.awaitsConfirmation) : [];
 }
 
 /** Whether a user shown in the household's history has left it. */

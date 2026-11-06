@@ -10,8 +10,10 @@ import { PageHeader } from "@/components/page-header";
 import {
   useFeatureEnabled,
   useHouseholdId,
+  useWaitingPayments,
 } from "@/components/shell/household-context";
 import { balancesPath, householdPath } from "@/components/shell/household-nav";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { parseExpenseFilters } from "@/lib/expenses";
 import { ExpenseFiltersBar } from "./expense-filters";
@@ -21,6 +23,7 @@ import { ExpenseList } from "./expense-list";
 export default function ExpensesPage() {
   const enabled = useFeatureEnabled("expenses");
   const householdId = useHouseholdId();
+  const waiting = useWaitingPayments().length;
   const search = useSearchParams();
   const filters = useMemo(
     () => parseExpenseFilters(new URLSearchParams(search.toString())),
@@ -53,6 +56,14 @@ export default function ExpensesPage() {
             >
               <ScaleIcon aria-hidden data-icon="inline-start" />
               Balances
+              {waiting > 0 ? (
+                <>
+                  <span className="sr-only">, {waiting} to confirm</span>
+                  <Badge aria-hidden variant="secondary">
+                    {waiting}
+                  </Badge>
+                </>
+              ) : null}
             </Link>
             {enabled ? <NewExpenseLink householdId={householdId} /> : null}
           </>

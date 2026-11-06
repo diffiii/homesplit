@@ -1,6 +1,7 @@
 import { infiniteQueryOptions } from "@tanstack/react-query";
 import type { ExpenseFilters } from "@/lib/expenses";
 import { api } from "./client";
+import { endpointQuery } from "./queries";
 import { queryKeys } from "./query-keys";
 
 /** Expenses loaded per page as the list scrolls. */
@@ -28,6 +29,36 @@ export function expenseListQuery(householdId: string, filters: ExpenseFilters) {
     initialPageParam: 1,
     getNextPageParam: ({ page, pageSize, totalItems }) =>
       page * pageSize < totalItems ? page + 1 : undefined,
+  });
+}
+
+/** Payments loaded per page as the history scrolls. */
+export const SETTLEMENT_PAGE_SIZE = 20;
+
+/** Every page of the payment history loaded so far, under `listSettlements` like the expense list. */
+export function settlementHistoryQuery(householdId: string) {
+  return infiniteQueryOptions({
+    queryKey: [
+      ...queryKeys.endpoint("listSettlements", { params: { householdId } }),
+      "infinite",
+    ],
+    queryFn: ({ pageParam, signal }) =>
+      api("listSettlements", {
+        params: { householdId },
+        query: { page: pageParam, pageSize: SETTLEMENT_PAGE_SIZE },
+        signal,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: ({ page, pageSize, totalItems }) =>
+      page * pageSize < totalItems ? page + 1 : undefined,
+  });
+}
+
+/** The newest pending payments, up to the API's largest page: few are pending at once. */
+export function pendingSettlementsQuery(householdId: string) {
+  return endpointQuery("listSettlements", {
+    params: { householdId },
+    query: { status: "pending", pageSize: 100 },
   });
 }
 
