@@ -47,6 +47,11 @@ export function householdPath(householdId: string, segment = ""): string {
     : `/households/${householdId}`;
 }
 
+/** Who owes whom and settling up, which belong to the expenses section. */
+export function balancesPath(householdId: string): string {
+  return `${householdPath(householdId, "expenses")}/balances`;
+}
+
 /** The overview matches only itself; other sections also match their sub-pages. */
 export function isActive(
   pathname: string,

@@ -5,6 +5,8 @@ import { expectNoAxeViolations } from "../axe";
 import { test } from "./fixtures";
 
 const HOUSEHOLD_URL = /\/households\/[^/]+$/u;
+const BALANCES_URL = /\/expenses\/balances$/u;
+const ANY_SWITCHER = /^Switch household, /u;
 
 test("switches from every household screen and remembers the last household", async ({
   page,
@@ -110,4 +112,60 @@ test("shows not found for a household the user isn't in and for broken links", a
   await expect(
     page.getByRole("heading", { name: "Your households" })
   ).toBeVisible();
+});
+
+test("leaving is blocked until settled, and a deleted household is gone", async ({
+  page,
+}) => {
+  test.slow();
+  const { households } = SCENARIOS[DEFAULT_SCENARIO].build();
+  const id = (name: string) =>
+    households.find((household) => household.name === name)?.id;
+
+  // Alice owes money in the cabin, so she's sent to settle up.
+  await page.goto(`/households/${id("Lake cabin")}/settings`);
+  await page.getByRole("button", { name: "Leave household" }).click();
+  const leave = page.getByRole("alertdialog", {
+    name: "Leave this household?",
+  });
+  await leave.getByRole("button", { name: "Leave" }).click();
+  await expectNoAxeViolations(page);
+  await leave.getByRole("link", { name: "Go to balances" }).click();
+  await expect(page.getByRole("heading", { name: "Balances" })).toBeVisible();
+  await expect(page).toHaveURL(BALANCES_URL);
+
+  // The flat's last owner can't leave, and can't delete it with balances open.
+  await page.goto(`/households/${id("Flat on Piękna")}/settings`);
+  await expect(
+    page.getByRole("button", { name: "Leave household" })
+  ).toBeDisabled();
+
+  // A new household has nothing to settle, so it can go.
+  await page
+    .getByRole("button", { name: "Switch household, Flat on Piękna" })
+    .click();
+  await page.getByRole("menuitem", { name: "New household" }).click();
+  const create = page.getByRole("dialog", { name: "New household" });
+  await create.getByLabel("Name").fill("Studio");
+  await create.getByRole("button", { name: "Create" }).click();
+  const switcher = page.getByRole("button", {
+    name: "Switch household, Studio",
+  });
+  await expect(switcher).toBeVisible();
+  const studioPath = new URL(page.url()).pathname;
+  await page.goto(`${studioPath}/settings`);
+
+  await page.getByRole("button", { name: "Delete household" }).click();
+  const remove = page.getByRole("alertdialog", { name: "Delete “Studio”?" });
+  const confirm = remove.getByRole("button", { name: "Delete household" });
+  await expect(confirm).toBeDisabled();
+  await remove.getByLabel("Type “Studio” to confirm").fill("Studio");
+  await expectNoAxeViolations(page);
+  await confirm.click();
+
+  await expect(page).not.toHaveURL(new RegExp(studioPath, "u"));
+  const next = page.getByRole("button", { name: ANY_SWITCHER });
+  await expect(next).toBeVisible();
+  await next.click();
+  await expect(page.getByRole("menuitem", { name: "Studio" })).toHaveCount(0);
 });
