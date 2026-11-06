@@ -101,6 +101,89 @@ describe("scenarios", () => {
       db.state.users.map(({ id }) => id)
     );
   });
+
+  describe("lots-of-expenses", () => {
+    const scenario = SCENARIOS["lots-of-expenses"];
+    const params = (name: string) => ({
+      params: { householdId: householdId(name) },
+    });
+
+    /** Every expense in the household, through the contract-checked client. */
+    const listAll = async (name: string) => {
+      const first = await api("listExpenses", {
+        ...params(name),
+        query: { pageSize: 100 },
+      });
+      const pages = Math.ceil(first.totalItems / first.pageSize);
+      const rest = await Promise.all(
+        Array.from({ length: pages - 1 }, (_, i) =>
+          api("listExpenses", {
+            ...params(name),
+            query: { page: i + 2, pageSize: 100 },
+          })
+        )
+      );
+      return [first, ...rest].flatMap(({ items }) => items);
+    };
+
+    beforeEach(() => db.replace(scenario.build()));
+
+    it("hold over a thousand contract-valid expenses in every method and five currencies", async () => {
+      const house = await listAll("Shared house");
+      const trips = await listAll("Trips");
+      const all = [...house, ...trips];
+      expect(house.length).toBeGreaterThan(1000);
+      expect(trips.length).toBeGreaterThan(100);
+      expect(new Set(all.map(({ total }) => total.currency))).toEqual(
+        new Set(["PLN", "EUR", "GBP", "JPY", "USD"])
+      );
+      expect(new Set(all.map(({ allocation }) => allocation.method))).toEqual(
+        new Set(["equal", "shares", "percentage", "exact", "adjustment"])
+      );
+      for (const { total, payers, splits } of all) {
+        const sum = (rows: { amountCents: number }[]) =>
+          rows.reduce((cents, row) => cents + row.amountCents, 0);
+        expect(sum(payers)).toBe(total.amountCents);
+        expect(sum(splits)).toBe(total.amountCents);
+      }
+    });
+
+    it("keep balances adding up, with a departed member among them", async () => {
+      for (const name of ["Shared house", "Trips"]) {
+        // biome-ignore lint/performance/noAwaitInLoops: one household at a time is clearer
+        const { items } = await api("listBalances", params(name));
+        for (const { balances } of items) {
+          expect(balances.reduce((sum, b) => sum + b.amountCents, 0)).toBe(0);
+        }
+      }
+      const { items } = await api("listBalances", params("Shared house"));
+      expect(
+        items.flatMap(({ balances }) => balances.map(({ user }) => user.name))
+      ).toContain("Dawid Lewandowski");
+      await expect(
+        api("listSettlementSuggestions", params("Shared house"))
+      ).resolves.toBeDefined();
+    });
+
+    it("build the same data every time", () => {
+      const summary = () =>
+        scenario
+          .build()
+          .expenses.map(({ id, name, total, allocation, payers }) => ({
+            id,
+            name,
+            total,
+            allocation,
+            payers,
+          }));
+      expect(summary()).toEqual(summary());
+    });
+
+    it("fit in localStorage, where the browser saves it after every change", () => {
+      // Browsers allow about 5 million characters per origin.
+      expect(JSON.stringify(scenario.build()).length).toBeLessThan(2_500_000);
+    });
+  });
 });
 
 describe("application routes", () => {
