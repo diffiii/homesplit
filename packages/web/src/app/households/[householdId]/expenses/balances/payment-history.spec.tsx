@@ -118,6 +118,21 @@ describe("the payment history", () => {
     expect(await section.findByText("Showing 25 of 25 payments")).toBeVisible();
   });
 
+  it("doesn't repeat a row when someone's new payment shifts the pages", async () => {
+    for (let i = 0; i < 25; i += 1) {
+      addPayment("Lake cabin", EWA, ALICE, { confirmed: true });
+    }
+    const { user } = renderBalances(cabin());
+    const section = within(await history());
+    await section.findByText("Showing 20 of 25 payments");
+
+    addPayment("Lake cabin", EWA, ALICE, { confirmed: true });
+    await user.click(section.getByRole("button", { name: "Load more" }));
+
+    expect(await section.findByText("Showing 25 of 26 payments")).toBeVisible();
+    expect(section.getAllByText("Ewa Zielińska paid you")).toHaveLength(25);
+  });
+
   it("says when there are no payments yet", async () => {
     renderBalances(cabin());
 

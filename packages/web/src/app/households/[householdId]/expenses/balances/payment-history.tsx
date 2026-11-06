@@ -169,8 +169,13 @@ export function PaymentHistory({ onAction }: { onAction: StartAction }) {
   const householdId = useHouseholdId();
   const list = useInfiniteQuery(settlementHistoryQuery(householdId));
   const pages = list.data ? list.data.pages : null;
+  // Someone else's new payment shifts later pages, repeating a row across two.
   const payments = useMemo(
-    () => pages?.flatMap((page) => page.items) ?? [],
+    () => [
+      ...new Map(
+        pages?.flatMap((page) => page.items).map((item) => [item.id, item])
+      ).values(),
+    ],
     [pages]
   );
   const totalItems = pages?.at(-1)?.totalItems ?? 0;
