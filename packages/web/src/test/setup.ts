@@ -56,4 +56,11 @@ afterEach(() => {
   localStorage.clear();
 });
 
-afterAll(() => server.close());
+// A second after its last listener goes, Better Auth's session store cleans up
+// using `window`. Wait for that here: once jsdom is gone, it fails the whole run.
+const SESSION_STORE_UNMOUNT_MS = 1000;
+
+afterAll(async () => {
+  await new Promise((resolve) => setTimeout(resolve, SESSION_STORE_UNMOUNT_MS));
+  server.close();
+});
