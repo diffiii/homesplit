@@ -1,9 +1,13 @@
 import {
   ATTACHMENT_UPLOAD_FIELD,
   type Attachment,
+  AVATAR_UPLOAD_FIELD,
   buildPath,
+  type Endpoint,
   endpoints,
+  type UserSummary,
 } from "@homesplit/contracts";
+import type { z } from "zod";
 import { ApiRequestError } from "./api-error";
 import { redirectToSignIn } from "./session";
 
@@ -14,7 +18,7 @@ export interface UploadOptions {
 }
 
 /**
- * Upload `file` as an attachment of the household. It goes through
+ * Upload `file` as an attachment of the household. Uploads go through
  * `XMLHttpRequest` rather than the API client, since `fetch` can't report
  * upload progress. Failures throw an `ApiRequestError` like the client's,
  * and aborting through `signal` rejects with the signal's reason.
@@ -22,9 +26,39 @@ export interface UploadOptions {
 export function uploadAttachment(
   householdId: string,
   file: File,
-  { onProgress, signal }: UploadOptions = {}
+  options: UploadOptions = {}
 ): Promise<Attachment> {
   const endpoint = endpoints.uploadAttachment;
+  return uploadFile(
+    endpoint,
+    buildPath(endpoint, { householdId }),
+    ATTACHMENT_UPLOAD_FIELD,
+    file,
+    options
+  );
+}
+
+export function uploadAvatar(
+  file: File,
+  options: UploadOptions = {}
+): Promise<UserSummary> {
+  const endpoint = endpoints.uploadAvatar;
+  return uploadFile(
+    endpoint,
+    buildPath(endpoint),
+    AVATAR_UPLOAD_FIELD,
+    file,
+    options
+  );
+}
+
+function uploadFile<R extends z.ZodType>(
+  endpoint: Endpoint & { response: R },
+  path: string,
+  field: string,
+  file: File,
+  { onProgress, signal }: UploadOptions
+): Promise<z.output<R>> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(signal.reason);
@@ -72,8 +106,8 @@ export function uploadAttachment(
     });
 
     const form = new FormData();
-    form.append(ATTACHMENT_UPLOAD_FIELD, file);
-    xhr.open(endpoint.method, buildPath(endpoint, { householdId }));
+    form.append(field, file);
+    xhr.open(endpoint.method, path);
     xhr.send(form);
   });
 }

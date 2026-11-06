@@ -29,6 +29,7 @@
     "drizzle-orm": "^0.45.4",
     "file-type": "^22.2.0",
     "heic-decode": "^2.1.0",
+    "openai": "^7.45.1",
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "resend": "^6.34.1",

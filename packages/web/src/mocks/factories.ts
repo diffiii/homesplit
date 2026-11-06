@@ -139,7 +139,13 @@ export class MockFactory {
       name,
       slug: this.id(),
       createdAt: this.time(ago),
-      features: { expenses: true, chores: true, shopping: true, ...features },
+      features: {
+        expenses: true,
+        chores: true,
+        shopping: true,
+        ai: false,
+        ...features,
+      },
     };
     this.state.households.push(household);
     this.state.categories.push(

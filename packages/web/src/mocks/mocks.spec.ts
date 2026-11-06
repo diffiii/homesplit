@@ -258,7 +258,12 @@ describe("application routes", () => {
     signInAs("Bartek");
     await expect(
       api("updateHouseholdFeatures", { ...flat(), body: { shopping: false } })
-    ).resolves.toEqual({ expenses: true, chores: true, shopping: false });
+    ).resolves.toEqual({
+      expenses: true,
+      chores: true,
+      shopping: false,
+      ai: false,
+    });
   });
 
   it("paginate and order lists like the backend", async () => {
@@ -617,6 +622,7 @@ describe("Better Auth routes", () => {
       expenses: true,
       chores: true,
       shopping: true,
+      ai: false,
     });
     expect((await api("listExpenseCategories", params)).items).toHaveLength(7);
     await households.rename({ ...params.params, name: "Studio" });

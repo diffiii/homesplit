@@ -47,7 +47,7 @@ describe("household features", () => {
   }
 
   describe("creation and storage", () => {
-    it("seeds all modules enabled when a household is created", async () => {
+    it("seeds every module but ai enabled when a household is created", async () => {
       const alice = await createUser(app, "Alice");
       const household = await createHousehold(alice);
 
@@ -59,6 +59,7 @@ describe("household features", () => {
         expensesEnabled: true,
         choresEnabled: true,
         shoppingEnabled: true,
+        aiEnabled: false,
       });
 
       const response = await alice.client
@@ -68,6 +69,7 @@ describe("household features", () => {
         expenses: true,
         chores: true,
         shopping: true,
+        ai: false,
       });
     });
 
@@ -123,6 +125,7 @@ describe("household features", () => {
       expensesEnabled: true,
       choresEnabled: true,
       shoppingEnabled: true,
+      aiEnabled: false,
     });
   });
 
@@ -145,6 +148,7 @@ describe("household features", () => {
             expenses: true,
             chores: false,
             shopping: true,
+            ai: false,
           });
         });
 
@@ -157,8 +161,25 @@ describe("household features", () => {
             expenses: true,
             chores: false,
             shopping: false,
+            ai: false,
           });
         });
+    });
+
+    it("turns ai on, which households opt into", async () => {
+      await alice.client
+        .patch(featuresPath(household.id))
+        .send({ ai: true })
+        .expect(200)
+        .expect(({ body }) => {
+          expect(HouseholdFeatures.parse(body)).toMatchObject({ ai: true });
+        });
+
+      const [row] = await db
+        .select({ aiEnabled: householdFeatures.aiEnabled })
+        .from(householdFeatures)
+        .where(eq(householdFeatures.organizationId, household.id));
+      expect(row).toEqual({ aiEnabled: true });
     });
 
     it.each([

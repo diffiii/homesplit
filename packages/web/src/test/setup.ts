@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { File as NodeFile } from "node:buffer";
 import { cleanup } from "@testing-library/react";
+import { toast } from "sonner";
 import { afterAll, afterEach, beforeEach, vi } from "vitest";
 import { DEFAULT_SCENARIO } from "@/mocks/scenarios";
 import { loadScenario, server } from "./mock-server";
@@ -48,6 +49,8 @@ beforeEach(() => loadScenario(DEFAULT_SCENARIO));
 
 afterEach(() => {
   cleanup();
+  // Sonner keeps toasts in module state and replays them to the next test's toaster.
+  toast.dismiss();
   server.resetHandlers();
   resetNavigation();
   localStorage.clear();
