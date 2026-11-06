@@ -341,40 +341,75 @@ describe("BalancesPage", () => {
     }
   });
 
-  it("says how far a write-off got when a payment fails", async () => {
-    const before = db.state.settlements.length;
-    const { user } = renderBalances(flatId());
+  /** Start splitting Dawid's debt, with the second payment failing. */
+  async function splitFailingOnSecondPayment() {
+    const rendered = renderBalances(flatId());
+    const { user } = rendered;
     await user.click(
       await screen.findByRole("button", { name: WRITE_OFF_PLN })
     );
     await user.click(await screen.findByRole("menuitem", { name: SPLIT }));
     const dialog = await screen.findByRole("alertdialog");
-
     let calls = 0;
     server.use(
       http.post("*/api/households/:householdId/settlements", () => {
         calls += 1;
-        return calls === 1
-          ? undefined
-          : HttpResponse.json(
+        return calls === 2
+          ? HttpResponse.json(
               { code: "INTERNAL", message: "Down" },
               { status: 500 }
-            );
+            )
+          : undefined;
       })
     );
     await user.click(within(dialog).getByRole("button", { name: "Write off" }));
-
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(
       "1 of 3 payments were recorded"
     );
-    expect(db.state.settlements.length - before).toBe(1);
-    // What's left is one payment of the remaining debt per member.
-    await waitFor(() =>
-      expect(namesOfPayments(dialog)).toEqual([
-        "Dawid Lewandowski → Alice NowakPLN 235.00",
-        "Dawid Lewandowski → Bartek KowalskiPLN 235.00",
-        "Dawid Lewandowski → Celina WiśniewskaPLN 235.00",
-      ])
+    return { ...rendered, dialog };
+  }
+
+  const REMAINING_SHARES = [
+    "Dawid Lewandowski → Bartek KowalskiPLN 352.50",
+    "Dawid Lewandowski → Celina WiśniewskaPLN 352.50",
+  ];
+
+  it("keeps a split equal when a failed write-off is tried again", async () => {
+    const before = db.state.settlements.length;
+    const { user, dialog } = await splitFailingOnSecondPayment();
+
+    // The balance has moved by now, and the shares still haven't.
+    expect(await screen.findByText("Owes PLN 705.00")).toBeInTheDocument();
+    expect(namesOfPayments(dialog)).toEqual(REMAINING_SHARES);
+
+    await user.click(within(dialog).getByRole("button", { name: "Write off" }));
+
+    await screen.findByText(WAS_WRITTEN_OFF);
+    const recorded = db.state.settlements.slice(before);
+    expect(recorded.map(({ amount }) => amount.amountCents)).toEqual([
+      35_250, 35_250, 35_250,
+    ]);
+    expect(new Set(recorded.map(({ payeeId }) => payeeId)).size).toBe(3);
+  });
+
+  it("offers only the unfinished payments after closing a failed write-off", async () => {
+    const { user, dialog } = await splitFailingOnSecondPayment();
+
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await user.click(
+      await screen.findByRole("button", { name: WRITE_OFF_PLN })
+    );
+
+    expect(
+      screen.queryByRole("menuitem", { name: SPLIT })
+    ).not.toBeInTheDocument();
+    await user.click(
+      await screen.findByRole("menuitem", {
+        name: "Finish the write-off (2 left)",
+      })
+    );
+    expect(namesOfPayments(await screen.findByRole("alertdialog"))).toEqual(
+      REMAINING_SHARES
     );
   });
 
