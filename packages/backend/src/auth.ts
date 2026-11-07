@@ -14,7 +14,16 @@ import { db } from "./db";
 import * as schema from "./db/schema/auth";
 import { seedDefaultCategories } from "./features/expense-categories/default-categories";
 import { hasUnsettledBalances } from "./features/expenses/balances/balances.repository";
-import { createMailer, loadMailConfig } from "./mail";
+import { createMailer, type Email, loadMailConfig } from "./mail";
+import {
+  assertResetRequestAllowed,
+  isPasswordResetRequest,
+  mayEmailResetLink,
+  PASSWORD_RESET,
+  passwordResetEmail,
+  resetLink,
+  VISITOR_IP_HEADER,
+} from "./password-reset";
 
 const frontendUrl = process.env.FRONTEND_URL;
 
@@ -40,6 +49,20 @@ if (skipEmailVerification && mailConfig.driver !== "log") {
 const VERIFICATION_LINK_TTL_SECONDS = 24 * 60 * 60;
 
 const logger = new Logger("Auth");
+
+/**
+ * Sends an email without making the caller wait for the provider, and logs a
+ * failure instead of throwing it.
+ */
+function sendInBackground(build: () => Email, failure: string): void {
+  try {
+    mailer.send(build()).catch((error: unknown) => {
+      logger.error(failure, error);
+    });
+  } catch (error) {
+    logger.error(failure, error);
+  }
+}
 
 const previewOrigins = (process.env.FRONTEND_PREVIEW_ORIGINS ?? "")
   .split(",")
@@ -83,7 +106,7 @@ export const auth = betterAuth({
     ipAddress: {
       // Vercel replaces this header with the visitor's address and forwards it
       // through the rewrite. Better Auth ignores it when it lists several hops.
-      ipAddressHeaders: ["x-forwarded-for"],
+      ipAddressHeaders: [VISITOR_IP_HEADER],
     },
   },
   database: drizzleAdapter(db, {
@@ -112,6 +135,25 @@ export const auth = betterAuth({
     // session, and sign-in answers 403 `EMAIL_NOT_VERIFIED` until the link
     // is opened; see "Better Auth endpoints" in docs/decisions.md.
     requireEmailVerification: !skipEmailVerification,
+    resetPasswordTokenExpiresIn: PASSWORD_RESET.linkTtlSeconds,
+    // A reset signs nobody in, so this ends every session of the user.
+    revokeSessionsOnPasswordReset: true,
+    // The answer to a reset request must not depend on whether the email has
+    // an account, and a send takes far longer than the path for an unknown
+    // email, so the answer doesn't wait for it. A send that fails, or that the
+    // per-email limit holds back, is logged and the answer stays the same.
+    sendResetPassword: ({ user, url, token }) => {
+      if (mayEmailResetLink(user.email)) {
+        sendInBackground(
+          () =>
+            passwordResetEmail(user.email, resetLink(frontendUrl, token, url)),
+          `Password reset email not sent to user ${user.id}`
+        );
+      } else {
+        logger.warn(`Password reset email held back for user ${user.id}`);
+      }
+      return Promise.resolve();
+    },
   },
   emailVerification: {
     // A link that expired or never arrived is replaced on the next sign-in.
@@ -151,6 +193,12 @@ export const auth = betterAuth({
         return {
           context: { body: { ...ctx.body, name: parseNewUserName(ctx.body) } },
         };
+      }
+
+      // The answer to a reset request doesn't depend on the email, so the only
+      // limit that can answer differently is the visitor's address.
+      if (isPasswordResetRequest(ctx.path)) {
+        assertResetRequestAllowed(ctx.headers);
       }
 
       // Households are deleted only through DELETE /api/households/:householdId,
