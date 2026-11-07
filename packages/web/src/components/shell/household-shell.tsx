@@ -34,6 +34,7 @@ import {
 import { UserAvatar } from "@/components/user-avatar";
 import { useRequiredSession } from "@/hooks/use-required-session";
 import { isApiRequestError } from "@/lib/api/api-error";
+import { pendingSettlementsQuery } from "@/lib/api/expense-queries";
 import {
   householdQueries,
   isHouseholdNotFound,
@@ -42,7 +43,7 @@ import { endpointQuery } from "@/lib/api/queries";
 import { queryKeys } from "@/lib/api/query-keys";
 import { ACCOUNT_PATH } from "@/lib/api/session";
 import { rememberHousehold } from "@/lib/last-household";
-import { strongestRole } from "@/lib/permissions";
+import { permissionsFor, strongestRole } from "@/lib/permissions";
 import { signOutAndReset } from "@/lib/sign-out";
 import { HouseholdContext, type HouseholdData } from "./household-context";
 import { HOUSEHOLD_NAV, householdPath, isActive } from "./household-nav";
@@ -173,6 +174,10 @@ function useRecheckMembershipOn404(householdId: string): void {
  */
 export function HouseholdShell({ householdId, children }: HouseholdShellProps) {
   const state = useHouseholdState(householdId);
+  const waiting = useWaitingPaymentCount(
+    householdId,
+    state.status === "ready" ? state.data : null
+  );
   useRecheckMembershipOn404(householdId);
   const ready = state.status === "ready";
 
@@ -195,7 +200,7 @@ export function HouseholdShell({ householdId, children }: HouseholdShellProps) {
       >
         Skip to content
       </a>
-      <DesktopSidebar householdId={householdId} />
+      <DesktopSidebar householdId={householdId} waiting={waiting} />
       <div className="flex min-h-svh min-w-0 flex-1 flex-col">
         <MobileTopBar householdId={householdId} />
         <main
@@ -219,9 +224,29 @@ export function HouseholdShell({ householdId, children }: HouseholdShellProps) {
           ) : null}
         </main>
       </div>
-      <BottomNav householdId={householdId} />
+      <BottomNav householdId={householdId} waiting={waiting} />
     </SidebarProvider>
   );
+}
+
+/** How many pending payments the Expenses item counts; the shell renders above `useWaitingPayments`'s context. */
+function useWaitingPaymentCount(
+  householdId: string,
+  data: HouseholdData | null
+): number {
+  const enabled = data?.features.expenses === true;
+  const pending = useQuery({
+    ...pendingSettlementsQuery(householdId),
+    enabled,
+  });
+  if (!(data && enabled && pending.data)) {
+    return 0;
+  }
+  const can = permissionsFor(
+    { userId: data.userId, role: data.role },
+    data.members
+  );
+  return pending.data.items.filter(can.awaitsConfirmation).length;
 }
 
 /** Modules turned off for the household; their sections stay reachable but read-only. */
@@ -234,7 +259,13 @@ function useDisabledFeatures(householdId: string): ReadonlySet<string> {
   );
 }
 
-function DesktopSidebar({ householdId }: { householdId: string }) {
+function DesktopSidebar({
+  householdId,
+  waiting,
+}: {
+  householdId: string;
+  waiting: number;
+}) {
   const pathname = usePathname();
   const disabled = useDisabledFeatures(householdId);
   return (
@@ -264,9 +295,19 @@ function DesktopSidebar({ householdId }: { householdId: string }) {
                         >
                           <Icon aria-hidden />
                           <span>{label}</span>
+                          {feature === "expenses" && waiting > 0 ? (
+                            <span className="sr-only">
+                              , {waiting} to confirm
+                            </span>
+                          ) : null}
                         </SidebarMenuButton>
                         {feature && disabled.has(feature) ? (
                           <SidebarMenuBadge>Off</SidebarMenuBadge>
+                        ) : null}
+                        {feature === "expenses" && waiting > 0 ? (
+                          <SidebarMenuBadge aria-hidden>
+                            {waiting}
+                          </SidebarMenuBadge>
                         ) : null}
                       </SidebarMenuItem>
                     );
@@ -297,7 +338,13 @@ function MobileTopBar({ householdId }: { householdId: string }) {
   );
 }
 
-function BottomNav({ householdId }: { householdId: string }) {
+function BottomNav({
+  householdId,
+  waiting,
+}: {
+  householdId: string;
+  waiting: number;
+}) {
   const pathname = usePathname();
   const disabled = useDisabledFeatures(householdId);
   return (
@@ -319,12 +366,25 @@ function BottomNav({ householdId }: { householdId: string }) {
                 )}
                 href={householdPath(householdId, segment)}
               >
-                <Icon
-                  aria-hidden
-                  className={cn("size-5", off && "opacity-50")}
-                />
+                <span className="relative">
+                  <Icon
+                    aria-hidden
+                    className={cn("size-5", off && "opacity-50")}
+                  />
+                  {feature === "expenses" && waiting > 0 ? (
+                    <span
+                      aria-hidden
+                      className="bg-primary text-primary-foreground absolute -top-1.5 left-3.5 h-4 min-w-4 rounded-full px-1 text-center text-[0.625rem] leading-4 tabular-nums"
+                    >
+                      {waiting}
+                    </span>
+                  ) : null}
+                </span>
                 {label}
                 {off ? <span className="sr-only">(turned off)</span> : null}
+                {feature === "expenses" && waiting > 0 ? (
+                  <span className="sr-only">, {waiting} to confirm</span>
+                ) : null}
               </Link>
             </li>
           );

@@ -18,9 +18,13 @@ import { errorMessage } from "@/lib/api/error-message";
 
 interface ConfirmDialogProps {
   cancelLabel?: string;
+  /** Shown under the description, such as what will happen or a field to fill in. */
+  children?: ReactNode;
+  /** Holds back the confirm button, such as until the user has typed a name. */
+  confirmDisabled?: boolean;
   confirmLabel: string;
-  /** Explains a failure the generic messages don't cover, such as a 409. */
-  describeError?: (error: unknown) => string;
+  /** Explains a failure the generic messages don't cover, such as a 409, and may link to the way out. */
+  describeError?: (error: unknown) => ReactNode;
   description?: ReactNode;
   /** Styles the confirm button for actions that delete or can't be undone. */
   destructive?: boolean;
@@ -45,6 +49,8 @@ export function ConfirmDialog({
   trigger,
   title,
   description,
+  children,
+  confirmDisabled = false,
   confirmLabel,
   cancelLabel = "Cancel",
   destructive = false,
@@ -94,6 +100,7 @@ export function ConfirmDialog({
             <AlertDialogDescription>{description}</AlertDialogDescription>
           ) : null}
         </AlertDialogHeader>
+        {children}
         {error === null ? null : (
           <p className="text-destructive text-sm" role="alert">
             {describeError(error)}
@@ -104,7 +111,7 @@ export function ConfirmDialog({
             {cancelLabel}
           </AlertDialogCancel>
           <AlertDialogAction
-            disabled={pending}
+            disabled={pending || confirmDisabled}
             onClick={confirm}
             variant={destructive ? "destructive" : "default"}
           >

@@ -83,6 +83,9 @@ describe("encodeQuery", () => {
     expect(
       encodeQuery(endpoints.listChores, { assignedToId: USER_ID })
     ).toEqual({ assignedToId: USER_ID });
+    expect(
+      encodeQuery(endpoints.listSettlements, { status: "pending" })
+    ).toEqual({ status: "pending" });
     expect(encodeQuery(endpoints.listExpenses, {})).toEqual({});
     expect(
       encodeQuery(endpoints.listExpenses, {

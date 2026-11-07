@@ -154,6 +154,7 @@ A payment is an independent ledger entry. It references no expense or split, so 
 - Amounts: `amount.amountCents` is a positive integer up to `MAX_AMOUNT_CENTS` in any [supported currency](../money.md#supported-currencies). The currency doesn't have to match an existing expense.
 - Notes: an omitted `note` is stored as `null`.
 - Ordering: `createdAt` descending, then `id` descending. `createdAt` is the database's time when the recording transaction started.
+- Filtering: `GET /settlements?status=pending` or `status=confirmed` keeps only payments in that state, and `totalItems` counts only those, so a screen can list what's pending without paging through the history.
 - Disabled module: `GET /settlements` keeps working. The other three routes answer 403 `MODULE_DISABLED`.
 
 #### Overpayment

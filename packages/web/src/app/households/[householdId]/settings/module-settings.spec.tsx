@@ -68,7 +68,7 @@ describe("ModuleSettings", () => {
     expect(alert).toHaveTextContent("anyone owes or is owed money");
     expect(
       within(alert).getByRole("link", { name: "Settle the balances first" })
-    ).toHaveAttribute("href", `/households/${flat.id}/expenses`);
+    ).toHaveAttribute("href", `/households/${flat.id}/expenses/balances`);
     expect(screen.getByRole("switch", { name: "Expenses" })).toBeChecked();
     expect(household("Flat on Piękna").features.expenses).toBe(true);
   });

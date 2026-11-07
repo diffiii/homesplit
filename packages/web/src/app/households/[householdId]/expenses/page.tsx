@@ -1,7 +1,7 @@
 "use client";
 
 import type { Expense, UserSummary } from "@homesplit/contracts";
-import { PlusIcon } from "lucide-react";
+import { PlusIcon, ScaleIcon } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
@@ -10,8 +10,10 @@ import { PageHeader } from "@/components/page-header";
 import {
   useFeatureEnabled,
   useHouseholdId,
+  useWaitingPayments,
 } from "@/components/shell/household-context";
-import { householdPath } from "@/components/shell/household-nav";
+import { balancesPath, householdPath } from "@/components/shell/household-nav";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { parseExpenseFilters } from "@/lib/expenses";
 import { ExpenseFiltersBar } from "./expense-filters";
@@ -21,6 +23,7 @@ import { ExpenseList } from "./expense-list";
 export default function ExpensesPage() {
   const enabled = useFeatureEnabled("expenses");
   const householdId = useHouseholdId();
+  const waiting = useWaitingPayments().length;
   const search = useSearchParams();
   const filters = useMemo(
     () => parseExpenseFilters(new URLSearchParams(search.toString())),
@@ -45,7 +48,26 @@ export default function ExpensesPage() {
   return (
     <>
       <PageHeader
-        actions={enabled ? <NewExpenseLink householdId={householdId} /> : null}
+        actions={
+          <>
+            <Link
+              className={buttonVariants({ variant: "outline" })}
+              href={balancesPath(householdId)}
+            >
+              <ScaleIcon aria-hidden data-icon="inline-start" />
+              Balances
+              {waiting > 0 ? (
+                <>
+                  <span className="sr-only">, {waiting} to confirm</span>
+                  <Badge aria-hidden variant="secondary">
+                    {waiting}
+                  </Badge>
+                </>
+              ) : null}
+            </Link>
+            {enabled ? <NewExpenseLink householdId={householdId} /> : null}
+          </>
+        }
         title="Expenses"
       />
       {enabled ? null : <ModuleDisabledAlert module="Expenses" />}
