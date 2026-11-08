@@ -1,5 +1,8 @@
+import { randomUUID } from "node:crypto";
+import { APIError } from "better-auth/api";
 import { describe, expect, it } from "vitest";
 import {
+  assertInvitationAllowed,
   INVITATION,
   invitationEmail,
   invitationLink,
@@ -64,5 +67,52 @@ describe("invitationEmail", () => {
     });
 
     expect(email.subject).not.toMatch(LINE_BREAK);
+  });
+});
+
+describe("assertInvitationAllowed", () => {
+  const sender = () => `sender-${randomUUID()}`;
+  const guest = (n: number) => `guest-${randomUUID()}-${n}@example.com`;
+
+  it("lets a sender invite up to the limit, then refuses", () => {
+    const id = sender();
+    for (let i = 0; i < INVITATION.maxPerSender; i += 1) {
+      assertInvitationAllowed(id, guest(i));
+    }
+
+    expect(() => assertInvitationAllowed(id, guest(-1))).toThrow(APIError);
+  });
+
+  it("limits an address whoever sends to it, ignoring case", () => {
+    const address = `Guest-${randomUUID()}@Example.com`;
+    for (let i = 0; i < INVITATION.maxPerRecipient; i += 1) {
+      assertInvitationAllowed(
+        sender(),
+        i % 2 === 0 ? address : address.toLowerCase()
+      );
+    }
+
+    expect(() => assertInvitationAllowed(sender(), address)).toThrow(APIError);
+  });
+
+  it("doesn't charge an address for a sender who is over the limit", () => {
+    const id = sender();
+    const address = guest(0);
+    for (let i = 0; i < INVITATION.maxPerSender; i += 1) {
+      assertInvitationAllowed(id, guest(i + 1));
+    }
+    expect(() => assertInvitationAllowed(id, address)).toThrow(APIError);
+
+    for (let i = 0; i < INVITATION.maxPerRecipient; i += 1) {
+      assertInvitationAllowed(sender(), address);
+    }
+  });
+
+  it("leaves a request without a sender or an address to Better Auth", () => {
+    expect(() =>
+      assertInvitationAllowed(undefined, "a@example.com")
+    ).not.toThrow();
+    expect(() => assertInvitationAllowed(sender(), undefined)).not.toThrow();
+    expect(() => assertInvitationAllowed(sender(), 42)).not.toThrow();
   });
 });

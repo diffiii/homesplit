@@ -1,12 +1,24 @@
+import { APIError } from "better-auth/api";
 import type { Email } from "./mail";
+import { RateLimiter } from "./rate-limiter";
 
 /** See "Better Auth endpoints" in docs/decisions.md. */
 export const INVITATION = {
   /** How long an invitation can be accepted. */
   expiresInSeconds: 7 * 24 * 60 * 60,
+  /** The period the limits below apply to. */
+  windowSeconds: 60 * 60,
+  /** Invitation emails one user may trigger, new or sent again. */
+  maxPerSender: 30,
+  /** Invitation emails one address may be sent, whoever sends them. */
+  maxPerRecipient: 5,
+  /** Keys each limiter remembers; the least recently used go first. */
+  maxTrackedKeys: 10_000,
 } as const;
 
 const SECONDS_PER_DAY = 24 * 60 * 60;
+const MS_PER_SECOND = 1000;
+const WINDOW_MS = INVITATION.windowSeconds * MS_PER_SECOND;
 const HTML_SPECIAL = /[&<>"']/gu;
 const WHITESPACE = /\s+/gu;
 const HTML_ESCAPES: Record<string, string> = {
@@ -16,6 +28,45 @@ const HTML_ESCAPES: Record<string, string> = {
   '"': "&quot;",
   "'": "&#39;",
 };
+
+const bySender = new RateLimiter({
+  max: INVITATION.maxPerSender,
+  maxKeys: INVITATION.maxTrackedKeys,
+  windowMs: WINDOW_MS,
+});
+
+const byRecipient = new RateLimiter({
+  max: INVITATION.maxPerRecipient,
+  maxKeys: INVITATION.maxTrackedKeys,
+  windowMs: WINDOW_MS,
+});
+
+/**
+ * Throws 429 `RATE_LIMITED` when this user has sent too many invitation emails,
+ * or this address has been sent too many by anyone. It runs before Better Auth
+ * writes anything, and counts every request of a signed-in user, even one
+ * Better Auth then refuses. A request without a session or an email address is
+ * left to Better Auth.
+ */
+export function assertInvitationAllowed(
+  senderId: string | undefined,
+  recipient: unknown
+): void {
+  if (!senderId || typeof recipient !== "string") {
+    return;
+  }
+  if (
+    !(
+      bySender.tryConsume(senderId) &&
+      byRecipient.tryConsume(recipient.trim().toLowerCase())
+    )
+  ) {
+    throw new APIError("TOO_MANY_REQUESTS", {
+      code: "RATE_LIMITED",
+      message: "Too many invitations. Try again later.",
+    });
+  }
+}
 
 function escapeHtml(text: string): string {
   return text.replace(HTML_SPECIAL, (char) => HTML_ESCAPES[char] ?? char);

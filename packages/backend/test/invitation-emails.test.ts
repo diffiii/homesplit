@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { INestApplication } from "@nestjs/common";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   afterAll,
   afterEach,
@@ -28,8 +30,18 @@ const ORG = "/api/auth/organization";
 const MS_PER_SECOND = 1000;
 const ONE_MINUTE_MS = 60_000;
 const EXPIRY_MS = INVITATION.expiresInSeconds * MS_PER_SECOND;
+const WINDOW_MS = INVITATION.windowSeconds * MS_PER_SECOND;
+
+const MIGRATIONS = join(process.cwd(), "src/db/migrations");
+const TRIGGER_MIGRATION = join(
+  MIGRATIONS,
+  readdirSync(MIGRATIONS).find((file) =>
+    file.endsWith("_invitation_single_pending.sql")
+  ) ?? "missing-migration.sql"
+);
 
 const guestEmail = () => `guest-${randomUUID()}@test.local`;
+const CONCURRENT_INSERTS = 8;
 
 describe("household invitation emails", () => {
   let app: INestApplication;
@@ -43,6 +55,7 @@ describe("household invitation emails", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -69,6 +82,19 @@ describe("household invitation emails", () => {
       .from(invitation)
       .where(eq(invitation.id, id));
     return row;
+  }
+
+  function pendingFor(householdId: string, email: string) {
+    return db
+      .select()
+      .from(invitation)
+      .where(
+        and(
+          eq(invitation.organizationId, householdId),
+          eq(invitation.email, email),
+          eq(invitation.status, "pending")
+        )
+      );
   }
 
   async function isMember(householdId: string, userId: string) {
@@ -285,6 +311,203 @@ describe("household invitation emails", () => {
       expect((await invitationRow(first.body.id))?.status).toBe("pending");
       expect(invitationEmails(bob.email)).toHaveLength(2);
       expect(invitationLink(bob.email).id).toBe(first.body.id);
+    });
+  });
+
+  describe("concurrent invitations", () => {
+    it("leaves one pending row when many are inserted at once, whatever the limits", async () => {
+      const alice = await createUser(app, "Alice");
+      const household = await createHousehold(alice);
+      const email = guestEmail();
+      const expiresAt = new Date(Date.now() + EXPIRY_MS);
+
+      await Promise.all(
+        Array.from({ length: CONCURRENT_INSERTS }, () =>
+          db.insert(invitation).values({
+            email,
+            expiresAt,
+            inviterId: alice.id,
+            organizationId: household.id,
+            role: "owner",
+          })
+        )
+      );
+
+      expect(await pendingFor(household.id, email)).toHaveLength(1);
+    });
+
+    it("leaves one pending invitation for an address however many arrive at once", async () => {
+      const alice = await createUser(app, "Alice");
+      const household = await createHousehold(alice);
+      const bob = await createUser(app, "Bob");
+
+      const sent = await Promise.all(
+        Array.from({ length: INVITATION.maxPerRecipient - 1 }, () =>
+          invite(alice, household, bob.email, "owner")
+        )
+      );
+      for (const response of sent) {
+        expect(response.status).toBe(200);
+      }
+      expect(await pendingFor(household.id, bob.email)).toHaveLength(1);
+
+      const latest = await invite(alice, household, bob.email, "member").expect(
+        200
+      );
+
+      const pending = await pendingFor(household.id, bob.email);
+      expect(pending.map((row) => row.id)).toEqual([latest.body.id]);
+      await Promise.all(
+        sent.map((response) => accept(bob.client, response.body.id).expect(400))
+      );
+      expect(await isMember(household.id, bob.id)).toBe(false);
+      await accept(bob.client, latest.body.id).expect(200);
+      const [membership] = await db
+        .select({ role: member.role })
+        .from(member)
+        .where(
+          and(
+            eq(member.organizationId, household.id),
+            eq(member.userId, bob.id)
+          )
+        );
+      expect(membership?.role).toBe("member");
+    });
+
+    it("cancels older pending duplicates when the migration runs on existing data", async () => {
+      const alice = await createUser(app, "Alice");
+      const household = await createHousehold(alice);
+      const email = guestEmail();
+      const expiresAt = new Date(Date.now() + EXPIRY_MS);
+
+      await db.execute(
+        sql`ALTER TABLE invitation DISABLE TRIGGER invitation_single_pending`
+      );
+      try {
+        await db.insert(invitation).values([
+          {
+            email,
+            expiresAt,
+            inviterId: alice.id,
+            organizationId: household.id,
+            createdAt: new Date("2026-01-01T00:00:00Z"),
+          },
+          {
+            email,
+            expiresAt,
+            inviterId: alice.id,
+            organizationId: household.id,
+            createdAt: new Date("2026-01-02T00:00:00Z"),
+          },
+        ]);
+        expect(await pendingFor(household.id, email)).toHaveLength(2);
+
+        await db.execute(sql.raw(readFileSync(TRIGGER_MIGRATION, "utf8")));
+      } finally {
+        await db.execute(
+          sql`ALTER TABLE invitation ENABLE TRIGGER invitation_single_pending`
+        );
+      }
+
+      const pending = await pendingFor(household.id, email);
+      expect(pending).toHaveLength(1);
+      expect(pending[0]?.createdAt.toISOString()).toBe(
+        "2026-01-02T00:00:00.000Z"
+      );
+    });
+  });
+
+  describe("limits", () => {
+    it("limits the invitation emails one user can trigger", async () => {
+      const alice = await createUser(app, "Alice");
+      const household = await createHousehold(alice);
+      await Promise.all(
+        Array.from({ length: INVITATION.maxPerSender }, () =>
+          invite(alice, household, guestEmail()).expect(200)
+        )
+      );
+      const before = await db
+        .select()
+        .from(invitation)
+        .where(eq(invitation.organizationId, household.id));
+
+      const limited = await invite(alice, household, guestEmail()).expect(429);
+
+      expect(limited.body.code).toBe("RATE_LIMITED");
+      const after = await db
+        .select()
+        .from(invitation)
+        .where(eq(invitation.organizationId, household.id));
+      expect(after).toHaveLength(before.length);
+      const bob = await createUser(app, "Bob");
+      const bobsHousehold = await createHousehold(bob);
+      await invite(bob, bobsHousehold, guestEmail()).expect(200);
+    });
+
+    it("limits the invitation emails one address gets, from any sender", async () => {
+      const guest = guestEmail();
+      const senders = await Promise.all(
+        Array.from({ length: INVITATION.maxPerRecipient }, async () => {
+          const user = await createUser(app, "Sender");
+          return { user, household: await createHousehold(user) };
+        })
+      );
+      await Promise.all(
+        senders.map(({ user, household }) =>
+          invite(user, household, guest).expect(200)
+        )
+      );
+      const extra = await createUser(app, "Extra");
+      const extraHousehold = await createHousehold(extra);
+
+      const limited = await invite(extra, extraHousehold, guest).expect(429);
+
+      expect(limited.body.code).toBe("RATE_LIMITED");
+      expect(invitationEmails(guest)).toHaveLength(INVITATION.maxPerRecipient);
+    });
+
+    it("counts invitations sent again", async () => {
+      const alice = await createUser(app, "Alice");
+      const household = await createHousehold(alice);
+      const guest = guestEmail();
+      await invite(alice, household, guest).expect(200);
+      await Promise.all(
+        Array.from({ length: INVITATION.maxPerRecipient - 1 }, () =>
+          invite(alice, household, guest, "member", { resend: true }).expect(
+            200
+          )
+        )
+      );
+
+      await invite(alice, household, guest, "member", {
+        resend: true,
+      }).expect(429);
+
+      expect(invitationEmails(guest)).toHaveLength(INVITATION.maxPerRecipient);
+    });
+
+    it("allows invitations again once the window has passed", async () => {
+      const alice = await createUser(app, "Alice");
+      const household = await createHousehold(alice);
+      const guest = guestEmail();
+      await invite(alice, household, guest).expect(200);
+      await Promise.all(
+        Array.from({ length: INVITATION.maxPerRecipient - 1 }, () =>
+          invite(alice, household, guest, "member", { resend: true }).expect(
+            200
+          )
+        )
+      );
+
+      vi.useFakeTimers({ toFake: ["Date"], now: Date.now() + WINDOW_MS });
+      await invite(alice, household, guest, "member", {
+        resend: true,
+      }).expect(200);
+      vi.useRealTimers();
+
+      expect(invitationEmails(guest)).toHaveLength(
+        INVITATION.maxPerRecipient + 1
+      );
     });
   });
 
