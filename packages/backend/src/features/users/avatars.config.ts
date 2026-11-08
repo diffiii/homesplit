@@ -1,13 +1,10 @@
+import { DEFAULT_AVATAR_MAX_BYTES } from "@homesplit/contracts";
 import { z } from "zod";
 
 const AvatarsEnv = z.object({
   AVATAR_MAX_BYTES: z.preprocess(
     (value) => (value === "" ? undefined : value),
-    z.coerce
-      .number()
-      .int()
-      .min(1)
-      .default(10 * 1024 * 1024)
+    z.coerce.number().int().min(1).default(DEFAULT_AVATAR_MAX_BYTES)
   ),
 });
 

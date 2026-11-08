@@ -7,7 +7,7 @@ import {
   toSafeInteger,
 } from "@homesplit/contracts";
 import { Injectable } from "@nestjs/common";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { db, type Executor, readSnapshot, type Transaction } from "@/db";
 import { settlements } from "@/db/schema";
 import { lockHouseholdForLedgerWrite } from "@/features/expenses/household-ledger-lock";
@@ -110,18 +110,20 @@ async function lockSettlement(
 export class SettlementsService {
   list(
     householdId: string,
-    { page, pageSize }: ListSettlementHistoryQuery
+    { page, pageSize, status }: ListSettlementHistoryQuery
   ): Promise<SettlementListResponse> {
+    const where = and(
+      eq(settlements.householdId, householdId),
+      status === "pending" ? isNull(settlements.confirmedAt) : undefined,
+      status === "confirmed" ? isNotNull(settlements.confirmedAt) : undefined
+    );
     return readSnapshot(async (tx) => {
       const rows = await selectSettlements(tx)
-        .where(eq(settlements.householdId, householdId))
+        .where(where)
         .orderBy(desc(settlements.createdAt), desc(settlements.id))
         .limit(pageSize)
         .offset((page - 1) * pageSize);
-      const totalItems = await tx.$count(
-        settlements,
-        eq(settlements.householdId, householdId)
-      );
+      const totalItems = await tx.$count(settlements, where);
       return { items: rows.map(toSettlement), page, pageSize, totalItems };
     });
   }

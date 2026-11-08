@@ -1,6 +1,11 @@
 import type { Pagination } from "@homesplit/contracts";
 import type { MockDb } from "../db";
-import { invalidReference, notFound } from "../errors";
+import {
+  invalidReference,
+  MockApiError,
+  notFound,
+  validationError,
+} from "../errors";
 
 type Comparator<T> = (a: T, b: T) => number;
 
@@ -91,4 +96,44 @@ export function assertCurrentMembers(
   if (issues.length > 0) {
     throw invalidReference(issues);
   }
+}
+
+interface UploadRules<T extends string> {
+  allowed: readonly T[];
+  maxBytes: number;
+  typeOf: (file: File) => T | null;
+}
+
+/**
+ * The one file in `field` of an upload. The backend detects the type from
+ * the content; the mocks trust the file's declared type and name. As there,
+ * the size is checked first.
+ */
+export function uploadedFile<T extends string>(
+  form: FormData | undefined,
+  field: string,
+  { allowed, maxBytes, typeOf }: UploadRules<T>
+): { file: File; type: T } {
+  const files = form?.getAll(field) ?? [];
+  const [file] = files;
+  if (files.length !== 1 || !file || typeof file === "string") {
+    throw validationError([{ path: [], message: "File is required" }]);
+  }
+  if (file.size > maxBytes) {
+    throw new MockApiError(
+      413,
+      "PAYLOAD_TOO_LARGE",
+      "Request body is too large"
+    );
+  }
+  const type = typeOf(file);
+  if (!type || file.size === 0) {
+    throw new MockApiError(
+      415,
+      "UNSUPPORTED_FILE_TYPE",
+      "Unsupported file type",
+      { allowed }
+    );
+  }
+  return { file, type };
 }
