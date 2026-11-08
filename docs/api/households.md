@@ -1,6 +1,6 @@
 # Households API
 
-Module flag: none · Tasks: #26, #27, #41 · Contracts: [households](../../packages/contracts/src/features/households/index.ts)
+Module flag: none · Tasks: #26, #27, #41, #93 · Contracts: [households](../../packages/contracts/src/features/households/index.ts)
 
 ## Routes
 
@@ -9,6 +9,7 @@ Module flag: none · Tasks: #26, #27, #41 · Contracts: [households](../../packa
 | GET | `/api/households/:householdId/features` | `HouseholdIdParams` | `HouseholdFeatures` | 200 | all |
 | PATCH | `/api/households/:householdId/features` | `HouseholdIdParams`, `UpdateHouseholdFeaturesRequest` | `HouseholdFeatures` | 200 | admin+ |
 | DELETE | `/api/households/:householdId` | `HouseholdIdParams` | none | 204 | `owner` |
+| GET | `/api/invitations/:invitationId` | `InvitationIdParams` | `InvitationPreview` | 200 | any signed-in user |
 
 Better Auth's `/api/auth/organization/delete` answers 404, so households are deleted only through `DELETE /api/households/:householdId`.
 
@@ -19,6 +20,15 @@ Better Auth's `/api/auth/organization/delete` answers 404, so households are del
 - Ordering: none.
 - Partial updates: an omitted flag in `PATCH /features` stays unchanged. Concurrent patches that touch different flags compose; each issues a single `UPDATE` of only the fields it sends.
 - Repeated and concurrent requests: deletion locks the `organization` row with `SELECT … FOR UPDATE` and deletes it in the same transaction. A repeat answers 404, because the caller is no longer a member.
+
+## Invitation preview
+
+`GET /api/invitations/:invitationId` is what the invitation page shows before the invitee answers through Better Auth's `accept-invitation` or `reject-invitation`. Better Auth's `get-invitation` can't serve it: it answers 403 without the address to a user signed in with another email, and the same 400 to expired, cancelled, and answered invitations.
+
+- Any signed-in user may read any invitation, so the page can tell someone signed in with the wrong account which address the invitation is for. The ID is a random UUID that only the invitation email links to, so knowing it is what lets a user read it. It shows the household's ID and name, the inviter's `UserSummary`, the invited address, and the role. A visitor who isn't signed in gets 401, and an unknown ID 404.
+- `status` is Better Auth's stored status (`pending`, `accepted`, `rejected`, or `canceled`), except that a `pending` invitation whose `expiresAt` has passed is `expired`, as Better Auth refuses it then. An invitation replaced by a newer one to the same address is `canceled` (see [Better Auth endpoints](../decisions.md#better-auth-endpoints)).
+- `role` is the strongest HomeSplit role in the stored value, or `member` when none is stored, which is the role Better Auth grants then.
+- Reading changes nothing, so the answer can be out of date by the time the invitee answers; Better Auth checks again when they do.
 
 ## Settled-up checks
 
