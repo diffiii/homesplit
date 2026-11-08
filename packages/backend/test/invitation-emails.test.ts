@@ -417,6 +417,93 @@ describe("household invitation emails", () => {
     });
   });
 
+  describe("restoring an invitation", () => {
+    const setStatus = (id: string, status: string) =>
+      db.update(invitation).set({ status }).where(eq(invitation.id, id));
+
+    it("keeps the newer invitation when a failed acceptance restores an older one", async () => {
+      const alice = await createUser(app, "Alice");
+      const household = await createHousehold(alice);
+      const bob = await createUser(app, "Bob");
+
+      const older = await invite(alice, household, bob.email, "owner").expect(
+        200
+      );
+      // Accepting the older invitation is under way, so it isn't pending.
+      await setStatus(older.body.id, "accepted");
+      const newer = await invite(alice, household, bob.email, "member").expect(
+        200
+      );
+      // Creating the membership failed, and Better Auth restores the older one.
+      await setStatus(older.body.id, "pending");
+
+      const pending = await pendingFor(household.id, bob.email);
+      expect(pending.map((row) => row.id)).toEqual([newer.body.id]);
+      expect((await invitationRow(older.body.id))?.status).toBe("canceled");
+
+      await accept(bob.client, older.body.id).expect(400);
+      expect(await isMember(household.id, bob.id)).toBe(false);
+      await accept(bob.client, newer.body.id).expect(200);
+      const [membership] = await db
+        .select({ role: member.role })
+        .from(member)
+        .where(
+          and(
+            eq(member.organizationId, household.id),
+            eq(member.userId, bob.id)
+          )
+        );
+      expect(membership?.role).toBe("member");
+    });
+
+    it("restores an invitation when no newer one is pending", async () => {
+      const alice = await createUser(app, "Alice");
+      const household = await createHousehold(alice);
+      const bob = await createUser(app, "Bob");
+
+      const only = await invite(alice, household, bob.email).expect(200);
+      await setStatus(only.body.id, "accepted");
+      await setStatus(only.body.id, "pending");
+
+      const pending = await pendingFor(household.id, bob.email);
+      expect(pending.map((row) => row.id)).toEqual([only.body.id]);
+      await accept(bob.client, only.body.id).expect(200);
+    });
+
+    it("leaves one pending invitation when restores and new invitations race", async () => {
+      const alice = await createUser(app, "Alice");
+      const household = await createHousehold(alice);
+      const email = guestEmail();
+      const expiresAt = new Date(Date.now() + EXPIRY_MS);
+
+      const [first] = await db
+        .insert(invitation)
+        .values({
+          email,
+          expiresAt,
+          inviterId: alice.id,
+          organizationId: household.id,
+          role: "owner",
+          status: "accepted",
+        })
+        .returning({ id: invitation.id });
+
+      await Promise.all([
+        setStatus(first?.id ?? "", "pending"),
+        ...Array.from({ length: CONCURRENT_INSERTS }, () =>
+          db.insert(invitation).values({
+            email,
+            expiresAt,
+            inviterId: alice.id,
+            organizationId: household.id,
+          })
+        ),
+      ]);
+
+      expect(await pendingFor(household.id, email)).toHaveLength(1);
+    });
+  });
+
   describe("limits", () => {
     it("limits the invitation emails one user can trigger", async () => {
       const alice = await createUser(app, "Alice");
