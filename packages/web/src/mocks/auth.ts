@@ -14,7 +14,7 @@ import {
   now,
 } from "./db";
 import { MockApiError, validationError } from "./errors";
-import { defaultCategories } from "./factories";
+import { defaultCategories, mockResetToken } from "./factories";
 import { hasRole, type MockNetwork, simulateLatency } from "./routes";
 
 /** Better Auth answers with `{ code, message }` and its own statuses. */
@@ -299,6 +299,47 @@ export function createAuthHandlers(
     route("post", "/sign-out", () => {
       db.state.sessionUserId = null;
       return { success: true };
+    }),
+
+    // Sends nothing: the link is `/reset-password?token=` + `mockResetToken`.
+    // Answers the same whether or not the email has an account.
+    route("post", "/request-password-reset", ({ input }) => {
+      if (!z.email().safeParse(text(input, "email")).success) {
+        throw ERRORS.invalidEmail();
+      }
+      return {
+        status: true,
+        message:
+          "If this email exists in our system, check your email for the reset link",
+      };
+    }),
+
+    // Unlike the backend, a token works more than once and never expires.
+    route("post", "/reset-password", ({ input }) => {
+      const user = db.state.users.find(
+        ({ id }) => mockResetToken(id) === text(input, "token")
+      );
+      if (!user) {
+        throw authError(BAD_REQUEST, "INVALID_TOKEN", "Invalid token");
+      }
+      const newPassword = text(input, "newPassword");
+      if (newPassword.length < MIN_PASSWORD_LENGTH) {
+        throw authError(
+          BAD_REQUEST,
+          "PASSWORD_TOO_SHORT",
+          "Password too short"
+        );
+      }
+      if (newPassword.length > MAX_PASSWORD_LENGTH) {
+        throw authError(BAD_REQUEST, "PASSWORD_TOO_LONG", "Password too long");
+      }
+      user.password = newPassword;
+      // `revokeSessionsOnPasswordReset` signs the user out everywhere.
+      revokeOtherSessions(user.id);
+      if (db.state.sessionUserId === user.id) {
+        db.state.sessionUserId = null;
+      }
+      return { status: true };
     }),
 
     route("post", "/change-password", ({ input }) => {

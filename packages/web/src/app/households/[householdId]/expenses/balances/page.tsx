@@ -46,6 +46,7 @@ import {
   usePaymentActions,
   WaitingPayments,
 } from "./payment-history";
+import { type StartWriteOff, useWriteOffs, WriteOffMenu } from "./write-off";
 
 type StartPayment = (
   event: MouseEvent<HTMLElement>,
@@ -73,6 +74,7 @@ export default function BalancesPage() {
   const opener = useRef<HTMLElement | null>(null);
   const recordButton = useRef<HTMLButtonElement>(null);
   const actions = usePaymentActions(recordButton);
+  const writeOffs = useWriteOffs(recordButton);
   const startPayment: StartPayment = (event, prefill) => {
     opener.current = event.currentTarget;
     setPayment({ open: true, prefill });
@@ -120,7 +122,11 @@ export default function BalancesPage() {
         {() =>
           open?.length ? (
             open.map((group) => (
-              <CurrencyGroup group={group} key={group.currency} />
+              <CurrencyGroup
+                group={group}
+                key={group.currency}
+                onWriteOff={writeOffs.start}
+              />
             ))
           ) : (
             <EmptyState
@@ -134,6 +140,7 @@ export default function BalancesPage() {
       {open?.length ? <Suggestions onRecord={startPayment} /> : null}
       <PaymentHistory onAction={actions.start} />
       {actions.dialog}
+      {writeOffs.dialog}
       <PaymentDialog
         finalFocus={() =>
           opener.current?.isConnected ? opener.current : recordButton.current
@@ -184,9 +191,17 @@ function RefreshFailed({
 const isOpen = ({ balances }: CurrencyBalances) =>
   balances.some(({ amountCents }) => amountCents !== 0);
 
-function CurrencyGroup({ group }: { group: CurrencyBalances }) {
+function CurrencyGroup({
+  group,
+  onWriteOff,
+}: {
+  group: CurrencyBalances;
+  onWriteOff: StartWriteOff;
+}) {
   const { userId } = useHousehold();
   const isDeparted = useIsDeparted();
+  const can = usePermissions();
+  const enabled = useFeatureEnabled("expenses");
   const { currency, balances } = group;
   const headingId = `balances-${currency}`;
   return (
@@ -198,7 +213,8 @@ function CurrencyGroup({ group }: { group: CurrencyBalances }) {
         </span>
       </h2>
       <ul className="flex flex-col divide-y overflow-hidden rounded-xl border">
-        {balances.map(({ user, amountCents }) => {
+        {balances.map((balance) => {
+          const { user, amountCents } = balance;
           const you = user.id === userId;
           const departed = isDeparted(user);
           return (
@@ -218,6 +234,13 @@ function CurrencyGroup({ group }: { group: CurrencyBalances }) {
               >
                 {describeBalance(amountCents, currency, { you })}
               </span>
+              {enabled && can.writeOff && departed && amountCents !== 0 ? (
+                <WriteOffMenu
+                  currency={currency}
+                  onStart={onWriteOff}
+                  subject={balance}
+                />
+              ) : null}
             </li>
           );
         })}

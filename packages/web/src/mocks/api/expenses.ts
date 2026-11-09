@@ -5,8 +5,10 @@ import {
   type ExpenseAllocationInput,
   type ExpensePayerInput,
   type ListExpensesQuery,
+  planWriteOff,
   type Settlement,
   UNCATEGORIZED,
+  WRITE_OFF_NOTE,
 } from "@homesplit/contracts";
 import { type MockDb, type MockExpense, type MockSettlement, now } from "../db";
 import { conflict, forbidden, invalidReference } from "../errors";
@@ -409,6 +411,72 @@ export const expenseRoutes: MockRoutes = {
         settlement.confirmedAt = now();
       }
       return renderSettlement(db, settlement) as ConfirmedSettlement;
+    },
+  },
+
+  writeOffBalance: {
+    minRole: "admin",
+    module: "expenses",
+    resolve: ({ db, household, userId, body }) => {
+      if (!db.isParty(household.id, body.userId)) {
+        throw invalidReference([
+          { path: ["userId"], message: "Not a household party" },
+        ]);
+      }
+      const members = db.members(household.id);
+      if (members.some((member) => member.userId === body.userId)) {
+        throw conflict(
+          "MEMBER_NOT_DEPARTED",
+          "Only a departed member's balance can be written off"
+        );
+      }
+      const group =
+        listBalances(db, household.id).items.find(
+          ({ currency }) => currency === body.currency
+        )?.balances ?? [];
+      const subject = group.find(({ user }) => user.id === body.userId);
+      if (subject?.amountCents !== body.amountCents) {
+        throw conflict("BALANCE_CHANGED", "The balance isn't the one given");
+      }
+      const pending = db.state.settlements.some(
+        (settlement) =>
+          settlement.householdId === household.id &&
+          settlement.confirmedAt === null &&
+          settlement.amount.currency === body.currency &&
+          (settlement.payerId === body.userId ||
+            settlement.payeeId === body.userId)
+      );
+      if (pending) {
+        throw conflict(
+          "HAS_PENDING_PAYMENTS",
+          "Their pending payments must be confirmed or deleted first"
+        );
+      }
+      const time = now();
+      const payments = planWriteOff(
+        body.method,
+        subject,
+        group,
+        members.map((member) => db.summary(member.userId))
+      );
+      return {
+        items: payments.map(({ payer, payee, amountCents }) => {
+          const settlement: MockSettlement = {
+            id: crypto.randomUUID(),
+            householdId: household.id,
+            payerId: payer.id,
+            payeeId: payee.id,
+            createdById: userId,
+            amount: { amountCents, currency: body.currency },
+            note: WRITE_OFF_NOTE,
+            createdAt: time,
+            confirmedById: userId,
+            confirmedAt: time,
+          };
+          db.state.settlements.push(settlement);
+          return renderSettlement(db, settlement) as ConfirmedSettlement;
+        }),
+      };
     },
   },
 

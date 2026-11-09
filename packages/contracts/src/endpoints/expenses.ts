@@ -22,6 +22,8 @@ import {
   SettlementSuggestionListResponse,
   UpdateExpenseCategoryRequest,
   UpdateExpenseRequest,
+  WriteOffRequest,
+  WriteOffResponse,
 } from "../features/expenses";
 import { HouseholdIdParams } from "../features/households";
 import type { Endpoint } from "./endpoint";
@@ -154,6 +156,14 @@ export const expenseEndpoints = {
     params: SettlementIdParams,
     status: 200,
     response: ConfirmedSettlement,
+  },
+  writeOffBalance: {
+    method: "POST",
+    path: `${HOUSEHOLD}/write-offs`,
+    params: HouseholdIdParams,
+    body: WriteOffRequest,
+    status: 201,
+    response: WriteOffResponse,
   },
   listBalances: {
     method: "GET",

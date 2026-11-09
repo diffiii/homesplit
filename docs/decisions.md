@@ -56,7 +56,7 @@ A trigger runs in the same statement as every insert, whatever the path, includi
 | Module flags | all | – (automatic) | admin+⁶ | – | – |
 | Expense categories | all | admin+ | admin+ | admin+⁵ | – |
 | Expenses | all | all | author or admin+ | author or admin+ | – |
-| Payments (settlements) | all | party or admin+⁴ | – | pending only: party or admin+⁴ | confirm: payee or admin+⁴ |
+| Payments (settlements) | all | party or admin+⁴ | – | pending only: party or admin+⁴ | confirm: payee or admin+⁴; [write off](#writing-off-debts) a departed member's balance: admin+ |
 | Balances and suggestions | all | – | – | – | – |
 | Chores | all | all | all | all | complete, reopen: all |
 | Shopping items | all | all | all | all | purchase, unpurchase, clear purchased: all |
@@ -66,7 +66,7 @@ A trigger runs in the same statement as every insert, whatever the path, includi
 1. Only while every balance in the household is zero; see [Deleting households](#deleting-households).
 2. Better Auth's rules apply: only an `owner` can invite, promote, demote, or remove an owner, and the last owner can't be demoted or removed. HomeSplit adds that nobody removes themselves; they leave instead.
 3. Only with every balance settled; see [Departed members](#departed-members). Better Auth doesn't let the last `owner` leave.
-4. A party is the payer or the payee. A payment recorded by its payer waits for confirmation, and nobody confirms their own payment; see [Recording payments](#recording-payments).
+4. A party is the payer or the payee. A payment recorded by its payer waits for confirmation, and nobody confirms their own payment, except in a [write-off](#writing-off-debts); see [Recording payments](#recording-payments).
 5. Only while no expense uses the category; see [Deleting households](#deleting-households).
 6. `expenses` can't be turned off while any balance in the household isn't zero; see [Disabled modules](#disabled-modules).
 
@@ -113,7 +113,7 @@ Better Auth's `/organization/delete` can't do this safely. In 1.7.7, `beforeDele
 Every settled-up check is serialized against ledger writes on the `organization` row:
 
 - A settled-up check runs in the same transaction as the change it guards, after `SELECT … FROM organization WHERE id = $1 FOR UPDATE`. Under `READ COMMITTED`, the balance query after the lock sees every ledger write committed before it.
-- Every transaction that writes the ledger (expenses, their child rows, and settlements) first takes `FOR SHARE` on the same row, so it waits for a check in progress and the check waits for it. A write that waited on a deletion then finds no household and answers 404.
+- Every transaction that writes the ledger (expenses, their child rows, and settlements) first takes `FOR SHARE` on the same row (a write-off takes `FOR UPDATE`), so it waits for a check in progress and the check waits for it. A write that waited on a deletion then finds no household and answers 404.
 
 Deleting a settled household deletes its expenses and settlements with it, since nobody is owed anything. An unsettled household stays: members settle up before leaving, an admin+ can remove members who don't and [write off](#writing-off-debts) what they still owe, and Better Auth never lets the last `owner` leave or be removed, so it keeps an owner while it has members. The only way a household loses its last member is account deletion, which then deletes the household too (see [Deleting accounts](#deleting-accounts)). Archiving is deferred.
 
@@ -160,17 +160,17 @@ For example, A pays 90.00, split equally among A, B, and C. C pays A 30.00 and l
 
 - The payer and payee are distinct household parties.
 - The recorder (`createdBy`, from the session) is a current member who is the payer or the payee, or an admin+ recording between any two parties. A departed member's payment is recorded by the other party or by an admin+.
-- A payment recorded by its payer is `pending` until the payee, or an admin+ other than the payer, confirms it with `POST /settlements/:settlementId/confirm`. A payment recorded by the payee, or by an admin+ who isn't the payer, is `confirmed` at once. Nobody confirms their own payment, so an admin+ paying a departed member needs another admin+ to confirm.
+- A payment recorded by its payer is `pending` until the payee, or an admin+ other than the payer, confirms it with `POST /settlements/:settlementId/confirm`. A payment recorded by the payee, or by an admin+ who isn't the payer, is `confirmed` at once. Nobody confirms their own payment, so an admin+ paying a departed member needs another admin+ to confirm, except in a [write-off](#writing-off-debts).
 - Only confirmed payments count toward balances, suggestions, and every settled-up check. While a payment is pending, `DELETE /settlements/:settlementId` removes it: the payer withdraws it, or the payee or an admin+ rejects it. A confirmed payment can't be deleted, and `DELETE` answers 409 `SETTLEMENT_CONFIRMED`.
 - The expenses module must be enabled. Eligibility doesn't depend on balances; #40 decides balance limits, duplicate handling, and corrections of confirmed payments.
 - The contracts don't have this yet. #40 adds a `status` (`pending` or `confirmed`) with `confirmedBy` and `confirmedAt` to `Settlement`, the two routes, and their params.
 
 ### Writing off debts
 
-There's no write-off operation. When a departed member's debt can't be collected, an admin+ settles it with ordinary payments from the debtor, which are confirmed at once because the admin isn't the payer, and writes `Write-off` in each `note`. There are two ways to do it:
+When a departed member's debt can't be collected, an admin+ writes it off with `POST /write-offs`, which records ordinary payments from the debtor, all at once, confirmed, and with `Write-off` in each `note` (see [Write-offs](api/expenses.md#write-offs)). There are two ways to do it:
 
 - **Forgive it:** payments from the debtor to the creditors, up to what each is owed, so the creditors take the loss.
-- **Split it:** one payment from the debtor to each current member, an equal share each, so everyone takes the same loss.
+- **Split it:** one payment from the debtor to each current member, an equal share each, so everyone takes the same loss. A share that rounds to nothing records no payment.
 
 For example, departed D owes 30.00, A is owed 30.00, and A, B, and C are still members. Forgiving it records D→A 30.00, which leaves everyone at zero. Splitting it records D→A, D→B, and D→C for 10.00 each, which leaves A at +20.00 and B and C at −10.00.
 
@@ -192,7 +192,7 @@ Household paths in this table are relative to `/api/households/:householdId`. Ta
 | Module flags | `/features`: `GET`, `PATCH` |
 | Categories | `/expense-categories`: `GET`, `POST` · `/expense-categories/:categoryId`: `PATCH`, `DELETE` |
 | Expenses | `/expenses`: `GET`, `POST` · `/expenses/:expenseId`: `GET`, `PATCH`, `DELETE` |
-| Payments | `/settlements`: `GET`, `POST` · `/settlements/:settlementId`: `DELETE` · `/settlements/:settlementId/confirm`: `POST` |
+| Payments | `/settlements`: `GET`, `POST` · `/settlements/:settlementId`: `DELETE` · `/settlements/:settlementId/confirm`: `POST` · `/write-offs`: `POST` |
 | Balances | `/balances`: `GET` · `/settlement-suggestions`: `GET` |
 | Chores | `/chores`: `GET`, `POST` · `/chores/:choreId`: `GET`, `PATCH`, `DELETE` · `/chores/:choreId/complete` and `/reopen`: `POST` |
 | Shopping | `/shopping-items`: `GET`, `POST` · `/shopping-items/:itemId`: `GET`, `PATCH`, `DELETE` · `/shopping-items/:itemId/purchase` and `/unpurchase`: `POST` · `/shopping-items/clear-purchased`: `POST` |
@@ -378,5 +378,5 @@ Tables, constraints, foreign-key delete behavior, and indexes added by this area
 
 - An account-deletion endpoint, following [Deleting accounts](#deleting-accounts). It asks for the password, since every session counts as fresh (see [Signed-in devices](#signed-in-devices)).
 - Archiving households.
-- A write-off action that does [Writing off debts](#writing-off-debts) in one step and keeps write-offs apart from real payments.
+- Keeping [write-offs](#writing-off-debts) apart from real payments in the ledger.
 - Custom roles and teams.

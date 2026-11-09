@@ -62,7 +62,7 @@ describe("SignInForm", () => {
     expect(body).toMatchObject({ callbackURL: "/households" });
   });
 
-  it("keeps redirectTo when switching to sign-up", () => {
+  it("keeps redirectTo when switching to sign-up or resetting the password", () => {
     renderWithProviders(<SignInForm />, {
       url: "/sign-in?redirectTo=%2Fhouseholds",
     });
@@ -70,5 +70,8 @@ describe("SignInForm", () => {
     expect(
       screen.getByRole("link", { name: "Create an account" })
     ).toHaveAttribute("href", "/sign-up?redirectTo=%2Fhouseholds");
+    expect(
+      screen.getByRole("link", { name: "Forgot password?" })
+    ).toHaveAttribute("href", "/forgot-password?redirectTo=%2Fhouseholds");
   });
 });
