@@ -311,7 +311,8 @@ export interface ChecklistOption {
 
 /**
  * Pick any number of `options`, such as the people splitting an expense. The
- * value lists the picked ones in the order of `options`.
+ * value lists the picked ones in the order of `options`, after any picked
+ * values `options` leaves out, such as ones a search hides, which stay picked.
  */
 function ChecklistField({
   label,
@@ -341,9 +342,11 @@ function ChecklistField({
     } else {
       picked.delete(option);
     }
-    field.handleChange(
-      options.map((o) => o.value).filter((v) => picked.has(v))
-    );
+    const shown = options.map((o) => o.value);
+    field.handleChange([
+      ...value.filter((v) => !shown.includes(v)),
+      ...shown.filter((v) => picked.has(v)),
+    ]);
   };
 
   return (
