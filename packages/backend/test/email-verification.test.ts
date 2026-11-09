@@ -61,7 +61,7 @@ describe("email verification", () => {
   };
 
   describe("sign-up", () => {
-    it("sends one email with a link to verify-email on the frontend origin", async () => {
+    it("sends one email with a link to the frontend's verify-email page", async () => {
       const email = newEmail();
 
       const response = await signUp(email).expect(200);
@@ -71,7 +71,7 @@ describe("email verification", () => {
       expect(verificationEmails(email)).toHaveLength(1);
       const { url } = verificationLink(email);
       expect(`${url.origin}${url.pathname}`).toBe(
-        `${process.env.FRONTEND_URL}/api/auth/verify-email`
+        `${process.env.FRONTEND_URL}/verify-email`
       );
       expect(url.searchParams.get("token")).toBeTruthy();
       expect(await isVerified(email)).toBe(false);
@@ -128,7 +128,7 @@ describe("email verification", () => {
         .send({ email, password: TEST_PASSWORD, callbackURL: "/households" })
         .expect(403);
 
-      expect(verificationLink(email).url.searchParams.get("callbackURL")).toBe(
+      expect(verificationLink(email).url.searchParams.get("redirectTo")).toBe(
         "/households"
       );
     });
@@ -149,17 +149,32 @@ describe("email verification", () => {
       await signIn(email).expect(200);
     });
 
-    it("redirects to the callbackURL given at sign-up", async () => {
+    it("carries the callbackURL given at sign-up as the page's redirectTo", async () => {
       const email = newEmail();
-      await signUp(email, "/households").expect(200);
+      await signUp(email, "/invitations/abc").expect(200);
+
       const { url } = verificationLink(email);
 
-      const response = await createClient(app)
-        .get(`${url.pathname}${url.search}`)
-        .expect(302);
+      expect(url.searchParams.get("redirectTo")).toBe("/invitations/abc");
+      expect(url.searchParams.has("callbackURL")).toBe(false);
+    });
 
-      expect(response.headers.location).toBe("/households");
-      expect(sessionCookie(response)).toBeTruthy();
+    it("works in a browser that never signed up, such as on another device", async () => {
+      const email = newEmail();
+      await signUp(email, "/households").expect(200);
+
+      // A fresh client has no cookies, like a phone opening the email.
+      const verified = await createClient(app)
+        .get(verificationLink(email).path)
+        .expect(200);
+
+      // Better Auth answers `user: null` even now; the cookie signs this
+      // browser in.
+      expect(verified.body).toEqual({ status: true, user: null });
+      const session = await createClient(app, sessionCookie(verified))
+        .get("/api/auth/get-session")
+        .expect(200);
+      expect(session.body.user).toMatchObject({ email, emailVerified: true });
     });
 
     it("rejects a tampered token", async () => {

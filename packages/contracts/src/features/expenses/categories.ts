@@ -47,3 +47,56 @@ export const ExpenseCategoryListResponse = z.object({
 export type ExpenseCategoryListResponse = z.infer<
   typeof ExpenseCategoryListResponse
 >;
+
+/** How sure the model is of a suggested category. */
+export const CATEGORY_SUGGESTION_CONFIDENCES = [
+  "low",
+  "medium",
+  "high",
+] as const;
+
+export const CategorySuggestionConfidence = z.enum(
+  CATEGORY_SUGGESTION_CONFIDENCES
+);
+export type CategorySuggestionConfidence = z.infer<
+  typeof CategorySuggestionConfidence
+>;
+
+/**
+ * What to suggest a category for: an expense's name, description, one of the
+ * household's attachments (an image or PDF, such as a receipt), or any
+ * combination, with at least one of them. `null` is the same as omitted, so
+ * the expense form's values can be sent as they are.
+ */
+export const SuggestExpenseCategoryRequest = z
+  .strictObject({
+    name: z.string().min(1).nullable().optional(),
+    description: z.string().min(1).nullable().optional(),
+    attachmentId: Id.nullable().optional(),
+  })
+  .refine(
+    ({ name, description, attachmentId }) =>
+      (name ?? description ?? attachmentId ?? null) !== null,
+    "Send a name, a description, or an attachment"
+  );
+export type SuggestExpenseCategoryRequest = z.infer<
+  typeof SuggestExpenseCategoryRequest
+>;
+
+/**
+ * One of the household's own categories, or `suggestion: null` when none
+ * fits. Nothing is saved. Clients prefill the category field only when
+ * `confidence` is `"high"` and the member hasn't picked a category yet; any
+ * other suggestion may be offered as a hint, never applied on its own.
+ */
+export const ExpenseCategorySuggestion = z.object({
+  suggestion: z
+    .object({
+      categoryId: Id,
+      confidence: CategorySuggestionConfidence,
+    })
+    .nullable(),
+});
+export type ExpenseCategorySuggestion = z.infer<
+  typeof ExpenseCategorySuggestion
+>;

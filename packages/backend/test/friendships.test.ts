@@ -18,6 +18,7 @@ const REQUESTS = "/api/me/friend-requests";
 const FRIENDS = "/api/me/friends";
 const acceptPath = (requestId: string) => `${REQUESTS}/${requestId}/accept`;
 const declinePath = (requestId: string) => `${REQUESTS}/${requestId}/decline`;
+const requestPath = (requestId: string) => `${REQUESTS}/${requestId}`;
 const friendshipPath = (friendshipId: string) => `${FRIENDS}/${friendshipId}`;
 
 const friendUser = ({ id, name, email }: TestUser) => ({
@@ -212,6 +213,64 @@ describe("friendships", () => {
     });
   });
 
+  describe("DELETE /api/me/friend-requests/:requestId", () => {
+    it("lets the requester withdraw, and ask again", async () => {
+      const alice = await createUser(app, "Alice");
+      const bob = await createUser(app, "Bob");
+      const request = await sendRequest(alice, bob);
+
+      await alice.client.delete(requestPath(request.id)).expect(204);
+
+      const incoming = await bob.client.get(`${REQUESTS}/incoming`).expect(200);
+      expect(incoming.body).toEqual({ items: [] });
+      expect(await db.select().from(friendRequests)).toEqual([]);
+      expect(await db.select().from(friendships)).toEqual([]);
+      await sendRequest(alice, bob);
+    });
+
+    it("answers 403 to the recipient and 404 to anyone else", async () => {
+      const alice = await createUser(app, "Alice");
+      const bob = await createUser(app, "Bob");
+      const carol = await createUser(app, "Carol");
+      const request = await sendRequest(alice, bob);
+
+      const byRecipient = await bob.client
+        .delete(requestPath(request.id))
+        .expect(403);
+      const byStranger = await carol.client
+        .delete(requestPath(request.id))
+        .expect(404);
+
+      expectApiError(byRecipient, "FORBIDDEN");
+      expectApiError(byStranger, "NOT_FOUND");
+      expect(await db.select().from(friendRequests)).toHaveLength(1);
+    });
+
+    it("answers 404 once the request is withdrawn, declined, or accepted", async () => {
+      const alice = await createUser(app, "Alice");
+      const bob = await createUser(app, "Bob");
+      const carol = await createUser(app, "Carol");
+      const dave = await createUser(app, "Dave");
+      const withdrawn = await sendRequest(alice, bob);
+      const declined = await sendRequest(alice, carol);
+      const accepted = await sendRequest(alice, dave);
+      await alice.client.delete(requestPath(withdrawn.id)).expect(204);
+      await carol.client.post(declinePath(declined.id)).expect(204);
+      await dave.client.post(acceptPath(accepted.id)).expect(200);
+
+      const repeats = await Promise.all(
+        [withdrawn, declined, accepted].map(({ id }) =>
+          alice.client.delete(requestPath(id)).expect(404)
+        )
+      );
+
+      for (const response of repeats) {
+        expectApiError(response, "NOT_FOUND");
+      }
+      expect(await db.select().from(friendships)).toHaveLength(1);
+    });
+  });
+
   describe("GET /api/me/friends", () => {
     it("shows the other user from each side, by name ignoring case", async () => {
       const alice = await createUser(app, "Alice");
@@ -273,6 +332,7 @@ describe("friendships", () => {
     ["delete", friendshipPath(randomUUID())],
     ["post", acceptPath(randomUUID())],
     ["post", declinePath(randomUUID())],
+    ["delete", requestPath(randomUUID())],
   ] as const)("requires a session for %s %s", async (method, path) => {
     await createClient(app)[method](path).expect(401);
   });

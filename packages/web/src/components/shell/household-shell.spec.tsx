@@ -184,6 +184,23 @@ describe("HouseholdShell", () => {
     ).toHaveAttribute("href", "/account");
   });
 
+  it("links to the friends page with the number of incoming requests", async () => {
+    const { user: actor } = renderShell(
+      household("Flat on Piękna").id,
+      <OverviewPage />
+    );
+
+    expect(
+      await screen.findByRole("link", { name: "Friends, 1 friend request" })
+    ).toHaveAttribute("href", "/friends");
+    await actor.click(screen.getByRole("button", { name: "Alice Nowak" }));
+    expect(
+      await screen.findByRole("menuitem", {
+        name: "Friends, 1 friend request",
+      })
+    ).toHaveAttribute("href", "/friends");
+  });
+
   it("shows an error with a retry when the household fails to load", async () => {
     server.use(
       http.get("*/api/auth/organization/get-full-organization", () =>

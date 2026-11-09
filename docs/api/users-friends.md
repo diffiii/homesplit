@@ -1,6 +1,6 @@
 # Users and friends API
 
-Module flag: none · Tasks: #30, #31, #32, #115 · Contracts: [users](../../packages/contracts/src/features/users/index.ts), [friends](../../packages/contracts/src/features/friends/index.ts)
+Module flag: none · Tasks: #30, #31, #32, #97, #115 · Contracts: [users](../../packages/contracts/src/features/users/index.ts), [friends](../../packages/contracts/src/features/friends/index.ts)
 
 ## Routes
 
@@ -14,6 +14,7 @@ Module flag: none · Tasks: #30, #31, #32, #115 · Contracts: [users](../../pack
 | GET | `/api/me/friend-requests/sent` | none | `FriendRequestListResponse` | 200 | the signed-in user |
 | POST | `/api/me/friend-requests/:requestId/accept` | none | `Friendship` | 200 | the recipient |
 | POST | `/api/me/friend-requests/:requestId/decline` | none | none | 204 | the recipient |
+| DELETE | `/api/me/friend-requests/:requestId` | none | none | 204 | the requester |
 | GET | `/api/me/friends` | none | `FriendshipListResponse` | 200 | the signed-in user |
 | DELETE | `/api/me/friends/:friendshipId` | none | none | 204 | either friend |
 
@@ -46,6 +47,7 @@ Module flag: none · Tasks: #30, #31, #32, #115 · Contracts: [users](../../pack
 - Lists: `incoming` holds requests sent to the caller and `sent` holds requests the caller sent. In both, `user` is the other person. Lists are unpaginated and ordered by `createdAt` descending, then `id` descending.
 - Friends: sending a request to someone who is already a friend, in either direction, answers 409 `ALREADY_FRIENDS`.
 - Accept and decline: only the recipient answers a request. The requester gets 403 `FORBIDDEN`, and anyone else 404. Accepting deletes the request and creates the friendship in one transaction; declining only deletes the request, so the requester may send a new one at once. Both lock the request first, so concurrent answers run one at a time and every one after the first answers 404.
+- Withdraw: only the requester takes back a request. The recipient gets 403 `FORBIDDEN`, and anyone else 404. Withdrawing deletes the request, so it leaves the recipient's `incoming` list and the requester may send a new one at once. It locks the request like accept and decline, and a request that was already withdrawn, declined, or accepted answers 404.
 - Stale requests: the check for an existing friendship isn't serialized against accepting, so a new request sent while the pair's pending one is being accepted can still be created. Accepting such a request answers 409 `ALREADY_FRIENDS` and rolls back, leaving the request in place; declining removes it.
 - Friend list: `friend` is the other person and `createdAt` is when the request was accepted. The list is unpaginated and ordered by the friend's name ascending, ignoring case, then by `id` ascending.
 - Removal: either friend may end the friendship. Anyone else, and a repeated removal, gets 404.

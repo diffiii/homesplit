@@ -56,17 +56,17 @@ A trigger runs in the same statement as every insert, whatever the path, includi
 | Module flags | all | – (automatic) | admin+⁶ | – | – |
 | Expense categories | all | admin+ | admin+ | admin+⁵ | – |
 | Expenses | all | all | author or admin+ | author or admin+ | – |
-| Payments (settlements) | all | party or admin+⁴ | – | pending only: party or admin+⁴ | confirm: payee or admin+⁴ |
+| Payments (settlements) | all | party or admin+⁴ | – | pending only: party or admin+⁴ | confirm: payee or admin+⁴; [write off](#writing-off-debts) a departed member's balance: admin+ |
 | Balances and suggestions | all | – | – | – | – |
 | Chores | all | all | all | all | complete, reopen: all |
 | Shopping items | all | all | all | all | purchase, unpurchase, clear purchased: all |
 | Profile | self (Better Auth `get-session`) | – | self | – | – |
-| Friends | self | self | – | either friend | accept, decline: recipient |
+| Friends | self | self | – | friendship: either friend · request: sender | accept, decline: recipient |
 
 1. Only while every balance in the household is zero; see [Deleting households](#deleting-households).
 2. Better Auth's rules apply: only an `owner` can invite, promote, demote, or remove an owner, and the last owner can't be demoted or removed. HomeSplit adds that nobody removes themselves; they leave instead.
 3. Only with every balance settled; see [Departed members](#departed-members). Better Auth doesn't let the last `owner` leave.
-4. A party is the payer or the payee. A payment recorded by its payer waits for confirmation, and nobody confirms their own payment; see [Recording payments](#recording-payments).
+4. A party is the payer or the payee. A payment recorded by its payer waits for confirmation, and nobody confirms their own payment, except in a [write-off](#writing-off-debts); see [Recording payments](#recording-payments).
 5. Only while no expense uses the category; see [Deleting households](#deleting-households).
 6. `expenses` can't be turned off while any balance in the household isn't zero; see [Disabled modules](#disabled-modules).
 
@@ -113,7 +113,7 @@ Better Auth's `/organization/delete` can't do this safely. In 1.7.7, `beforeDele
 Every settled-up check is serialized against ledger writes on the `organization` row:
 
 - A settled-up check runs in the same transaction as the change it guards, after `SELECT … FROM organization WHERE id = $1 FOR UPDATE`. Under `READ COMMITTED`, the balance query after the lock sees every ledger write committed before it.
-- Every transaction that writes the ledger (expenses, their child rows, and settlements) first takes `FOR SHARE` on the same row, so it waits for a check in progress and the check waits for it. A write that waited on a deletion then finds no household and answers 404.
+- Every transaction that writes the ledger (expenses, their child rows, and settlements) first takes `FOR SHARE` on the same row (a write-off takes `FOR UPDATE`), so it waits for a check in progress and the check waits for it. A write that waited on a deletion then finds no household and answers 404.
 
 Deleting a settled household deletes its expenses and settlements with it, since nobody is owed anything. An unsettled household stays: members settle up before leaving, an admin+ can remove members who don't and [write off](#writing-off-debts) what they still owe, and Better Auth never lets the last `owner` leave or be removed, so it keeps an owner while it has members. The only way a household loses its last member is account deletion, which then deletes the household too (see [Deleting accounts](#deleting-accounts)). Archiving is deferred.
 
@@ -160,17 +160,17 @@ For example, A pays 90.00, split equally among A, B, and C. C pays A 30.00 and l
 
 - The payer and payee are distinct household parties.
 - The recorder (`createdBy`, from the session) is a current member who is the payer or the payee, or an admin+ recording between any two parties. A departed member's payment is recorded by the other party or by an admin+.
-- A payment recorded by its payer is `pending` until the payee, or an admin+ other than the payer, confirms it with `POST /settlements/:settlementId/confirm`. A payment recorded by the payee, or by an admin+ who isn't the payer, is `confirmed` at once. Nobody confirms their own payment, so an admin+ paying a departed member needs another admin+ to confirm.
+- A payment recorded by its payer is `pending` until the payee, or an admin+ other than the payer, confirms it with `POST /settlements/:settlementId/confirm`. A payment recorded by the payee, or by an admin+ who isn't the payer, is `confirmed` at once. Nobody confirms their own payment, so an admin+ paying a departed member needs another admin+ to confirm, except in a [write-off](#writing-off-debts).
 - Only confirmed payments count toward balances, suggestions, and every settled-up check. While a payment is pending, `DELETE /settlements/:settlementId` removes it: the payer withdraws it, or the payee or an admin+ rejects it. A confirmed payment can't be deleted, and `DELETE` answers 409 `SETTLEMENT_CONFIRMED`.
 - The expenses module must be enabled. Eligibility doesn't depend on balances; #40 decides balance limits, duplicate handling, and corrections of confirmed payments.
 - The contracts don't have this yet. #40 adds a `status` (`pending` or `confirmed`) with `confirmedBy` and `confirmedAt` to `Settlement`, the two routes, and their params.
 
 ### Writing off debts
 
-There's no write-off operation. When a departed member's debt can't be collected, an admin+ settles it with ordinary payments from the debtor, which are confirmed at once because the admin isn't the payer, and writes `Write-off` in each `note`. There are two ways to do it:
+When a departed member's debt can't be collected, an admin+ writes it off with `POST /write-offs`, which records ordinary payments from the debtor, all at once, confirmed, and with `Write-off` in each `note` (see [Write-offs](api/expenses.md#write-offs)). There are two ways to do it:
 
 - **Forgive it:** payments from the debtor to the creditors, up to what each is owed, so the creditors take the loss.
-- **Split it:** one payment from the debtor to each current member, an equal share each, so everyone takes the same loss.
+- **Split it:** one payment from the debtor to each current member, an equal share each, so everyone takes the same loss. A share that rounds to nothing records no payment.
 
 For example, departed D owes 30.00, A is owed 30.00, and A, B, and C are still members. Forgiving it records D→A 30.00, which leaves everyone at zero. Splitting it records D→A, D→B, and D→C for 10.00 each, which leaves A at +20.00 and B and C at −10.00.
 
@@ -192,12 +192,12 @@ Household paths in this table are relative to `/api/households/:householdId`. Ta
 | Module flags | `/features`: `GET`, `PATCH` |
 | Categories | `/expense-categories`: `GET`, `POST` · `/expense-categories/:categoryId`: `PATCH`, `DELETE` |
 | Expenses | `/expenses`: `GET`, `POST` · `/expenses/:expenseId`: `GET`, `PATCH`, `DELETE` |
-| Payments | `/settlements`: `GET`, `POST` · `/settlements/:settlementId`: `DELETE` · `/settlements/:settlementId/confirm`: `POST` |
+| Payments | `/settlements`: `GET`, `POST` · `/settlements/:settlementId`: `DELETE` · `/settlements/:settlementId/confirm`: `POST` · `/write-offs`: `POST` |
 | Balances | `/balances`: `GET` · `/settlement-suggestions`: `GET` |
 | Chores | `/chores`: `GET`, `POST` · `/chores/:choreId`: `GET`, `PATCH`, `DELETE` · `/chores/:choreId/complete` and `/reopen`: `POST` |
 | Shopping | `/shopping-items`: `GET`, `POST` · `/shopping-items/:itemId`: `GET`, `PATCH`, `DELETE` · `/shopping-items/:itemId/purchase` and `/unpurchase`: `POST` · `/shopping-items/clear-purchased`: `POST` |
 | Profile | `/api/me`: `PATCH` |
-| Friends | `/api/me/friends`: `GET` · `/api/me/friends/:friendshipId`: `DELETE` · `/api/me/friend-requests`: `POST` · `/api/me/friend-requests/incoming` and `/sent`: `GET` · `/api/me/friend-requests/:requestId/accept` and `/decline`: `POST` |
+| Friends | `/api/me/friends`: `GET` · `/api/me/friends/:friendshipId`: `DELETE` · `/api/me/friend-requests`: `POST` · `/api/me/friend-requests/incoming` and `/sent`: `GET` · `/api/me/friend-requests/:requestId`: `DELETE` · `/api/me/friend-requests/:requestId/accept` and `/decline`: `POST` |
 
 ### Better Auth endpoints
 
@@ -208,7 +208,7 @@ Household paths in this table are relative to `/api/households/:householdId`. Ta
 - Invitation emails are limited per sender and per recipient, with counters in the backend process (a restart resets them and separate instances don't share them), as for password resets. One user can trigger 30 invitation emails an hour, new or sent again, and one address can be sent 5 an hour whoever sends them. Beyond that, `invite-member` answers 429 `RATE_LIMITED` before anything is written. Every request of a signed-in user counts, even one Better Auth then refuses. The recipient limit means someone can use up an address's quota and keep others from inviting it for the hour. That's accepted, because the same person could do it with a household of their own. Better Auth's own limiter, which is on in production only, applies on top and has no per-recipient limit.
 - A failed send is logged and doesn't fail `invite-member`, as for the verification email: the invitation exists, shows up in `list-invitations`, and the inviter sends it again by inviting the address once more, so no pending invitation is out of their sight. Clients can't tell a failed send from a successful one, so a pending invitation is the only sign that the invitee hasn't answered.
 - Sign-in requires a verified email (`emailAndPassword.requireEmailVerification`). Sign-up creates the user, emails a verification link, and answers 200 with `token: null` and no session cookie. A sign-up for a taken email gets the same answer and sends nothing, so it doesn't reveal which emails have accounts. Sign-in answers 403 `EMAIL_NOT_VERIFIED` until the link is opened.
-- The link is Better Auth's `/api/auth/verify-email` on the frontend origin, so it works in any browser. Opening it verifies the email, signs the user in (`autoSignInAfterVerification`), and redirects to the `callbackURL` given at sign-up, or answers JSON without one. It expires after 24 hours (`expiresIn`); an expired or tampered link answers 401 `TOKEN_EXPIRED` or `INVALID_TOKEN`, or redirects to `callbackURL` with `?error=`. Tokens are stateless JWTs, so a used link keeps working until it expires, but on a verified user it changes nothing and signs no one in.
+- The link is the frontend's `/verify-email?token=…&redirectTo=…` page (#85), with `redirectTo` copied from the `callbackURL` given at sign-up (see [Email links](#email-links)). The page calls Better Auth's `GET /api/auth/verify-email?token=…` without `callbackURL`, which verifies the email, signs the user in on that browser (`autoSignInAfterVerification`), and answers `{ status: true, user: null }`; the page then reads the session to see who is signed in. The token doesn't depend on a session, so it works in any browser or on another device. It expires after 24 hours (`expiresIn`); an expired or tampered token answers 401 `TOKEN_EXPIRED` or `INVALID_TOKEN`. Tokens are stateless JWTs, so a used link keeps working until it expires, but on a verified user it changes nothing and signs no one in, so the page finds no session for the address and shows an already used link.
 - A new link comes from `/api/auth/send-verification-email` with the email, which answers 200 even for an unknown or verified email and then sends nothing, or from signing in, which sends one before answering 403 (`sendOnSignIn`). That covers a link that expired or never arrived: a failed send is logged and doesn't fail sign-up, because the user row already exists and a retry would hit the taken-email case.
 - Mail goes through `src/mail.ts`, chosen by `MAIL_DRIVER`: `resend` (the default) needs `RESEND_API_KEY` and `MAIL_FROM`, and the backend doesn't start without them. `log` writes each email, links included, to the console instead, for local development; tests read what it kept. The web end-to-end tests also set `AUTH_SKIP_EMAIL_VERIFICATION=true`, which turns the requirement off and creates users verified, because they sign up through the UI and can't follow the link. The backend refuses that flag unless `MAIL_DRIVER=log`.
 - `list-user-invitations` requires a verified email and answers 403 `EMAIL_VERIFICATION_REQUIRED_FOR_INVITATION` to an unverified session. Since sign-in requires one too, an unverified user has no session, and the call gets Better Auth's 400 for a missing session instead. After verification it returns the invitations sent to the user's email. In 1.7.7, the three ID-based invitation endpoints (`get-invitation`, `accept-invitation`, `reject-invitation`) skip the verification check while invitation IDs are built-in UUIDs (`advanced.database.generateId: "uuid"`, no custom `generateId`) and `requireEmailVerificationOnInvitation` is unset; both must stay that way.
@@ -329,14 +329,14 @@ Returning the user to where they were going:
 
 What the pages can tell apart in 1.7.7:
 
-- Verification tokens are signed JWTs, not stored rows. An expired one answers `TOKEN_EXPIRED`, and a malformed or tampered one `INVALID_TOKEN`. Reusing a token for an address that's already verified succeeds again, so `/verify-email` can't show "already used" (#85) and shows success instead. The token doesn't depend on a session, so verifying works on another device.
+- Verification tokens are signed JWTs, not stored rows. An expired one answers `TOKEN_EXPIRED`, and a malformed or tampered one `INVALID_TOKEN`. Reusing a token for an address that's already verified answers like the first time but signs no one in, so `/verify-email`, finding nobody signed in with that address, shows it as already used (#85). The token doesn't depend on a session, so verifying works on another device.
 - Reset tokens are stored and deleted when used, so an expired token and a used one both answer `INVALID_TOKEN`.
 
 ## AI provider
 
 Applies to #53 and the AI features after it (#54 to #57). AI only proposes: a member reviews everything it returns before anything is saved.
 
-- **Interface.** Features call `AiService` in `packages/backend/src/ai`, which uses the `openai` SDK with any OpenAI-compatible `/chat/completions` API; the default is OpenRouter. A request with an image goes to `AI_VISION_MODEL`, any other to `AI_TEXT_MODEL`. Receipts are read by the vision model directly, without a separate OCR step.
+- **Interface.** Features call `AiService` in `packages/backend/src/ai`, which uses the `openai` SDK with any OpenAI-compatible `/chat/completions` API; the default is OpenRouter. A request with an image or a PDF (sent as an OpenAI `file` content part) goes to `AI_VISION_MODEL`, any other to `AI_TEXT_MODEL`. Receipts are read by the vision model directly, without a separate OCR step.
 - **Output.** Every request carries a Zod schema, sent as a strict JSON schema and checked against the reply. A reply that isn't JSON, fails the schema, was cut off, or is a refusal answers 502 `AI_INVALID_OUTPUT`, never a partial result. Schemas use `.nullable()` rather than `.optional()`, and no transforms. Output is untrusted: IDs it returns are checked against the household's own rows.
 - **Privacy.** `ai` defaults to off, and only an admin+ turns it on. Only what the task needs is sent (receipt images, expense text, category and shopping-item names), never user names, emails, or IDs; the settings screen says so next to the switch. A provider must not train on or keep the data: on OpenRouter, every request sets `provider.data_collection: "deny"`, `zdr: true`, and `require_parameters: true`. Prompts and replies are neither stored nor logged.
 - **Configuration.** AI runs only with `AI_BASE_URL`, `AI_API_KEY`, `AI_TEXT_MODEL`, and `AI_VISION_MODEL` set; otherwise requests answer 503 `AI_UNAVAILABLE`, and startup still succeeds. `AI_TIMEOUT_MS` bounds a whole request (504 `AI_TIMEOUT`). The SDK retries 408, 409, 429, 5xx, and network errors up to `AI_MAX_RETRIES` times, then the request answers 502 `AI_PROVIDER_ERROR`. Tests use `AI_DRIVER=fake`.
@@ -382,5 +382,5 @@ Tables, constraints, foreign-key delete behavior, and indexes added by this area
 
 - An account-deletion endpoint, following [Deleting accounts](#deleting-accounts). It asks for the password, since every session counts as fresh (see [Signed-in devices](#signed-in-devices)).
 - Archiving households.
-- A write-off action that does [Writing off debts](#writing-off-debts) in one step and keeps write-offs apart from real payments.
+- Keeping [write-offs](#writing-off-debts) apart from real payments in the ledger.
 - Custom roles and teams.

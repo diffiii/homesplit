@@ -20,12 +20,25 @@ export class AiService {
     householdId: string,
     request: AiRequest<T>
   ): Promise<z.output<T>> {
+    const client = await this.availableClient(householdId);
+    await consumeRequest(householdId, aiConfig.dailyRequestLimit);
+    return client.generate(request);
+  }
+
+  /**
+   * Fails as `generate` would before it calls the provider, without using the
+   * quota: for a route that can sometimes answer without calling it.
+   */
+  async assertAvailable(householdId: string): Promise<void> {
+    await this.availableClient(householdId);
+  }
+
+  private async availableClient(householdId: string): Promise<AiClient> {
     await assertAiEnabled(householdId);
     if (!this.client) {
       throw new AppError(503, "AI_UNAVAILABLE", "AI is not configured");
     }
-    await consumeRequest(householdId, aiConfig.dailyRequestLimit);
-    return this.client.generate(request);
+    return this.client;
   }
 }
 

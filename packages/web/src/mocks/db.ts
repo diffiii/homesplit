@@ -11,6 +11,8 @@ import type { HouseholdRole } from "@/lib/api/auth-client";
 export interface MockUser {
   createdAt: string;
   email: string;
+  /** Set once `/verify-email` has verified the user; seeded users start without it. */
+  emailVerified?: boolean;
   id: string;
   image: string | null;
   name: string;

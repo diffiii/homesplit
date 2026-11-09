@@ -48,6 +48,23 @@ const RECORD_CELINA_EUR = /^Record: Celina Wiśniewska pays you EUR/u;
 const RECORD_PAY_EWA = /^Record: You pay Ewa/u;
 const RECORD_BARTEK_EWA = /^Record: Bartek Kowalski pays Ewa/u;
 const WAITING_TO_BE_CONFIRMED = /waiting to be confirmed/u;
+const WRITE_OFF_PLN = "Write off Dawid Lewandowski's balance in PLN";
+const FORGIVE = /^Forgive/u;
+const SPLIT = /^Split/u;
+const WAS_WRITTEN_OFF = /was written off/u;
+
+const namesOfPayments = (dialog: HTMLElement) =>
+  within(within(dialog).getByRole("list", { name: "Payments to record" }))
+    .getAllByRole("listitem")
+    .map((item) => item.textContent?.replace(/\u00a0/gu, " "));
+
+const userIn = (email: string) => {
+  const found = db.userByEmail(email);
+  if (!found) {
+    throw new Error(`The scenario has no ${email}`);
+  }
+  return found;
+};
 
 async function pick(
   user: ReturnType<typeof renderBalances>["user"],
@@ -111,6 +128,9 @@ describe("BalancesPage", () => {
     await screen.findByText("Suggested payments");
     expect(
       screen.queryByRole("button", { name: "Record payment" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: WRITE_OFF_PLN })
     ).not.toBeInTheDocument();
   });
 
@@ -441,5 +461,178 @@ describe("BalancesPage", () => {
     expect(dialog).toHaveTextContent(
       "stays pending until another admin confirms it"
     );
+  });
+
+  /** Open the write-off dialog for Dawid's PLN debt with `method`. */
+  async function openWriteOff(method: RegExp) {
+    const rendered = renderBalances(flatId());
+    const button = await rendered.findByRole("button", { name: WRITE_OFF_PLN });
+    await rendered.user.click(button);
+    await rendered.user.click(
+      await screen.findByRole("menuitem", { name: method })
+    );
+    const dialog = await screen.findByRole("alertdialog");
+    await waitFor(() =>
+      expect(
+        within(dialog).getByRole("button", { name: "Write off" })
+      ).toBeEnabled()
+    );
+    return { ...rendered, button, dialog };
+  }
+
+  it("forgives a departed member's debt, the creditors taking the loss", async () => {
+    const { user, dialog } = await openWriteOff(FORGIVE);
+    expect(namesOfPayments(dialog)).toEqual([
+      "Dawid Lewandowski → Alice NowakPLN 1,057.50",
+    ]);
+    await expectNoAxeViolations(document.body, AXE_OPTIONS);
+
+    await user.click(within(dialog).getByRole("button", { name: "Write off" }));
+
+    await screen.findByText(WAS_WRITTEN_OFF);
+    expect(db.state.settlements.at(-1)).toMatchObject({
+      note: "Write-off",
+      amount: { amountCents: 105_750, currency: "PLN" },
+    });
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: WRITE_OFF_PLN })
+      ).not.toBeInTheDocument()
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Record payment" })
+      ).toHaveFocus()
+    );
+  });
+
+  it("splits a departed member's debt equally among current members", async () => {
+    const before = db.state.settlements.length;
+    const { user, dialog } = await openWriteOff(SPLIT);
+    expect(namesOfPayments(dialog)).toEqual([
+      "Dawid Lewandowski → Alice NowakPLN 352.50",
+      "Dawid Lewandowski → Bartek KowalskiPLN 352.50",
+      "Dawid Lewandowski → Celina WiśniewskaPLN 352.50",
+    ]);
+
+    await user.click(within(dialog).getByRole("button", { name: "Write off" }));
+
+    await screen.findByText(WAS_WRITTEN_OFF);
+    const recorded = db.state.settlements.slice(before);
+    expect(recorded).toHaveLength(3);
+    for (const payment of recorded) {
+      expect(payment.note).toBe("Write-off");
+      expect(payment.confirmedAt).not.toBeNull();
+    }
+  });
+
+  it("returns focus to the write-off button when it's cancelled", async () => {
+    const { user, button, dialog } = await openWriteOff(FORGIVE);
+
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => expect(button).toHaveFocus());
+  });
+
+  it("shows the new payments when the balance changed while it was open", async () => {
+    const { user, dialog } = await openWriteOff(FORGIVE);
+    // Someone records part of Dawid's debt in the meantime.
+    db.state.settlements.push({
+      id: crypto.randomUUID(),
+      householdId: flatId(),
+      payerId: userIn("dawid@example.com").id,
+      payeeId: userIn("alice@example.com").id,
+      createdById: userIn("alice@example.com").id,
+      amount: { amountCents: 57_500, currency: "PLN" },
+      note: null,
+      createdAt: new Date().toISOString(),
+      confirmedById: userIn("alice@example.com").id,
+      confirmedAt: new Date().toISOString(),
+    });
+
+    await user.click(within(dialog).getByRole("button", { name: "Write off" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "balance in PLN has changed, so nothing was recorded"
+    );
+    await waitFor(() =>
+      expect(namesOfPayments(dialog)).toEqual([
+        "Dawid Lewandowski → Alice NowakPLN 482.50",
+      ])
+    );
+  });
+
+  it("says why when the departed member has pending payments", async () => {
+    db.state.settlements.push({
+      id: crypto.randomUUID(),
+      householdId: flatId(),
+      payerId: userIn("bartek@example.com").id,
+      payeeId: userIn("dawid@example.com").id,
+      createdById: userIn("bartek@example.com").id,
+      amount: { amountCents: 10_000, currency: "PLN" },
+      note: null,
+      createdAt: new Date().toISOString(),
+      confirmedById: null,
+      confirmedAt: null,
+    });
+    const before = db.state.settlements.length;
+    const { user, dialog } = await openWriteOff(SPLIT);
+
+    await user.click(within(dialog).getByRole("button", { name: "Write off" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Payments with Dawid Lewandowski in PLN are pending"
+    );
+    expect(db.state.settlements).toHaveLength(before);
+  });
+
+  it("stops offering the write-off when the member has rejoined", async () => {
+    const { user, dialog } = await openWriteOff(SPLIT);
+    db.state.members.push({
+      id: crypto.randomUUID(),
+      householdId: flatId(),
+      userId: userIn("dawid@example.com").id,
+      role: "member",
+      createdAt: new Date().toISOString(),
+    });
+
+    await user.click(within(dialog).getByRole("button", { name: "Write off" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Dawid Lewandowski is a member again"
+    );
+    await waitFor(() =>
+      expect(
+        within(dialog).queryByRole("list", { name: "Payments to record" })
+      ).not.toBeInTheDocument()
+    );
+    expect(
+      within(dialog).getByRole("button", { name: "Write off" })
+    ).toBeDisabled();
+    expect(within(dialog).getByRole("status")).toHaveTextContent(
+      "Dawid Lewandowski is a member again"
+    );
+  });
+
+  it("doesn't offer write-offs to anyone but admins and owners", async () => {
+    const memberRow = (email: string) =>
+      db.state.members.find(
+        (member) =>
+          member.householdId === flatId() && member.userId === userIn(email).id
+      );
+    const alice = memberRow("alice@example.com");
+    const bartek = memberRow("bartek@example.com");
+    if (!(alice && bartek)) {
+      throw new Error("The scenario has no Alice or Bartek in the flat");
+    }
+    alice.role = "member";
+    bartek.role = "owner";
+    renderBalances(flatId());
+
+    await rowOf("PLN", "Dawid Lewandowski");
+    await screen.findByText("Suggested payments");
+    expect(
+      screen.queryByRole("button", { name: WRITE_OFF_PLN })
+    ).not.toBeInTheDocument();
   });
 });
