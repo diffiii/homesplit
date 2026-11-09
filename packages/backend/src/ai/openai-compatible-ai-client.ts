@@ -43,8 +43,8 @@ export class OpenAiCompatibleAiClient extends AiClient {
   async generate<T extends z.ZodType>(
     request: AiRequest<T>
   ): Promise<z.output<T>> {
-    const hasImage = request.input.some((part) => part.type === "image");
-    const model = hasImage
+    const needsVision = request.input.some((part) => part.type !== "text");
+    const model = needsVision
       ? this.config.models.vision
       : this.config.models.text;
     const signal = AbortSignal.timeout(this.config.timeoutMs);
@@ -105,9 +105,12 @@ function toContentPart(part: AiInput): ChatCompletionContentPart {
   if (part.type === "text") {
     return { type: "text", text: part.text };
   }
-  const data = Buffer.from(part.data).toString("base64");
-  return {
-    type: "image_url",
-    image_url: { url: `data:${part.mimeType};base64,${data}` },
-  };
+  const url = `data:${part.mimeType};base64,${Buffer.from(part.data).toString("base64")}`;
+  if (part.type === "file") {
+    return {
+      type: "file",
+      file: { filename: "attachment.pdf", file_data: url },
+    };
+  }
+  return { type: "image_url", image_url: { url } };
 }
