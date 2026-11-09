@@ -1,9 +1,8 @@
-import { DisplayName } from "@homesplit/contracts";
+import { DisplayName, INVITATION_EXPIRY_DAYS } from "@homesplit/contracts";
 import { type HttpHandler, HttpResponse, http } from "msw";
 import { z } from "zod";
 import type { HouseholdRole } from "@/lib/api/auth-client";
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/auth-errors";
-import { INVITATION_DAYS } from "@/lib/invitations";
 import { hasUnsettledBalances } from "./api/ledger";
 import {
   type MockDb,
@@ -678,7 +677,7 @@ export function createAuthHandlers(
       }
       const time = Date.now();
       const expiresAt = new Date(
-        time + INVITATION_DAYS * 24 * HOUR_MS
+        time + INVITATION_EXPIRY_DAYS * 24 * HOUR_MS
       ).toISOString();
       const pending = db.state.invitations.filter(
         (existing) =>

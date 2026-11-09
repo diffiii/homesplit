@@ -36,6 +36,9 @@ export const InvitationStatus = z.enum([
 ]);
 export type InvitationStatus = z.infer<typeof InvitationStatus>;
 
+/** How long an invitation link works: the backend's `invitationExpiresIn`, and what the web says. */
+export const INVITATION_EXPIRY_DAYS = 7;
+
 /** Path params for routes scoped to one invitation. */
 export const InvitationIdParams = z.object({
   invitationId: Id,

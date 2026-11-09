@@ -1,6 +1,11 @@
 "use client";
 
-import type { InvitationPreview } from "@homesplit/contracts";
+import {
+  type HouseholdSummary,
+  INVITATION_EXPIRY_DAYS,
+  type InvitationPreview,
+  type UserSummary,
+} from "@homesplit/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CircleCheckIcon,
@@ -28,7 +33,7 @@ import { errorMessage } from "@/lib/api/error-message";
 import { invitationQuery } from "@/lib/api/invitation-queries";
 import { queryKeys } from "@/lib/api/query-keys";
 import { formatLocalDate } from "@/lib/dates";
-import { INVITATION_DAYS, invitationPath } from "@/lib/invitations";
+import { invitationPath } from "@/lib/invitations";
 import { HOUSEHOLDS_PATH, rememberHousehold } from "@/lib/last-household";
 import { WITH_ARTICLE } from "@/lib/roles";
 import { signOutAndReset } from "@/lib/sign-out";
@@ -117,27 +122,26 @@ function InvitationContent({
   signedInAs: string;
 }) {
   const { household, inviter, status } = invitation;
-  const forUser = sameAddress(invitation.email, signedInAs);
+  // Only the invitee learns how it went. Anyone else, whatever the status, is
+  // told which account to use; the API gives them a masked address, and no
+  // household or inviter once the invitation isn't pending.
+  if (!(sameAddress(invitation.email, signedInAs) && household && inviter)) {
+    return <OtherAddress invitation={invitation} signedInAs={signedInAs} />;
+  }
 
   switch (status) {
     case "accepted":
       return (
         <Outcome
           action={
-            forUser ? (
-              <Link
-                className={buttonVariants()}
-                href={householdPath(household.id)}
-              >
-                Open {household.name}
-              </Link>
-            ) : undefined
+            <Link
+              className={buttonVariants()}
+              href={householdPath(household.id)}
+            >
+              Open {household.name}
+            </Link>
           }
-          description={
-            forUser
-              ? `You've joined ${household.name}.`
-              : `${invitation.email} has joined ${household.name}.`
-          }
+          description={`You've joined ${household.name}.`}
           icon={<CircleCheckIcon aria-hidden />}
           title="This invitation has been accepted"
         />
@@ -145,7 +149,7 @@ function InvitationContent({
     case "rejected":
       return (
         <Outcome
-          description={`Ask ${inviter.name} to invite you again if you'd like to join ${household.name}.`}
+          description={`You declined it. Ask ${inviter.name} to invite you again if you'd like to join ${household.name}.`}
           icon={<MailXIcon aria-hidden />}
           title="This invitation was declined"
         />
@@ -161,16 +165,18 @@ function InvitationContent({
     case "expired":
       return (
         <Outcome
-          description={`Invitations work for ${INVITATION_DAYS} days. Ask ${inviter.name} to send it again.`}
+          description={`Invitations work for ${INVITATION_EXPIRY_DAYS} days. Ask ${inviter.name} to send it again.`}
           icon={<HourglassIcon aria-hidden />}
           title="This invitation has expired"
         />
       );
     default:
-      return forUser ? (
-        <PendingInvitation invitation={invitation} />
-      ) : (
-        <OtherAddress invitation={invitation} signedInAs={signedInAs} />
+      return (
+        <PendingInvitation
+          household={household}
+          invitation={invitation}
+          inviter={inviter}
+        />
       );
   }
 }
@@ -219,6 +225,7 @@ function OtherAddress({
   signedInAs: string;
 }) {
   const [switching, setSwitching] = useState(false);
+  const { email, household, inviter } = invitation;
   return (
     <>
       <span className="bg-muted text-muted-foreground flex size-12 items-center justify-center rounded-full [&_svg]:size-6">
@@ -228,13 +235,21 @@ function OtherAddress({
         This invitation is for another address
       </h1>
       <p className="text-muted-foreground text-sm">
-        {invitation.inviter.name} invited{" "}
-        <strong className="text-foreground wrap-anywhere">
-          {invitation.email}
-        </strong>{" "}
-        to {invitation.household.name}, and you're signed in as{" "}
+        {inviter && household ? (
+          <>
+            {inviter.name} invited{" "}
+            <strong className="text-foreground wrap-anywhere">{email}</strong>{" "}
+            to {household.name}
+          </>
+        ) : (
+          <>
+            It was sent to{" "}
+            <strong className="text-foreground wrap-anywhere">{email}</strong>
+          </>
+        )}
+        , and you're signed in as{" "}
         <strong className="text-foreground wrap-anywhere">{signedInAs}</strong>.
-        Sign in with the invited address to answer, or create an account with
+        Sign in with the invited address to see it, or create an account with
         it.
       </p>
       <Button
@@ -253,8 +268,15 @@ function OtherAddress({
   );
 }
 
-function PendingInvitation({ invitation }: { invitation: InvitationPreview }) {
-  const { household, inviter } = invitation;
+function PendingInvitation({
+  invitation,
+  household,
+  inviter,
+}: {
+  household: HouseholdSummary;
+  invitation: InvitationPreview;
+  inviter: UserSummary;
+}) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [declining, setDeclining] = useState(false);
@@ -268,6 +290,12 @@ function PendingInvitation({ invitation }: { invitation: InvitationPreview }) {
     mutationFn: () =>
       households.acceptInvitation({ invitationId: invitation.id }),
     onSuccess: async () => {
+      // Going back to this page shouldn't offer to join again.
+      queryClient.setQueryData(
+        queryKeys.invitation(invitation.id),
+        (cached: InvitationPreview | undefined) =>
+          cached && { ...cached, status: "accepted" as const }
+      );
       rememberHousehold(household.id);
       await queryClient.invalidateQueries({ queryKey: queryKeys.households() });
       toast.success(`You joined ${household.name}.`);

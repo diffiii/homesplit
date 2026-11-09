@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { householdPath } from "@/components/shell/household-nav";
+import { queryKeys } from "@/lib/api/query-keys";
 import { expectNoAxeViolations } from "@/test/axe";
 import { db } from "@/test/mock-server";
 import { router } from "@/test/navigation";
@@ -33,7 +34,7 @@ function renderInvitation(invitationId: string) {
 describe("InvitationView", () => {
   it("shows the household and the inviter, and joins", async () => {
     const invitation = alices();
-    const { user } = renderInvitation(invitation.id);
+    const { user, queryClient } = renderInvitation(invitation.id);
 
     expect(
       await screen.findByRole("heading", { name: "Join Book club" })
@@ -53,6 +54,10 @@ describe("InvitationView", () => {
       )
     );
     expect(invitation.status).toBe("accepted");
+    // Coming back to the page shows it accepted, not "Join household" again.
+    expect(
+      queryClient.getQueryData(queryKeys.invitation(invitation.id))
+    ).toMatchObject({ status: "accepted" });
     expect(
       db.state.members.some(
         (member) =>
@@ -103,7 +108,9 @@ describe("InvitationView", () => {
         name: "This invitation is for another address",
       })
     ).toBeVisible();
-    expect(screen.getByText("ewa@example.com")).toBeVisible();
+    // The API masks the address for anyone but the invitee.
+    expect(screen.getByText("e•••@example.com")).toBeVisible();
+    expect(screen.queryByText("ewa@example.com")).not.toBeInTheDocument();
     expect(screen.getByText("alice@example.com")).toBeVisible();
     expect(
       screen.getByRole("button", { name: "Switch account" })
@@ -113,6 +120,25 @@ describe("InvitationView", () => {
     ).not.toBeInTheDocument();
     await expectNoAxeViolations();
   });
+
+  it.each(["canceled", "accepted"] as const)(
+    "tells anyone else only which account to use once it's %s",
+    async (status) => {
+      const invitation = invitationTo("ewa@example.com");
+      invitation.status = status;
+      renderInvitation(invitation.id);
+
+      expect(
+        await screen.findByRole("heading", {
+          name: "This invitation is for another address",
+        })
+      ).toBeVisible();
+      expect(
+        screen.getByText("It was sent to", { exact: false })
+      ).toHaveTextContent("e•••@example.com");
+      expect(screen.queryByText("Flat on Piękna", { exact: false })).toBeNull();
+    }
+  );
 
   it.each([
     ["canceled", "This invitation was cancelled"],

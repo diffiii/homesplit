@@ -3,6 +3,7 @@
 import {
   HOUSEHOLD_ROLES,
   HouseholdRole as HouseholdRoleSchema,
+  INVITATION_EXPIRY_DAYS,
 } from "@homesplit/contracts";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -27,7 +28,6 @@ import { type HouseholdRole, households } from "@/lib/api/auth-client";
 import { queryKeys } from "@/lib/api/query-keys";
 import { applyAuthErrors } from "@/lib/auth-errors";
 import type { ServerErrors } from "@/lib/form";
-import { INVITATION_DAYS } from "@/lib/invitations";
 import { ROLE_LABEL } from "@/lib/roles";
 
 const InviteValues = z.object({
@@ -111,7 +111,8 @@ export function InviteDialog({
               <ResponsiveDialogTitle>Invite someone</ResponsiveDialogTitle>
               <ResponsiveDialogDescription>
                 We'll email them a link to join {household.name}. It works for{" "}
-                {INVITATION_DAYS} days, and they can create an account with it.
+                {INVITATION_EXPIRY_DAYS} days, and they can create an account
+                with it.
               </ResponsiveDialogDescription>
             </ResponsiveDialogHeader>
             <ResponsiveDialogBody className="flex flex-col gap-4">

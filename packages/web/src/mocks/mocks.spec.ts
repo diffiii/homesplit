@@ -739,12 +739,16 @@ describe("Better Auth routes", () => {
 
     signInAs("Ewa");
     await expect(api("getInvitationPreview", params)).resolves.toMatchObject({
-      email: "alice@example.com",
+      household: { name: "Book club" },
+      email: "a•••@example.com",
     });
     if (invitation) {
       invitation.expiresAt = new Date(Date.now() - 60_000).toISOString();
     }
     await expect(api("getInvitationPreview", params)).resolves.toMatchObject({
+      household: null,
+      inviter: null,
+      email: "a•••@example.com",
       status: "expired",
     });
     await expect(

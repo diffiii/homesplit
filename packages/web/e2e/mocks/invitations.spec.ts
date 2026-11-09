@@ -52,7 +52,7 @@ test("names the invited address to someone signed in with another", async ({
       name: "This invitation is for another address",
     })
   ).toBeVisible();
-  await expect(page.getByText("ewa@example.com")).toBeVisible();
+  await expect(page.getByText("e•••@example.com")).toBeVisible();
   await expectNoAxeViolations(page);
 });
 
