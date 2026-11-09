@@ -20,6 +20,20 @@ import type {
 /** Every seeded user's password. */
 export const MOCK_PASSWORD = "homesplit";
 
+/**
+ * The token in the mocks' password reset link for `userId`. The mocks send no
+ * email, so open `/reset-password?token=…` with it by hand.
+ */
+export const mockResetToken = (userId: string) => `mock-reset-${userId}`;
+
+/**
+ * The token in the mocks' verification link for `userId`; open
+ * `/verify-email?token=…` with it by hand. `MOCK_EXPIRED_VERIFY_TOKEN` answers
+ * like an expired link.
+ */
+export const mockVerifyToken = (userId: string) => `mock-verify-${userId}`;
+export const MOCK_EXPIRED_VERIFY_TOKEN = "mock-verify-expired";
+
 /** The categories the backend gives every new household. */
 const DEFAULT_CATEGORIES = [
   ["Groceries", "🛒"],

@@ -6,7 +6,11 @@ import { z } from "zod";
 import { useAppForm } from "@/components/form";
 import { useRedirectIfSignedIn } from "@/hooks/use-redirect-if-signed-in";
 import { account } from "@/lib/api/auth-client";
-import { safeRedirectPath, signUpUrl } from "@/lib/api/session";
+import {
+  forgotPasswordUrl,
+  safeRedirectPath,
+  signUpUrl,
+} from "@/lib/api/session";
 import { applyAuthErrors } from "@/lib/auth-errors";
 
 const SignInValues = z.object({
@@ -54,6 +58,12 @@ export function SignInForm() {
               />
             )}
           </form.AppField>
+          <Link
+            className="text-muted-foreground hover:text-foreground -mt-2 self-end text-sm underline underline-offset-4"
+            href={forgotPasswordUrl(redirectTo)}
+          >
+            Forgot password?
+          </Link>
           <form.FormError />
           <form.SubmitButton size="lg">Sign in</form.SubmitButton>
         </form.Form>

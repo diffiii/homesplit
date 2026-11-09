@@ -230,6 +230,42 @@ export function createAuth({ baseURL, fetch }: AuthClientOptions = {}) {
     signOut: () => unwrap(client.signOut()),
 
     /**
+     * Emails a new verification link that continues to `callbackURL`.
+     * Answers the same for an unknown or already verified email, and sends
+     * nothing then.
+     */
+    sendVerificationEmail: (body: { email: string; callbackURL?: string }) =>
+      unwrap(client.sendVerificationEmail(body)),
+
+    /**
+     * Verifies the emailed token and, the first time, signs the user in on
+     * this browser. Better Auth answers `user: null` either way, so `user` is
+     * whoever is signed in here afterwards, or null. An expired or tampered
+     * token answers 401 `TOKEN_EXPIRED` or `INVALID_TOKEN`.
+     */
+    verifyEmail: async ({ token }: { token: string }) => {
+      await unwrap(client.verifyEmail({ query: { token } }));
+      const session = await unwrap(client.getSession());
+      return { user: session?.user ?? null };
+    },
+
+    /**
+     * Emails a reset link that continues to `redirectTo`. Answers the same
+     * whether or not the email has an account; 429 `RATE_LIMITED` after too
+     * many requests from one network.
+     */
+    requestPasswordReset: (body: { email: string; redirectTo?: string }) =>
+      unwrap(client.requestPasswordReset(body)),
+
+    /**
+     * Sets the password with the emailed token, signing the user out
+     * everywhere and in nowhere. A used, expired, or unknown token answers
+     * 400 `INVALID_TOKEN`.
+     */
+    resetPassword: (body: { newPassword: string; token: string }) =>
+      unwrap(client.resetPassword(body)),
+
+    /**
      * Needs the current password. With `revokeOtherSessions`, Better Auth
      * deletes every session and signs this device in again with a new one.
      */

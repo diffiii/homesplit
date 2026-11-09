@@ -82,4 +82,12 @@ export class FriendsController {
   ): Promise<void> {
     await this.requests.decline(session.user.id, requestId);
   }
+
+  @Route(endpoints.withdrawFriendRequest)
+  async withdrawFriendRequest(
+    @Session() session: UserSession,
+    @Param("requestId", new ZodPipe(Id)) requestId: Id
+  ): Promise<void> {
+    await this.requests.withdraw(session.user.id, requestId);
+  }
 }

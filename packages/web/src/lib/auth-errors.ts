@@ -6,6 +6,9 @@ import { applyServerErrors, type ServerErrors, showServerErrors } from "./form";
 export const MIN_PASSWORD_LENGTH = 8;
 export const MAX_PASSWORD_LENGTH = 128;
 
+/** How long a password reset link works, the backend's `resetPasswordTokenExpiresIn`. */
+export const RESET_LINK_HOURS = 1;
+
 /** Better Auth codes the sign-in and sign-up forms explain themselves. */
 const AUTH_FORM_ERRORS: Partial<Record<string, ServerErrors>> = {
   INVALID_EMAIL_OR_PASSWORD: {

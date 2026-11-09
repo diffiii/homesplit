@@ -40,6 +40,10 @@ describe("SignUpForm", () => {
       "href",
       "/sign-in?redirectTo=%2Fhouseholds"
     );
+    // The email was just sent, so resending waits.
+    expect(
+      screen.getByRole("button", { name: "Send a new link in 60 s" })
+    ).toBeDisabled();
     await expectNoAxeViolations();
   });
 });

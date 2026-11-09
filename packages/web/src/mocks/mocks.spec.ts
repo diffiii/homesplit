@@ -410,6 +410,16 @@ describe("application routes", () => {
     await expect(
       failure(api("acceptFriendRequest", requestParams))
     ).resolves.toMatchObject({ status: 404 });
+
+    const [sent] = (await api("listSentFriendRequests")).items;
+    const sentParams = { params: { requestId: sent?.id ?? "" } };
+    await expect(
+      failure(api("acceptFriendRequest", sentParams))
+    ).resolves.toMatchObject({ status: 403, code: "FORBIDDEN" });
+    await api("withdrawFriendRequest", sentParams);
+    await expect(
+      failure(api("withdrawFriendRequest", sentParams))
+    ).resolves.toMatchObject({ status: 404 });
   });
 
   it("record payments by the decision-record rules", async () => {
