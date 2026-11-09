@@ -43,13 +43,18 @@ export const InvitationIdParams = z.object({
 export type InvitationIdParams = z.infer<typeof InvitationIdParams>;
 
 /**
- * What the invitation page shows before the invitee answers, whoever is signed
- * in, so it can say which address the invitation is for.
+ * What the invitation page shows before the invitee answers. Anyone else
+ * holding the link sees the address masked, as `j•••@gmail.com`, enough to
+ * pick the right account, and once the invitation can't be answered, neither
+ * the household nor the inviter.
  */
 export const InvitationPreview = z.object({
   id: Id,
-  household: HouseholdSummary,
-  inviter: UserSummary,
+  /** Null for anyone but the invitee once the invitation isn't `pending`. */
+  household: HouseholdSummary.nullable(),
+  /** Null when `household` is. */
+  inviter: UserSummary.nullable(),
+  /** The invited address for the invitee; masked for anyone else. */
   email: z.string().min(1),
   role: HouseholdRole,
   status: InvitationStatus,

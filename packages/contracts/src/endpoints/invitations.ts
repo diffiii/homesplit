@@ -5,7 +5,8 @@ import { INVITATION } from "./paths";
 export const invitationEndpoints = {
   /**
    * Any signed-in user with the invitation's ID, which only its email links
-   * to. Answers 404 for an unknown ID.
+   * to; anyone but the invitee gets less (see `InvitationPreview`). Answers
+   * 404 for an unknown ID.
    */
   getInvitationPreview: {
     method: "GET",
