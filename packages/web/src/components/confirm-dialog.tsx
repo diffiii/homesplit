@@ -93,7 +93,11 @@ export function ConfirmDialog({
       open={open}
     >
       {trigger ? <AlertDialogTrigger render={trigger} /> : null}
-      <AlertDialogContent finalFocus={finalFocus}>
+      {/* Scrolls as a whole on short screens, so the buttons stay reachable. */}
+      <AlertDialogContent
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto"
+        finalFocus={finalFocus}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           {description ? (
