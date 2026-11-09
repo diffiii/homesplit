@@ -1,13 +1,15 @@
 import { screen, waitFor, within } from "@testing-library/react";
+import { delay, HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { HouseholdShell } from "@/components/shell/household-shell";
 import { queryKeys } from "@/lib/api/query-keys";
 import { todayIsoDate } from "@/lib/dates";
 import { rememberExpenseCurrency } from "@/lib/recent-currencies";
 import { expectNoAxeViolations } from "@/test/axe";
-import { db } from "@/test/mock-server";
+import { db, server } from "@/test/mock-server";
 import { router } from "@/test/navigation";
 import { renderWithProviders } from "@/test/render";
+import { SUGGESTION_DELAY_MS } from "../category-suggestion";
 import NewExpensePage from "./page";
 
 const flat = () => {
@@ -91,6 +93,43 @@ async function pickMethod(
 
 // jsdom sees both navs labelled "Household"; a browser shows one per screen size.
 const AXE_OPTIONS = { rules: { "landmark-unique": { enabled: false } } };
+
+const SUGGESTION_URL = "*/expense-categories/suggestion";
+/** Long enough for the name to settle and the answer to arrive. */
+const SETTLED = { timeout: SUGGESTION_DELAY_MS + 2000 };
+const SUGGESTED = "Suggested from the name";
+
+function enableAi() {
+  const household = flat();
+  household.features = { ...household.features, ai: true };
+}
+
+/** The names suggestions are asked for from now on. */
+function suggestionRequests(): string[] {
+  const names: string[] = [];
+  server.events.on("request:start", async ({ request }) => {
+    if (request.url.endsWith("/expense-categories/suggestion")) {
+      names.push((await request.clone().json()).name);
+    }
+  });
+  return names;
+}
+
+/** Waits past the delay, for checking that nothing was asked. */
+const settle = () =>
+  new Promise((resolve) => setTimeout(resolve, SUGGESTION_DELAY_MS + 300));
+
+const categoryId = (name: string) =>
+  db.state.categories.find(
+    (category) => category.householdId === flat().id && category.name === name
+  )?.id;
+const categoryPicker = () => screen.getByRole("combobox", { name: "Category" });
+
+async function save(user: ReturnType<typeof renderForm>["user"]) {
+  await user.type(screen.getByLabelText("Amount"), "90");
+  await user.click(screen.getByRole("button", { name: "Add expense" }));
+  await waitFor(() => expect(router.push).toHaveBeenCalled());
+}
 
 describe("NewExpensePage", () => {
   it("starts with today, PLN, and every current member", async () => {
@@ -467,6 +506,184 @@ describe("NewExpensePage", () => {
       )
     ).toBeVisible();
     expect(router.push).not.toHaveBeenCalled();
+  });
+
+  describe("category suggestions", () => {
+    it("fills the category from the name and marks it as suggested", async () => {
+      enableAi();
+      const asked = suggestionRequests();
+      const { user } = renderForm();
+
+      await user.type(await screen.findByLabelText("Name"), "Pizza night");
+      expect(await screen.findByText(SUGGESTED, {}, SETTLED)).toBeVisible();
+      expect(categoryPicker()).toHaveTextContent("Dining out");
+      expect(categoryPicker()).toHaveAccessibleDescription(SUGGESTED);
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Dining out suggested as the category."
+      );
+      expect(asked).toEqual(["Pizza night"]);
+      await expectNoAxeViolations(document.body, AXE_OPTIONS);
+
+      await save(user);
+      expect(
+        db.state.expenses.find(({ name }) => name === "Pizza night")?.categoryId
+      ).toBe(categoryId("Dining out"));
+    });
+
+    it("shows that it's looking while the answer is on its way", async () => {
+      enableAi();
+      server.use(
+        http.post(SUGGESTION_URL, async () => {
+          await delay(300);
+          return HttpResponse.json({
+            suggestion: { categoryId: categoryId("Rent"), confidence: "high" },
+          });
+        })
+      );
+      const { user } = renderForm();
+
+      await user.type(await screen.findByLabelText("Name"), "August");
+      expect(
+        await screen.findByText("Finding a category…", {}, SETTLED)
+      ).toBeVisible();
+      expect(await screen.findByText(SUGGESTED, {}, SETTLED)).toBeVisible();
+      expect(screen.queryByText("Finding a category…")).not.toBeInTheDocument();
+      expect(categoryPicker()).toHaveTextContent("Rent");
+    });
+
+    it("follows the name, asking once per name, until a category is picked", async () => {
+      enableAi();
+      const asked = suggestionRequests();
+      const { user } = renderForm();
+      const name = await screen.findByLabelText("Name");
+
+      await user.type(name, "Pizza");
+      await waitFor(
+        () => expect(categoryPicker()).toHaveTextContent("Dining out"),
+        SETTLED
+      );
+      await user.clear(name);
+      await user.type(name, "Taxi home");
+      await waitFor(
+        () => expect(categoryPicker()).toHaveTextContent("Transport"),
+        SETTLED
+      );
+      await user.clear(name);
+      await user.type(name, "Pizza");
+      await waitFor(
+        () => expect(categoryPicker()).toHaveTextContent("Dining out"),
+        SETTLED
+      );
+      expect(asked).toEqual(["Pizza", "Taxi home"]);
+
+      // Picking the suggested category itself confirms it.
+      await user.click(categoryPicker());
+      await user.click(
+        await screen.findByRole("option", { name: "Dining out" })
+      );
+      expect(screen.queryByText(SUGGESTED)).not.toBeInTheDocument();
+      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+
+      await user.clear(name);
+      await user.type(name, "Cinema");
+      await settle();
+      expect(categoryPicker()).toHaveTextContent("Dining out");
+      expect(asked).toEqual(["Pizza", "Taxi home"]);
+    }, 20_000);
+
+    it("doesn't ask once a category is picked", async () => {
+      enableAi();
+      const asked = suggestionRequests();
+      const { user } = renderForm();
+
+      await user.click(
+        await screen.findByRole("combobox", { name: "Category" })
+      );
+      await user.click(await screen.findByRole("option", { name: "Rent" }));
+      await user.type(screen.getByLabelText("Name"), "Pizza");
+      await settle();
+
+      expect(asked).toEqual([]);
+      expect(categoryPicker()).toHaveTextContent("Rent");
+    });
+
+    it("leaves the category empty when the answer is only a guess", async () => {
+      enableAi();
+      const asked = suggestionRequests();
+      const { user } = renderForm();
+
+      await user.type(await screen.findByLabelText("Name"), "Something");
+      await waitFor(() => expect(asked).toEqual(["Something"]), SETTLED);
+      await save(user);
+
+      expect(screen.queryByText(SUGGESTED)).not.toBeInTheDocument();
+      expect(
+        db.state.expenses.find(({ name }) => name === "Something")?.categoryId
+      ).toBeNull();
+    });
+
+    it("says nothing and still saves when the request fails", async () => {
+      enableAi();
+      const asked = suggestionRequests();
+      // What Cloudflare puts in place of the backend's 502.
+      server.use(
+        http.post(SUGGESTION_URL, () =>
+          HttpResponse.html("<h1>Bad gateway</h1>", { status: 502 })
+        )
+      );
+      const { user } = renderForm();
+
+      await user.type(await screen.findByLabelText("Name"), "Pizza");
+      await waitFor(() => expect(asked).toEqual(["Pizza"]), SETTLED);
+      await save(user);
+
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(
+        db.state.expenses.find(({ name }) => name === "Pizza")?.categoryId
+      ).toBeNull();
+    });
+
+    it("stops asking once the daily limit is reached", async () => {
+      enableAi();
+      const asked = suggestionRequests();
+      server.use(
+        http.post(SUGGESTION_URL, () =>
+          HttpResponse.json(
+            { code: "RATE_LIMITED", message: "Too many requests" },
+            { status: 429 }
+          )
+        )
+      );
+      const { user } = renderForm();
+      const name = await screen.findByLabelText("Name");
+
+      await user.type(name, "Pizza");
+      await waitFor(() => expect(asked).toEqual(["Pizza"]), SETTLED);
+      await user.clear(name);
+      await user.type(name, "Taxi home");
+      await settle();
+
+      expect(asked).toEqual(["Pizza"]);
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    it("doesn't ask while the AI module is off", async () => {
+      const asked = suggestionRequests();
+      const { user } = renderForm();
+      const name = await screen.findByLabelText("Name");
+      await user.type(name, "Pizza");
+      await settle();
+      expect(asked).toEqual([]);
+    });
+
+    it("doesn't ask about a name of one or two letters", async () => {
+      enableAi();
+      const asked = suggestionRequests();
+      const { user } = renderForm();
+      await user.type(await screen.findByLabelText("Name"), "Pi");
+      await settle();
+      expect(asked).toEqual([]);
+    });
   });
 
   it("shows the module as off instead of the form", async () => {

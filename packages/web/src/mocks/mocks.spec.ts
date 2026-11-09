@@ -313,6 +313,30 @@ describe("application routes", () => {
     });
   });
 
+  it("suggest a category from the text while the ai module is on", async () => {
+    const ask = (name: string) =>
+      api("suggestExpenseCategory", { ...flat(), body: { name } });
+    await expect(failure(ask("Pizza"))).resolves.toMatchObject({
+      status: 403,
+      code: "MODULE_DISABLED",
+      details: { module: "ai" },
+    });
+
+    await api("updateHouseholdFeatures", { ...flat(), body: { ai: true } });
+    const { items } = await api("listExpenseCategories", flat());
+    const idOf = (name: string) =>
+      items.find((category) => category.name === name)?.id;
+    await expect(ask("Pizza")).resolves.toEqual({
+      suggestion: { categoryId: idOf("Dining out"), confidence: "high" },
+    });
+    await expect(ask("Rent, May")).resolves.toEqual({
+      suggestion: { categoryId: idOf("Rent"), confidence: "high" },
+    });
+    await expect(ask("Something")).resolves.toEqual({
+      suggestion: { categoryId: idOf("Other"), confidence: "low" },
+    });
+  });
+
   it("answer FORBIDDEN by role", async () => {
     signInAs("Celina");
     await expect(

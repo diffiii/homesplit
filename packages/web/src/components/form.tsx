@@ -541,9 +541,12 @@ function EmojiField({
 function CategoryField({
   label,
   description,
+  onPick,
 }: {
   description?: ReactNode;
   label: ReactNode;
+  /** Called when the user chooses, which setting the value from code doesn't do. */
+  onPick?: () => void;
 }) {
   const field = useFieldContext<string | null | undefined>();
   const value = useStore(field.store, (state) => state.value);
@@ -553,7 +556,10 @@ function CategoryField({
         <CategoryPicker
           {...control}
           onBlur={field.handleBlur}
-          onValueChange={field.handleChange}
+          onValueChange={(categoryId) => {
+            field.handleChange(categoryId);
+            onPick?.();
+          }}
           value={value ?? null}
         />
       )}

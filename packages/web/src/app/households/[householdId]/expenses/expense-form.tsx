@@ -1,7 +1,7 @@
 "use client";
 
 import type { UserSummary } from "@homesplit/contracts";
-import { revalidateLogic } from "@tanstack/react-form";
+import { revalidateLogic, useStore } from "@tanstack/react-form";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { useAppForm } from "@/components/form";
@@ -11,6 +11,7 @@ import { invalidate } from "@/lib/api/queries";
 import { queryKeys } from "@/lib/api/query-keys";
 import { type ExpenseFormValues, validateExpense } from "@/lib/expense-form";
 import { type ServerErrors, showServerErrors } from "@/lib/form";
+import { useCategorySuggestion } from "./category-suggestion";
 import { AdvancedSplit, SimpleSplit } from "./expense-split";
 
 /** Current members as `UserSummary`, the user first and then by name. */
@@ -102,6 +103,12 @@ export function ExpenseForm({
     },
   });
 
+  const suggestion = useCategorySuggestion({
+    name: useStore(form.store, (state) => state.values.name),
+    initial: defaultValues,
+    apply: (categoryId) => form.setFieldValue("categoryId", categoryId),
+  });
+
   return (
     <form.AppForm>
       <form.Form className="flex flex-col gap-4">
@@ -131,9 +138,18 @@ export function ExpenseForm({
             {(field) => <field.DateField label="Date" />}
           </form.AppField>
           <form.AppField name="categoryId">
-            {(field) => <field.CategoryField label="Category" />}
+            {(field) => (
+              <field.CategoryField
+                description={suggestion.hint}
+                label="Category"
+                onPick={suggestion.onPick}
+              />
+            )}
           </form.AppField>
         </div>
+        <p className="sr-only" role="status">
+          {suggestion.announcement}
+        </p>
         <form.Subscribe selector={(state) => state.values.advanced}>
           {(advanced) =>
             advanced ? (
