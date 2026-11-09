@@ -7,6 +7,9 @@ export const HOME_PATH = "/";
 /** The user's profile, password, and theme. */
 export const ACCOUNT_PATH = "/account";
 
+/** The user's friends and friend requests. */
+export const FRIENDS_PATH = "/friends";
+
 /**
  * The page `/` shows with a session cookie, sending the user on to a
  * household. Without one, `/` is the landing page.
