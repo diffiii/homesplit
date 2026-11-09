@@ -591,6 +591,26 @@ describe("NewExpensePage", () => {
       expect(asked).toEqual(["Pizza", "Taxi home"]);
     }, 20_000);
 
+    it("says the category came from an earlier name once the name has no answer", async () => {
+      enableAi();
+      const asked = suggestionRequests();
+      const { user } = renderForm();
+      const name = await screen.findByLabelText("Name");
+
+      await user.type(name, "Pizza");
+      expect(await screen.findByText(SUGGESTED, {}, SETTLED)).toBeVisible();
+      await user.clear(name);
+      await user.type(name, "Something");
+      await waitFor(
+        () => expect(asked).toEqual(["Pizza", "Something"]),
+        SETTLED
+      );
+
+      expect(screen.getByText("Suggested from an earlier name")).toBeVisible();
+      expect(screen.queryByText(SUGGESTED)).not.toBeInTheDocument();
+      expect(categoryPicker()).toHaveTextContent("Dining out");
+    });
+
     it("doesn't ask once a category is picked", async () => {
       enableAi();
       const asked = suggestionRequests();

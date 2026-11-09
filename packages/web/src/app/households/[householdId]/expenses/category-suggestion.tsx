@@ -43,7 +43,8 @@ interface CategorySuggestion {
  * It asks once the name has changed and then stayed the same for
  * `SUGGESTION_DELAY_MS`, at most once per distinct name, and fills only a
  * `high` confidence answer, only until the member picks a category. A later
- * answer replaces an earlier one. Failures are silent.
+ * answer replaces an earlier one; a name without one keeps the category and
+ * the hint says it came from an earlier name. Failures are silent.
  */
 export function useCategorySuggestion({
   name,
@@ -58,7 +59,11 @@ export function useCategorySuggestion({
   );
 
   const [loading, setLoading] = useState(false);
-  const [suggestedId, setSuggestedId] = useState<string | null>(null);
+  /** The category filled in and the name it was suggested for. */
+  const [filled, setFilled] = useState<{
+    categoryId: string;
+    name: string;
+  } | null>(null);
   const [initialName] = useState(() => initial.name.trim());
   const picked = useRef(initial.categoryId !== null);
   const stopped = useRef(false);
@@ -87,7 +92,7 @@ export function useCategorySuggestion({
     return answer;
   };
 
-  const fill = useEffectEvent((categoryId: string | null) => {
+  const fill = useEffectEvent((text: string, categoryId: string | null) => {
     setLoading(false);
     // A category the picker doesn't list yet would be saved without showing.
     if (
@@ -98,7 +103,7 @@ export function useCategorySuggestion({
       return;
     }
     apply(categoryId);
-    setSuggestedId(categoryId);
+    setFilled({ categoryId, name: text });
   });
 
   const request = useEffectEvent(async (text: string) => {
@@ -118,7 +123,7 @@ export function useCategorySuggestion({
     const timer = setTimeout(async () => {
       const categoryId = await request(text);
       if (current) {
-        fill(categoryId);
+        fill(text, categoryId);
       }
     }, SUGGESTION_DELAY_MS);
     return () => {
@@ -128,7 +133,9 @@ export function useCategorySuggestion({
     };
   }, [name, enabled, initialName]);
 
-  const suggested = categories.data?.items.find(({ id }) => id === suggestedId);
+  const suggested = categories.data?.items.find(
+    ({ id }) => id === filled?.categoryId
+  );
   let hint: ReactNode;
   if (loading) {
     hint = (
@@ -141,7 +148,9 @@ export function useCategorySuggestion({
     hint = (
       <span className="flex items-center gap-1.5">
         <SparklesIcon aria-hidden className="size-4" />
-        Suggested from the name
+        {filled?.name === name.trim()
+          ? "Suggested from the name"
+          : "Suggested from an earlier name"}
       </span>
     );
   }
@@ -154,7 +163,7 @@ export function useCategorySuggestion({
     onPick: () => {
       picked.current = true;
       setLoading(false);
-      setSuggestedId(null);
+      setFilled(null);
     },
   };
 }
