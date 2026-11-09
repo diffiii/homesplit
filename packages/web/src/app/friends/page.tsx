@@ -277,7 +277,8 @@ function PersonRow({
 }) {
   return (
     <li className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3">
-      <FriendLabel user={user} />
+      {/* Wide enough that the buttons wrap below rather than squeeze the email. */}
+      <FriendLabel className="min-w-48" user={user} />
       <div className="ml-auto flex gap-2">{children}</div>
     </li>
   );
