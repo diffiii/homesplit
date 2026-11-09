@@ -2,7 +2,7 @@
 
 import { matchQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "cn";
-import { LogOutIcon, UserIcon } from "lucide-react";
+import { LogOutIcon, UserIcon, UsersIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useEffect, useMemo } from "react";
@@ -36,12 +36,16 @@ import { useRequiredSession } from "@/hooks/use-required-session";
 import { isApiRequestError } from "@/lib/api/api-error";
 import { pendingSettlementsQuery } from "@/lib/api/expense-queries";
 import {
+  describeRequestCount,
+  useIncomingFriendRequestCount,
+} from "@/lib/api/friend-queries";
+import {
   householdQueries,
   isHouseholdNotFound,
 } from "@/lib/api/household-queries";
 import { endpointQuery } from "@/lib/api/queries";
 import { queryKeys } from "@/lib/api/query-keys";
-import { ACCOUNT_PATH } from "@/lib/api/session";
+import { ACCOUNT_PATH, FRIENDS_PATH } from "@/lib/api/session";
 import { rememberHousehold } from "@/lib/last-household";
 import { permissionsFor, strongestRole } from "@/lib/permissions";
 import { signOutAndReset } from "@/lib/sign-out";
@@ -268,6 +272,7 @@ function DesktopSidebar({
 }) {
   const pathname = usePathname();
   const disabled = useDisabledFeatures(householdId);
+  const requests = useIncomingFriendRequestCount();
   return (
     <Sidebar
       className="sticky top-0 hidden h-svh border-r md:flex"
@@ -313,6 +318,34 @@ function DesktopSidebar({
                     );
                   }
                 )}
+              </SidebarMenu>
+            </nav>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <nav aria-label="You">
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    aria-current={
+                      pathname === FRIENDS_PATH ? "page" : undefined
+                    }
+                    isActive={pathname === FRIENDS_PATH}
+                    render={<Link href={FRIENDS_PATH} />}
+                  >
+                    <UsersIcon aria-hidden />
+                    <span>Friends</span>
+                    {requests > 0 ? (
+                      <span className="sr-only">
+                        , {describeRequestCount(requests)}
+                      </span>
+                    ) : null}
+                  </SidebarMenuButton>
+                  {requests > 0 ? (
+                    <SidebarMenuBadge aria-hidden>{requests}</SidebarMenuBadge>
+                  ) : null}
+                </SidebarMenuItem>
               </SidebarMenu>
             </nav>
           </SidebarGroupContent>
@@ -396,6 +429,7 @@ function BottomNav({
 
 export function UserMenu({ showName = false }: { showName?: boolean }) {
   const { data } = useRequiredSession();
+  const requests = useIncomingFriendRequestCount();
   const user = data?.user;
   if (!user) {
     return <div className={cn("size-8", showName && "flex-1")} />;
@@ -428,6 +462,23 @@ export function UserMenu({ showName = false }: { showName?: boolean }) {
           <DropdownMenuItem render={<Link href={ACCOUNT_PATH} />}>
             <UserIcon aria-hidden />
             Account settings
+          </DropdownMenuItem>
+          <DropdownMenuItem render={<Link href={FRIENDS_PATH} />}>
+            <UsersIcon aria-hidden />
+            Friends
+            {requests > 0 ? (
+              <>
+                <span className="sr-only">
+                  , {describeRequestCount(requests)}
+                </span>
+                <span
+                  aria-hidden
+                  className="bg-primary text-primary-foreground ml-auto h-5 min-w-5 rounded-full px-1.5 text-center text-xs leading-5 tabular-nums"
+                >
+                  {requests}
+                </span>
+              </>
+            ) : null}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={signOutAndReset}>
             <LogOutIcon aria-hidden />

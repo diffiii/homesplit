@@ -25,9 +25,10 @@ export function verificationEmails(to: string): Email[] {
 }
 
 /**
- * The link in the newest verification email to `to`. `path` drops its
- * `callbackURL`, so the test app answers JSON and sets the session cookie
- * instead of redirecting.
+ * The link in the newest verification email to `to`, a frontend page, and
+ * `path`, the Better Auth call that page makes with its token. Without a
+ * `callbackURL`, the call answers JSON and sets the session cookie instead of
+ * redirecting.
  */
 export function verificationLink(to: string): { path: string; url: URL } {
   const href = verificationEmails(to).at(-1)?.text.match(URL_IN_TEXT)?.[0];
@@ -35,10 +36,9 @@ export function verificationLink(to: string): { path: string; url: URL } {
     throw new Error(`No verification email sent to ${to}`);
   }
   const url = new URL(href);
-  const withoutCallback = new URL(url);
-  withoutCallback.searchParams.delete("callbackURL");
+  const token = url.searchParams.get("token") ?? "";
   return {
-    path: `${withoutCallback.pathname}${withoutCallback.search}`,
+    path: `/api/auth/verify-email?${new URLSearchParams({ token })}`,
     url,
   };
 }

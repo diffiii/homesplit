@@ -22,6 +22,7 @@ import { ExpenseCategory } from "./categories";
 export * from "./allocation";
 export * from "./categories";
 export * from "./settlements";
+export * from "./write-offs";
 
 /** Amount a user actually paid towards an expense. */
 export const ExpensePayerInput = z.strictObject({

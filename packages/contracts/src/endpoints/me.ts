@@ -91,4 +91,11 @@ export const meEndpoints = {
     status: 204,
     response: null,
   },
+  withdrawFriendRequest: {
+    method: "DELETE",
+    path: FRIEND_REQUEST,
+    params: FriendRequestIdParams,
+    status: 204,
+    response: null,
+  },
 } as const satisfies Record<string, Endpoint>;

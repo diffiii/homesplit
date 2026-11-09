@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  forgotPasswordUrl,
   isSignedOutPath,
   safeRedirectPath,
   signInUrl,
@@ -54,11 +55,15 @@ describe("signed-out pages", () => {
     expect(signUpUrl("/invitations/abc")).toBe(
       "/sign-up?redirectTo=%2Finvitations%2Fabc"
     );
+    expect(forgotPasswordUrl("/households")).toBe(
+      "/forgot-password?redirectTo=%2Fhouseholds"
+    );
   });
 
   it("leaves out redirectTo when it would only lead home", () => {
     expect(signInUrl("/")).toBe("/sign-in");
     expect(signUpUrl(null)).toBe("/sign-up");
+    expect(forgotPasswordUrl(undefined)).toBe("/forgot-password");
     expect(signInUrl("https://evil.test")).toBe("/sign-in");
   });
 });
