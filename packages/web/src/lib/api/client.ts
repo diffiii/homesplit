@@ -64,15 +64,12 @@ export function createApiClient({
   fetch: fetchImpl = (...args) => fetch(...args),
   onUnauthenticated,
 }: ApiClientOptions = {}): ApiClient {
-  // Untyped inside: with the generic `name`, TypeScript would build the union
-  // of every endpoint's input and response, which grows too complex as routes
-  // are added. `ApiClient` keeps the calls typed.
-  const call = async (
-    name: EndpointName,
-    input: UntypedInput = {}
-  ): Promise<unknown> => {
+  return async (name, ...args) => {
     const endpoint: Endpoint = endpoints[name];
-    const { params, query, body, signal } = input;
+    // Cast before reading, so TypeScript doesn't build the union of every
+    // endpoint's input, which grows past its limit as endpoints are added.
+    const [input] = args as unknown as [UntypedInput?];
+    const { params, query, body, signal } = input ?? {};
 
     let response: Response;
     try {
@@ -105,9 +102,10 @@ export function createApiClient({
         response.statusText
       );
     }
-    return parseResponse(endpoint, response);
+    return (await parseResponse(endpoint, response)) as ApiResponse<
+      typeof name
+    >;
   };
-  return call as ApiClient;
 }
 
 function requestUrl(

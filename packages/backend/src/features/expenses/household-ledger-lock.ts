@@ -37,6 +37,17 @@ export function lockHouseholdForLedgerWrite(
 }
 
 /**
+ * Locks the household's `organization` row `FOR UPDATE`, so no ledger write
+ * runs until the transaction ends and balances read after it stay true.
+ */
+export function lockHouseholdLedger(
+  tx: Transaction,
+  householdId: string
+): Promise<void> {
+  return lockHousehold(tx, householdId, "update");
+}
+
+/**
  * Locks the household's `organization` row `FOR UPDATE` and answers 409
  * `HOUSEHOLD_HAS_UNSETTLED_BALANCES` while any balance in it isn't zero.
  * Ledger writes wait for the transaction to end, so the household stays
@@ -46,7 +57,7 @@ export async function assertHouseholdSettledUp(
   tx: Transaction,
   householdId: string
 ): Promise<void> {
-  await lockHousehold(tx, householdId, "update");
+  await lockHouseholdLedger(tx, householdId);
   if (await hasUnsettledBalances(tx, householdId)) {
     throw new AppError(
       409,

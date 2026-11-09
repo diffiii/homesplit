@@ -1,6 +1,6 @@
 # Expenses API
 
-Module flag: `expenses` · Tasks: #35, #37, #38, #40, #41, #42, #45, #103 · Contracts: [expenses](../../packages/contracts/src/features/expenses/index.ts), [attachments](../../packages/contracts/src/features/attachments/index.ts), [categories](../../packages/contracts/src/features/expenses/categories.ts), [settlements](../../packages/contracts/src/features/expenses/settlements.ts)
+Module flag: `expenses` · Tasks: #35, #37, #38, #40, #41, #42, #45, #103 · Contracts: [expenses](../../packages/contracts/src/features/expenses/index.ts), [attachments](../../packages/contracts/src/features/attachments/index.ts), [categories](../../packages/contracts/src/features/expenses/categories.ts), [settlements](../../packages/contracts/src/features/expenses/settlements.ts), [write-offs](../../packages/contracts/src/features/expenses/write-offs.ts)
 
 ## Routes
 
@@ -22,6 +22,7 @@ Module flag: `expenses` · Tasks: #35, #37, #38, #40, #41, #42, #45, #103 · Con
 | POST | `/api/households/:householdId/settlements` | `HouseholdIdParams`, `ProcessSettlementRequest` | `Settlement` | 201 | party or admin+ |
 | POST | `/api/households/:householdId/settlements/:settlementId/confirm` | `SettlementIdParams` | `ConfirmedSettlement` | 200 | payee, or admin+ who isn't the payer |
 | DELETE | `/api/households/:householdId/settlements/:settlementId` | `SettlementIdParams` | none | 204 | pending only: party or admin+ |
+| POST | `/api/households/:householdId/write-offs` | `HouseholdIdParams`, `WriteOffRequest` | `WriteOffResponse` | 201 | admin+ |
 | GET | `/api/households/:householdId/balances` | `HouseholdIdParams` | `BalanceListResponse` | 200 | all |
 | GET | `/api/households/:householdId/settlement-suggestions` | `HouseholdIdParams` | `SettlementSuggestionListResponse` | 200 | all |
 | GET | `/api/me/balances` | none | `UserBalanceListResponse` | 200 | any signed-in user, for themselves |
@@ -155,7 +156,7 @@ A payment is an independent ledger entry. It references no expense or split, so 
 - Notes: an omitted `note` is stored as `null`.
 - Ordering: `createdAt` descending, then `id` descending. `createdAt` is the database's time when the recording transaction started.
 - Filtering: `GET /settlements?status=pending` or `status=confirmed` keeps only payments in that state, and `totalItems` counts only those, so a screen can list what's pending without paging through the history.
-- Disabled module: `GET /settlements` keeps working. The other three routes answer 403 `MODULE_DISABLED`.
+- Disabled module: `GET /settlements` keeps working. The other routes, and `POST /write-offs`, answer 403 `MODULE_DISABLED`.
 
 #### Overpayment
 
@@ -186,11 +187,21 @@ A reversal follows the ordinary recording rules. The original payee is its payer
 
 #### Concurrent requests
 
-Every transaction that writes a payment first locks the household's `organization` row `FOR SHARE` with `lockHouseholdForLedgerWrite` from `packages/backend/src/features/expenses/household-ledger-lock.ts`, as [the decision record](../decisions.md#deleting-households) requires of every ledger write. A write that waited for a household's deletion answers 404.
+Every transaction that writes a payment first locks the household's `organization` row `FOR SHARE` with `lockHouseholdForLedgerWrite` (a write-off takes `FOR UPDATE`, see [Write-offs](#write-offs)) from `packages/backend/src/features/expenses/household-ledger-lock.ts`, as [the decision record](../decisions.md#deleting-households) requires of every ledger write. A write that waited for a household's deletion answers 404.
 
 Confirming and deleting also lock the payment's row `FOR UPDATE`. When both arrive together, the second one sees the first one's result: a confirmation after a deletion answers 404, and a deletion after a confirmation answers 409.
 
 A page of the history and its `totalItems` are read in one read-only `REPEATABLE READ` transaction (`readSnapshot` in `packages/backend/src/db/index.ts`).
+
+#### Write-offs
+
+`POST /write-offs` [writes off](../decisions.md#writing-off-debts) a departed member's balance in one currency. In one transaction, it locks the household's `organization` row `FOR UPDATE` with `lockHouseholdLedger`, so no ledger write runs in between, reads the balances and current members, and records every payment `planWriteOff` from `@homesplit/contracts` returns. Clients run the same function to show the payments first.
+
+- Every payment is `confirmed` at once by the caller, with the note `Write-off`, even when the caller is its payer.
+- `userId` must have been a member (400 `INVALID_REFERENCE` otherwise) and mustn't be one now (409 `MEMBER_NOT_DEPARTED`).
+- `amountCents` is the balance the caller saw. If it isn't the balance now, nothing is recorded and the answer is 409 `BALANCE_CHANGED`. A repeated request finds the balance at zero, so it's safe to resend one whose answer never came.
+- While a payment with the member in that currency is pending, the answer is 409 `HAS_PENDING_PAYMENTS`, since confirming it later would undo part of the write-off.
+- Payments aren't limited to `MAX_AMOUNT_CENTS`, since the server builds them from a balance.
 
 ### Balances
 
@@ -246,12 +257,16 @@ Shared errors from [the decision record](../decisions.md#errors) apply. Feature 
 | 400 | `INVALID_REFERENCE` | An expense payer or participant isn't a current member of this household and, in a financial replacement, isn't already on the expense. `details.issues` has one entry per failing user. |
 | 400 | `INVALID_REFERENCE` | `payerId` or `payeeId` has never been a member of this household. `details.issues` has one entry per failing field. |
 | 400 | `INVALID_REFERENCE` | An `attachmentId` to link isn't a file of this household. |
+| 400 | `INVALID_REFERENCE` | A write-off's `userId` has never been a member of this household. |
 | 403 | `FORBIDDEN` | Editing or deleting an expense, or linking or unlinking its files, as a `member` who isn't its author. |
-| 403 | `FORBIDDEN` | Recording a payment between two other users, or deleting one, without being admin+. Confirming a payment as its payer, or as a member who isn't its payee. |
+| 403 | `FORBIDDEN` | Recording a payment between two other users, or deleting one, without being admin+. Confirming a payment as its payer, or as a member who isn't its payee. Writing off a balance as a `member`. |
 | 409 | `ATTACHMENT_ALREADY_LINKED` | Linking a file that's already linked to the expense. |
 | 409 | `CATEGORY_IN_USE` | Deleting a category that an expense uses. |
 | 409 | `EXPENSE_ATTACHMENT_LIMIT_REACHED` | Linking a file to an expense that already has `ATTACHMENT_MAX_PER_EXPENSE` files. `details.limit` holds the limit. |
 | 409 | `SETTLEMENT_CONFIRMED` | Deleting a confirmed payment. |
+| 409 | `MEMBER_NOT_DEPARTED` | Writing off the balance of a current member. |
+| 409 | `BALANCE_CHANGED` | Writing off a balance that isn't `amountCents` any more. |
+| 409 | `HAS_PENDING_PAYMENTS` | Writing off a balance while a payment with that member in that currency is pending. |
 
 ## Storage
 

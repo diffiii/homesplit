@@ -17,6 +17,8 @@ const ALICE = /^Alice/u;
 const CELINA = /^Celina/u;
 const GROCERIES_RUN = /^Groceries run/u;
 const EUR_GROUP = /^EUR/u;
+const PLN_GROUP = /^PLN/u;
+const SPLIT_DEBT = /^Split/u;
 const CONFIRM_PAYMENT = /^Confirm: Celina/u;
 const RECORD_CELINA_EUR = /^Record: Celina Wiśniewska pays you EUR/u;
 
@@ -263,7 +265,7 @@ test("keeps departed payers and weighted participants readable", async ({
   await expectNoAxeViolations(page);
 });
 
-test("reaches balances from expenses and settles a suggestion", async ({
+test("reaches balances from expenses, settles a suggestion, and writes off a debt", async ({
   page,
 }) => {
   test.slow();
@@ -297,6 +299,20 @@ test("reaches balances from expenses and settles a suggestion", async ({
     page
       .getByRole("link", { name: "Expenses" })
       .filter({ hasText: "to confirm" })
+  ).toHaveCount(0);
+
+  await page
+    .getByRole("button", {
+      name: "Write off Dawid Lewandowski's balance in PLN",
+    })
+    .click();
+  await page.getByRole("menuitem", { name: SPLIT_DEBT }).click();
+  const writeOff = page.getByRole("alertdialog");
+  await expect(writeOff.getByRole("listitem")).toHaveCount(3);
+  await expectNoAxeViolations(page);
+  await writeOff.getByRole("button", { name: "Write off" }).click();
+  await expect(
+    page.getByRole("region", { name: PLN_GROUP }).getByText("Dawid Lewandowski")
   ).toHaveCount(0);
 
   // Alice owes money in the cabin, so her highlighted row shows a debt.

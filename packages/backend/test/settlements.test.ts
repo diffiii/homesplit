@@ -215,6 +215,12 @@ describe("settlements", () => {
           .send(payment(carol, alice)),
         alice.client.post(confirmPath(household.id, pending.id)),
         carol.client.delete(settlementPath(household.id, pending.id)),
+        alice.client.post(`/api/households/${household.id}/write-offs`).send({
+          userId: carol.id,
+          currency: "PLN",
+          method: "split",
+          amountCents: -2500,
+        }),
       ]);
 
       for (const response of responses) {

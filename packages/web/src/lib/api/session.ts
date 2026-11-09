@@ -1,5 +1,7 @@
 export const SIGN_IN_PATH = "/sign-in";
 export const SIGN_UP_PATH = "/sign-up";
+export const FORGOT_PASSWORD_PATH = "/forgot-password";
+export const RESET_PASSWORD_PATH = "/reset-password";
 
 /** Where a signed-in user goes when nothing asked for another page. */
 export const HOME_PATH = "/";
@@ -20,8 +22,8 @@ export const SIGNED_IN_HOME_PATH = "/home";
 export const SIGNED_OUT_PATHS: ReadonlySet<string> = new Set([
   SIGN_IN_PATH,
   SIGN_UP_PATH,
-  "/forgot-password",
-  "/reset-password",
+  FORGOT_PASSWORD_PATH,
+  RESET_PASSWORD_PATH,
   "/verify-email",
 ]);
 
@@ -45,6 +47,11 @@ export function signInUrl(redirectTo?: string | null): string {
 /** The sign-up page, continuing to `redirectTo` once the account exists. */
 export function signUpUrl(redirectTo?: string | null): string {
   return withRedirect(SIGN_UP_PATH, redirectTo);
+}
+
+/** The page that emails a reset link, which continues to `redirectTo` after the reset. */
+export function forgotPasswordUrl(redirectTo?: string | null): string {
+  return withRedirect(FORGOT_PASSWORD_PATH, redirectTo);
 }
 
 let redirecting = false;

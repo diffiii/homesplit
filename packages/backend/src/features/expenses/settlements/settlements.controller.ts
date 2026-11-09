@@ -6,6 +6,8 @@ import {
   ProcessSettlementRequest,
   type Settlement,
   type SettlementListResponse,
+  WriteOffRequest,
+  type WriteOffResponse,
 } from "@homesplit/contracts";
 import { Body, Controller, Inject, Param, Query } from "@nestjs/common";
 import {
@@ -39,6 +41,17 @@ export class SettlementsController {
     @Body(new ZodPipe(ProcessSettlementRequest)) body: ProcessSettlementRequest
   ): Promise<Settlement> {
     return this.settlements.record(household, body);
+  }
+
+  @HouseholdRoute(endpoints.writeOffBalance, {
+    minRole: "admin",
+    module: "expenses",
+  })
+  writeOffBalance(
+    @CurrentHousehold() household: HouseholdContext,
+    @Body(new ZodPipe(WriteOffRequest)) body: WriteOffRequest
+  ): Promise<WriteOffResponse> {
+    return this.settlements.writeOff(household, body);
   }
 
   @HouseholdRoute(endpoints.confirmSettlement, { module: "expenses" })
