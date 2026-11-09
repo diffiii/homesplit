@@ -66,7 +66,10 @@ export function createApiClient({
 }: ApiClientOptions = {}): ApiClient {
   return async (name, ...args) => {
     const endpoint: Endpoint = endpoints[name];
-    const { params, query, body, signal } = (args[0] ?? {}) as UntypedInput;
+    // Cast before reading, so TypeScript doesn't build the union of every
+    // endpoint's input, which grows past its limit as endpoints are added.
+    const [input] = args as unknown as [UntypedInput?];
+    const { params, query, body, signal } = input ?? {};
 
     let response: Response;
     try {
