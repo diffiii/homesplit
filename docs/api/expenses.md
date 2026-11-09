@@ -1,6 +1,6 @@
 # Expenses API
 
-Module flag: `expenses` · Tasks: #35, #37, #38, #40, #41, #42, #45, #103 · Contracts: [expenses](../../packages/contracts/src/features/expenses/index.ts), [attachments](../../packages/contracts/src/features/attachments/index.ts), [categories](../../packages/contracts/src/features/expenses/categories.ts), [settlements](../../packages/contracts/src/features/expenses/settlements.ts), [write-offs](../../packages/contracts/src/features/expenses/write-offs.ts)
+Module flag: `expenses`, plus `ai` for category suggestions · Tasks: #35, #37, #38, #40, #41, #42, #45, #54, #103 · Contracts: [expenses](../../packages/contracts/src/features/expenses/index.ts), [attachments](../../packages/contracts/src/features/attachments/index.ts), [categories](../../packages/contracts/src/features/expenses/categories.ts), [settlements](../../packages/contracts/src/features/expenses/settlements.ts), [write-offs](../../packages/contracts/src/features/expenses/write-offs.ts)
 
 ## Routes
 
@@ -10,6 +10,7 @@ Module flag: `expenses` · Tasks: #35, #37, #38, #40, #41, #42, #45, #103 · Con
 | POST | `/api/households/:householdId/expense-categories` | `HouseholdIdParams`, `CreateExpenseCategoryRequest` | `ExpenseCategory` | 201 | admin+ |
 | PATCH | `/api/households/:householdId/expense-categories/:categoryId` | `ExpenseCategoryIdParams`, `UpdateExpenseCategoryRequest` | `ExpenseCategory` | 200 | admin+ |
 | DELETE | `/api/households/:householdId/expense-categories/:categoryId` | `ExpenseCategoryIdParams` | none | 204 | admin+ |
+| POST | `/api/households/:householdId/expense-categories/suggestion` | `HouseholdIdParams`, `SuggestExpenseCategoryRequest` | `ExpenseCategorySuggestion` | 200 | all |
 | GET | `/api/households/:householdId/expenses` | `HouseholdIdParams`, `ListExpensesQuery` | `ExpenseListResponse` | 200 | all |
 | POST | `/api/households/:householdId/expenses` | `HouseholdIdParams`, `CreateExpenseRequest` | `Expense` | 201 | all |
 | GET | `/api/households/:householdId/expenses/:expenseId` | `ExpenseIdParams` | `Expense` | 200 | all |
@@ -51,6 +52,19 @@ Better Auth's `organizationHooks.afterCreateOrganization` in `packages/backend/s
 - It runs only for `/organization/create`. An `organization` row inserted any other way gets no defaults.
 
 The defaults live in `DEFAULT_CATEGORIES` in `default-categories.ts`, so changing them doesn't need a migration.
+
+### Category suggestions
+
+`POST /expense-categories/suggestion` asks the AI model (#53) which of the household's categories fits an expense. It saves nothing: the client fills the category field and the member can change it. Receipts (#56) reuse it.
+
+- Input: any of `name`, `description`, and `attachmentId`, with at least one; `null` counts as omitted. The name is cut to 200 characters and the description to 2,000 before sending.
+- Modules: `expenses` through the guard and `ai` through `AiService`, so both must be on. Every member may call it.
+- Order: body validation (400), the attachment reference (400 `INVALID_REFERENCE`), then `ai` on (403 `MODULE_DISABLED`) and configured (503 `AI_UNAVAILABLE`). A household without categories then answers `{ suggestion: null }` without a provider call. Otherwise the attachment is read and converted (415 `UNSUPPORTED_FILE_TYPE` if an image can't be decoded), and only then does the request count against the daily limit (429) and go to the provider.
+- Attachments: the attachment must be this household's; a missing one and another household's both answer 400 `INVALID_REFERENCE` at `["attachmentId"]`. Images are turned upright, shrunk to fit 2048 × 2048, and sent as JPEG, which also handles HEIC and drops EXIF and GPS data. PDFs are sent as they are, as an OpenAI `file` content part, to `AI_VISION_MODEL`; a provider that doesn't accept files answers 502 `AI_PROVIDER_ERROR`.
+- Sent to the provider: the category names numbered by list position and the expense text, as JSON, plus the converted attachment. No IDs and no user data.
+- Output: the model answers a list position and a confidence. A position that isn't on the list is discarded and the answer is `{ suggestion: null }`, so a suggestion is always one of the household's categories, read at request time. The model never creates categories.
+- Confidence: `high` when the expense clearly belongs in the category, `medium` for a likely fit, `low` for a guess. Clients prefill the category field only on `high`, and only while the member hasn't picked a category; they may show other suggestions as a hint.
+- Repeated requests: every one that reaches the provider counts against the daily limit, and answers may differ.
 
 ### Expenses
 
@@ -256,10 +270,11 @@ Shared errors from [the decision record](../decisions.md#errors) apply. Feature 
 | 400 | `INVALID_REFERENCE` | A `categoryId` in a request body isn't a category of this household. |
 | 400 | `INVALID_REFERENCE` | An expense payer or participant isn't a current member of this household and, in a financial replacement, isn't already on the expense. `details.issues` has one entry per failing user. |
 | 400 | `INVALID_REFERENCE` | `payerId` or `payeeId` has never been a member of this household. `details.issues` has one entry per failing field. |
-| 400 | `INVALID_REFERENCE` | An `attachmentId` to link isn't a file of this household. |
+| 400 | `INVALID_REFERENCE` | An `attachmentId` to link or to suggest a category from isn't a file of this household. |
 | 400 | `INVALID_REFERENCE` | A write-off's `userId` has never been a member of this household. |
 | 403 | `FORBIDDEN` | Editing or deleting an expense, or linking or unlinking its files, as a `member` who isn't its author. |
 | 403 | `FORBIDDEN` | Recording a payment between two other users, or deleting one, without being admin+. Confirming a payment as its payer, or as a member who isn't its payee. Writing off a balance as a `member`. |
+| 415 | `UNSUPPORTED_FILE_TYPE` | Suggesting a category from an image attachment that can't be decoded. |
 | 409 | `ATTACHMENT_ALREADY_LINKED` | Linking a file that's already linked to the expense. |
 | 409 | `CATEGORY_IN_USE` | Deleting a category that an expense uses. |
 | 409 | `EXPENSE_ATTACHMENT_LIMIT_REACHED` | Linking a file to an expense that already has `ATTACHMENT_MAX_PER_EXPENSE` files. `details.limit` holds the limit. |

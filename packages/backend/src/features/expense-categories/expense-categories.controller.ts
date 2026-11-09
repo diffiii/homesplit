@@ -2,8 +2,10 @@ import {
   CreateExpenseCategoryRequest,
   type ExpenseCategory,
   type ExpenseCategoryListResponse,
+  type ExpenseCategorySuggestion,
   endpoints,
   Id,
+  SuggestExpenseCategoryRequest,
   UpdateExpenseCategoryRequest,
 } from "@homesplit/contracts";
 import { Body, Controller, Inject, Param } from "@nestjs/common";
@@ -14,16 +16,20 @@ import {
 import type { HouseholdContext } from "@/features/households/access/household.guard";
 import { PatchPipe } from "@/http/patch.pipe";
 import { ZodPipe } from "@/http/zod.pipe";
+import { CategorySuggestionsService } from "./category-suggestions.service";
 import { ExpenseCategoriesService } from "./expense-categories.service";
 
 @Controller()
 export class ExpenseCategoriesController {
   private readonly categories: ExpenseCategoriesService;
+  private readonly suggestions: CategorySuggestionsService;
 
   constructor(
-    @Inject(ExpenseCategoriesService) categories: ExpenseCategoriesService
+    @Inject(ExpenseCategoriesService) categories: ExpenseCategoriesService,
+    @Inject(CategorySuggestionsService) suggestions: CategorySuggestionsService
   ) {
     this.categories = categories;
+    this.suggestions = suggestions;
   }
 
   @HouseholdRoute(endpoints.listExpenseCategories)
@@ -67,5 +73,15 @@ export class ExpenseCategoriesController {
     @Param("categoryId", new ZodPipe(Id)) categoryId: Id
   ): Promise<void> {
     await this.categories.delete(household.householdId, categoryId);
+  }
+
+  /** `AiService` checks the `ai` module. */
+  @HouseholdRoute(endpoints.suggestExpenseCategory, { module: "expenses" })
+  suggestExpenseCategory(
+    @CurrentHousehold() household: HouseholdContext,
+    @Body(new ZodPipe(SuggestExpenseCategoryRequest))
+    body: SuggestExpenseCategoryRequest
+  ): Promise<ExpenseCategorySuggestion> {
+    return this.suggestions.suggest(household.householdId, body);
   }
 }

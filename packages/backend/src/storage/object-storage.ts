@@ -17,6 +17,8 @@ export const AVATAR_STORAGE = Symbol("AVATAR_STORAGE");
 export abstract class ObjectStorage {
   abstract put(key: string, body: Buffer, contentType: string): Promise<void>;
 
+  abstract get(key: string): Promise<Buffer>;
+
   /** Succeeds when the object is already gone. */
   abstract delete(key: string): Promise<void>;
 

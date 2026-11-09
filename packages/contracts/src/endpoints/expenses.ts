@@ -10,6 +10,7 @@ import {
   ExpenseCategory,
   ExpenseCategoryIdParams,
   ExpenseCategoryListResponse,
+  ExpenseCategorySuggestion,
   ExpenseIdParams,
   ExpenseListResponse,
   LinkExpenseAttachmentRequest,
@@ -20,6 +21,7 @@ import {
   SettlementIdParams,
   SettlementListResponse,
   SettlementSuggestionListResponse,
+  SuggestExpenseCategoryRequest,
   UpdateExpenseCategoryRequest,
   UpdateExpenseRequest,
   WriteOffRequest,
@@ -64,6 +66,15 @@ export const expenseEndpoints = {
     params: ExpenseCategoryIdParams,
     status: 204,
     response: null,
+  },
+  /** Saves nothing; it needs the `ai` module as well as `expenses`. */
+  suggestExpenseCategory: {
+    method: "POST",
+    path: `${HOUSEHOLD}/expense-categories/suggestion`,
+    params: HouseholdIdParams,
+    body: SuggestExpenseCategoryRequest,
+    status: 200,
+    response: ExpenseCategorySuggestion,
   },
 
   listExpenses: {

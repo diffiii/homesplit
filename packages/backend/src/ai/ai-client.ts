@@ -1,9 +1,11 @@
 import type { z } from "zod";
 import { AppError } from "@/http/app-error";
 
+/** Images and files go to the vision model. */
 export type AiInput =
   | { type: "text"; text: string }
-  | { type: "image"; mimeType: string; data: Uint8Array };
+  | { type: "image"; mimeType: string; data: Uint8Array }
+  | { type: "file"; mimeType: "application/pdf"; data: Uint8Array };
 
 export interface AiRequest<T extends z.ZodType> {
   readonly input: readonly AiInput[];

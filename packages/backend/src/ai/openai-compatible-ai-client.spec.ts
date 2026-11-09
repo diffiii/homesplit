@@ -125,6 +125,27 @@ describe("OpenAiCompatibleAiClient", () => {
     ]);
   });
 
+  it("sends PDFs as files to the vision model", async () => {
+    const { client, sent } = setup([ok({ categoryId: null })]);
+
+    await client.generate(
+      request([
+        { type: "file", mimeType: "application/pdf", data: Buffer.from("pdf") },
+      ])
+    );
+
+    expect(sent(0).body.model).toBe("vision-cheap");
+    expect(sent(0).body.messages[1].content).toEqual([
+      {
+        type: "file",
+        file: {
+          filename: "attachment.pdf",
+          file_data: `data:application/pdf;base64,${btoa("pdf")}`,
+        },
+      },
+    ]);
+  });
+
   it.each([
     ["fails the schema", ok({ categoryId: 7 })],
     ["is cut off", completion('{"categoryId": null}', "length")],
