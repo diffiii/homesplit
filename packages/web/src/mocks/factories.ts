@@ -26,6 +26,14 @@ export const MOCK_PASSWORD = "homesplit";
  */
 export const mockResetToken = (userId: string) => `mock-reset-${userId}`;
 
+/**
+ * The token in the mocks' verification link for `userId`; open
+ * `/verify-email?token=…` with it by hand. `MOCK_EXPIRED_VERIFY_TOKEN` answers
+ * like an expired link.
+ */
+export const mockVerifyToken = (userId: string) => `mock-verify-${userId}`;
+export const MOCK_EXPIRED_VERIFY_TOKEN = "mock-verify-expired";
+
 /** The categories the backend gives every new household. */
 const DEFAULT_CATEGORIES = [
   ["Groceries", "🛒"],

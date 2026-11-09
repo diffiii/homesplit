@@ -14,7 +14,12 @@ import {
   now,
 } from "./db";
 import { MockApiError, validationError } from "./errors";
-import { defaultCategories, mockResetToken } from "./factories";
+import {
+  defaultCategories,
+  MOCK_EXPIRED_VERIFY_TOKEN,
+  mockResetToken,
+  mockVerifyToken,
+} from "./factories";
 import { hasRole, type MockNetwork, simulateLatency } from "./routes";
 
 /** Better Auth answers with `{ code, message }` and its own statuses. */
@@ -57,7 +62,7 @@ function renderUser(user: MockUser) {
     id: user.id,
     name: user.name,
     email: user.email,
-    emailVerified: false,
+    emailVerified: user.emailVerified ?? false,
     image: user.image,
     createdAt: user.createdAt,
     updatedAt: user.createdAt,
@@ -299,6 +304,36 @@ export function createAuthHandlers(
     route("post", "/sign-out", () => {
       db.state.sessionUserId = null;
       return { success: true };
+    }),
+
+    // Sends nothing: the link is `/verify-email?token=` + `mockVerifyToken`.
+    route("post", "/send-verification-email", ({ input }) => {
+      if (!z.email().safeParse(text(input, "email")).success) {
+        throw ERRORS.invalidEmail();
+      }
+      return { status: true };
+    }),
+
+    // Verifies once and signs the user in; again, it signs no one in. Like
+    // Better Auth, it answers without a user either way.
+    route("get", "/verify-email", ({ input }) => {
+      const token = text(input, "token");
+      if (token === MOCK_EXPIRED_VERIFY_TOKEN) {
+        throw authError(UNAUTHORIZED, "TOKEN_EXPIRED", "Token expired");
+      }
+      const user = db.state.users.find(
+        ({ id }) => mockVerifyToken(id) === token
+      );
+      if (!user) {
+        throw authError(UNAUTHORIZED, "INVALID_TOKEN", "Invalid token");
+      }
+      if (!user.emailVerified) {
+        user.emailVerified = true;
+        db.state.sessionUserId = user.id;
+        // Only POST routes save on their own; this saves the session cookie.
+        db.changed();
+      }
+      return { status: true, user: null };
     }),
 
     // Sends nothing: the link is `/reset-password?token=` + `mockResetToken`.

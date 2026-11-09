@@ -12,6 +12,7 @@ import { z } from "zod";
 import { db } from "./db";
 // biome-ignore lint/performance/noNamespaceImport: drizzle schema bag for better-auth adapter
 import * as schema from "./db/schema/auth";
+import { emailLink, VERIFY_EMAIL_PATH } from "./email-links";
 import { seedDefaultCategories } from "./features/expense-categories/default-categories";
 import { hasUnsettledBalances } from "./features/expenses/balances/balances.repository";
 import { createMailer, type Email, loadMailConfig } from "./mail";
@@ -160,9 +161,12 @@ export const auth = betterAuth({
     sendOnSignIn: true,
     autoSignInAfterVerification: true,
     expiresIn: VERIFICATION_LINK_TTL_SECONDS,
-    // `url` is `/api/auth/verify-email` on the frontend origin, with a
-    // URL-encoded `callbackURL`, so it's safe to put in HTML as is.
-    sendVerificationEmail: async ({ user, url }) => {
+    // The link opens the frontend's `/verify-email` page, which verifies the
+    // token, rather than Better Auth's `url`, which a mail scanner opening it
+    // would act on (docs/decisions.md, "Email links"). `URL` encodes it, so
+    // it's safe to put in HTML as is.
+    sendVerificationEmail: async ({ user, url: authUrl, token }) => {
+      const url = emailLink(frontendUrl, VERIFY_EMAIL_PATH, token, authUrl);
       // The user row exists by now. A failed send is logged rather than
       // thrown, so sign-up still succeeds and the next sign-in sends again.
       try {

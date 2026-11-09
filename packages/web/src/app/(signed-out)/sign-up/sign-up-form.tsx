@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { z } from "zod";
 import { useAppForm } from "@/components/form";
+import { ResendVerification } from "@/components/resend-verification";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useRedirectIfSignedIn } from "@/hooks/use-redirect-if-signed-in";
 import { account } from "@/lib/api/auth-client";
@@ -15,6 +16,7 @@ import {
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
 } from "@/lib/auth-errors";
+import { VERIFICATION_LINK_HOURS } from "@/lib/verification";
 
 const SignUpValues = z.object({
   // The limits of `DisplayName`, which the backend checks on sign-up.
@@ -67,10 +69,16 @@ export function SignUpForm() {
           <MailIcon aria-hidden />
           <AlertTitle>Check your inbox</AlertTitle>
           <AlertDescription>
-            We sent a link to {sentTo}. Open it within 24 hours to finish
-            creating your account. No email? Sign in, and we'll send a new one.
+            We sent a link to {sentTo}. Open it within {VERIFICATION_LINK_HOURS}{" "}
+            hours to finish creating your account, on this device or any other.
+            Nothing yet? Check your spam folder.
           </AlertDescription>
         </Alert>
+        <ResendVerification
+          coolingDown
+          email={sentTo}
+          redirectTo={redirectTo}
+        />
         <p className="text-muted-foreground text-center text-sm">
           <Link
             className="text-foreground font-medium underline underline-offset-4"
