@@ -20,6 +20,12 @@ import type {
 /** Every seeded user's password. */
 export const MOCK_PASSWORD = "homesplit";
 
+/**
+ * The token in the mocks' password reset link for `userId`. The mocks send no
+ * email, so open `/reset-password?token=…` with it by hand.
+ */
+export const mockResetToken = (userId: string) => `mock-reset-${userId}`;
+
 /** The categories the backend gives every new household. */
 const DEFAULT_CATEGORIES = [
   ["Groceries", "🛒"],
