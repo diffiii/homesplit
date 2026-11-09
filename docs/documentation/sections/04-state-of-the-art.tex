@@ -1,3 +1,75 @@
 \section{Stan wiedzy w obszarze przedsięwzięcia}
 
-\wskazowka{np. analiza istniejących rozwiązań z~podsumowaniem, opis porównywanych metod}
+Analiza objęła trzy obszary istotne dla projektu: istniejące aplikacje do wspólnego rozliczania kosztów, metody automatycznego odczytu danych z~paragonów oraz algorytmy upraszczania rozliczeń między wieloma osobami.
+
+\subsection{Istniejące aplikacje do dzielenia kosztów}
+
+\textbf{Splitwise} to aplikacja mobilna i~webowa do rejestrowania wspólnych wydatków w~grupach i~ustalania wzajemnych należności, z~funkcją upraszczania długów w~grupie. Skanowanie paragonów z~podziałem na pozycje jest dostępne wyłącznie w~płatnym planie Splitwise Pro~\cite{splitwise-appstore}. Według przeglądów porównawczych wersja bezpłatna ogranicza liczbę wydatków dodawanych w~ciągu dnia i~wyświetla reklamy~\cite{finny-alternatives}.
+
+\textbf{Tricount} jest bezpłatną aplikacją do rozliczania wydatków grupowych, od 2022~roku należącą do banku bunq~\cite{techcrunch-tricount}. Umożliwia import grup ze Splitwise~\cite{tricount-splitwise} oraz opcjonalne połączenie z~kartą bunq, dzięki któremu płatności kartą są automatycznie dodawane jako wydatki~\cite{tricount-features}.
+
+\textbf{Splid} nie wymaga rejestracji i~działa również bez połączenia z~internetem; grupę można prowadzić lokalnie lub synchronizować między uczestnikami. Koszty dzieli się równo lub według udziałów i~procentów, z~przeliczaniem walut~\cite{splid-appstore}.
+
+\textbf{Settle Up} oferuje w~płatnej wersji Premium dołączanie zdjęć paragonów do wydatków, kategorie, transakcje cykliczne (np. czynsz) oraz brak reklam~\cite{settleup-appstore}.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Porównanie wybranych aplikacji do dzielenia kosztów}
+  \label{tab:porownanie-aplikacji}
+  \begin{tabularx}{\textwidth}{@{}lL L@{}}
+    \toprule
+    Aplikacja & Model dostępu & Wyróżniające cechy \\
+    \midrule
+    Splitwise & bezpłatna z~ograniczeniami, plan Pro & skanowanie paragonów z~podziałem na pozycje (Pro), upraszczanie długów \\
+    Tricount & bezpłatna & import ze Splitwise, automatyczne wydatki z~karty bunq \\
+    Splid & bezpłatna & brak rejestracji, praca bez połączenia z~internetem \\
+    Settle Up & bezpłatna, plan Premium & zdjęcia paragonów, kategorie, transakcje cykliczne (Premium) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Przeanalizowane aplikacje (tab.~\ref{tab:porownanie-aplikacji}) koncentrują się na rozliczaniu wydatków. W~opisach ich funkcji nie występują wspólne listy zakupów ani obowiązki domowe, a~automatyczny odczyt paragonów, jeśli jest dostępny, wymaga płatnego planu. HomeSplit łączy rozliczenia z~organizacją domu i~udostępnia funkcje sztucznej inteligencji jako część podstawowej funkcjonalności.
+
+\subsection{Automatyczny odczyt danych z~paragonów}
+
+Odczyt paragonów jest dobrze zdefiniowanym problemem badawczym, dla którego istnieją publiczne zbiory danych i~miary oceny. W~konkursie SROIE, zorganizowanym w~ramach konferencji ICDAR 2019, przygotowano zbiór 1000~zeskanowanych paragonów i~trzy zadania: lokalizację tekstu na obrazie, rozpoznawanie tekstu (OCR) oraz ekstrakcję kluczowych informacji -- nazwy sprzedawcy, adresu, daty i~sumy~\cite{huang2019sroie}. Organizatorzy zwrócili uwagę, że jakość ekstrakcji informacji wciąż wyraźnie odbiega od oczekiwań, mimo dobrych wyników w~samym rozpoznawaniu tekstu.
+
+Zbiór CORD zawiera paragony z~indonezyjskich sklepów i~restauracji, opisane zarówno na potrzeby OCR, jak i~wielopoziomowymi etykietami semantycznymi (np. nazwa pozycji, liczba sztuk, cena, suma). Służy do oceny parsowania struktury paragonu po rozpoznaniu tekstu; publicznie udostępniono 1000~obrazów~\cite{park2019cord}.
+
+Klasyczne podejście do tego zadania składa się z~dwóch etapów: silnik OCR odczytuje tekst, a~osobny model wydobywa z~niego strukturę danych. Alternatywą są modele działające bezpośrednio na obrazie. Przykładem jest Donut, złożony z~kodera wizyjnego opartego na architekturze Swin Transformer i~dekodera tekstu opartego na BART, który generuje ustrukturyzowany wynik z~obrazu dokumentu bez zewnętrznego silnika OCR~\cite{kim2022donut}.
+
+Rozwinięciem podejścia bez osobnego etapu OCR są multimodalne duże modele językowe (LLM), które przyjmują obraz i~zwracają odpowiedź w~zadanym formacie, np. jako dokument JSON zgodny ze schematem. Pozwalają one odczytać paragon bez trenowania własnego modelu, kosztem zależności od zewnętrznego dostawcy i~ryzyka błędnych odpowiedzi. Z~tego powodu wynik takiego odczytu musi zostać sprawdzony programowo i~zatwierdzony przez użytkownika.
+
+\subsection{Upraszczanie rozliczeń}
+
+Po zarejestrowaniu wydatków każda osoba w~grupie ma saldo netto: różnicę między tym, co zapłaciła, a~tym, co przypada na nią w~podziałach. Suma sald w~grupie wynosi zero. Rozliczanie każdej pary osób osobno może w~grupie $n$~osób wymagać nawet $n(n-1)/2$ przelewów. Przelewy wyznaczone na podstawie sald netto ograniczają tę liczbę do co najwyżej $n-1$, ponieważ każdy przelew zeruje saldo co najmniej jednej osoby.
+
+Wyznaczenie najmniejszej możliwej liczby przelewów jest w~ogólnym przypadku problemem NP-trudnym~\cite{verhoeff2004}. W~praktyce stosuje się więc algorytmy przybliżone. Prosty algorytm zachłanny porządkuje wierzycieli i~dłużników malejąco według kwot, a~następnie łączy największego dłużnika z~największym wierzycielem przelewem na mniejszą z~dwóch kwot. Osoba, której saldo spadło do zera, ustępuje miejsca następnej na liście. Algorytm działa w~czasie $O(n \log n)$ i~wyznacza co najwyżej $n-1$ przelewów, choć nie zawsze jest to liczba minimalna.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Przykład działania algorytmu zachłannego dla czterech osób}
+  \label{tab:przyklad-rozliczenia}
+  \begin{tabular}{@{}lr@{\qquad}lr@{}}
+    \toprule
+    \multicolumn{2}{@{}l}{Salda netto} & \multicolumn{2}{l@{}}{Przelewy} \\
+    \midrule
+    Anna & $+50$ zł & Darek $\rightarrow$ Anna & 40 zł \\
+    Bartek & $+10$ zł & Celina $\rightarrow$ Anna & 10 zł \\
+    Celina & $-20$ zł & Celina $\rightarrow$ Bartek & 10 zł \\
+    Darek & $-40$ zł & & \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+W~przykładzie z~tab.~\ref{tab:przyklad-rozliczenia} rozliczanie par osobno mogłoby wymagać do sześciu przelewów, a~algorytm zachłanny wyznacza trzy, czyli $n-1$.
+
+\subsection{Wnioski}
+
+Z~przeglądu wynikają następujące wnioski dla projektu:
+
+\begin{itemize}
+  \item odczyt paragonów jest w~istniejących aplikacjach funkcją płatną lub niedostępną, dlatego funkcje sztucznej inteligencji (odczyt paragonów, kategorie, dopasowanie do listy zakupów) stanowią wyróżnik HomeSplit;
+  \item odczyt paragonów jest dobrze opisanym zadaniem z~publicznymi zbiorami danych, co pozwala ocenić skuteczność rozwiązania przez porównanie z~wartościami referencyjnymi;
+  \item upraszczanie rozliczeń jest dobrze opisanym problemem; prosty algorytm zachłanny, uzupełniony testami poprawności obliczeń, zapewnia akceptowalną liczbę przelewów.
+\end{itemize}

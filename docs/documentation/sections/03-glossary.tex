@@ -1,1 +1,23 @@
 \section{Słownik pojęć}
+
+\begin{description}
+  \item[Gospodarstwo domowe] -- grupa użytkowników, w~ramach której prowadzone są wspólne wydatki, rozliczenia, lista zakupów i~lista obowiązków. Wszystkie dane należą do gospodarstwa i~są dostępne wyłącznie dla jego bieżących członków.
+  \item[Członek gospodarstwa] -- użytkownik należący obecnie do gospodarstwa. Każdy członek ma jedną z~ról: \emph{właściciel}, \emph{administrator} lub \emph{członek}, od której zależą jego uprawnienia.
+  \item[Były członek] -- użytkownik, który opuścił gospodarstwo lub został z~niego usunięty. Traci dostęp do gospodarstwa, ale jego historia (wydatki, spłaty, obowiązki) pozostaje do niego przypisana, a~nierozliczone saldo nadal może zostać spłacone.
+  \item[Uczestnik rozliczeń] -- bieżący lub były członek gospodarstwa. Tylko uczestnik rozliczeń może być stroną spłaty.
+  \item[Moduł] -- niezależnie włączana dla każdego gospodarstwa część funkcjonalności: wydatki, obowiązki, zakupy lub sztuczna inteligencja. Wyłączenie modułu blokuje zmiany, ale nie usuwa danych.
+  \item[Wydatek] -- zarejestrowany koszt o~określonej kwocie, walucie, dacie i~opcjonalnej kategorii. Wydatek ma co najmniej jednego płatnika i~jest dzielony między uczestników.
+  \item[Płatnik] -- osoba, która faktycznie zapłaciła za wydatek lub jego część.
+  \item[Podział kosztów] -- sposób rozdzielenia kwoty wydatku między uczestników. Dostępne metody to podział równy, procentowy, według udziałów, według dokładnych kwot oraz podział równy z~indywidualnymi korektami.
+  \item[Kategoria wydatku] -- zdefiniowana w~gospodarstwie grupa wydatków, np. \enquote{Spożywcze}, z~opcjonalną ikoną emoji.
+  \item[Saldo] -- różnica między kwotą zapłaconą przez osobę a~kwotą przypadającą na nią w~podziałach, skorygowana o~potwierdzone spłaty. Saldo dodatnie oznacza, że osobie należą się pieniądze, ujemne -- że jest dłużna. Salda liczone są oddzielnie dla każdej waluty, a~ich suma w~gospodarstwie wynosi zero.
+  \item[Spłata] -- zarejestrowany przelew między dwoma uczestnikami rozliczeń, wykonany poza aplikacją. Spłata zgłoszona przez płacącego ma status \emph{oczekująca} do czasu potwierdzenia przez odbiorcę, a~do sald wliczane są tylko spłaty \emph{potwierdzone}.
+  \item[Sugestia rozliczenia] -- proponowany przelew od dłużnika do wierzyciela, wyznaczony z~bieżących sald tak, aby po wykonaniu wszystkich sugestii salda w~danej walucie wynosiły zero.
+  \item[Gospodarstwo rozliczone] -- gospodarstwo, w~którym saldo każdego uczestnika rozliczeń wynosi zero. Opuszczenie gospodarstwa, jego usunięcie i~wyłączenie modułu wydatków wymagają, by gospodarstwo (lub dany członek) było rozliczone.
+  \item[Jednostka podrzędna waluty] -- najmniejsza jednostka waluty według normy ISO 4217, np. grosz dla złotego. Wszystkie kwoty przechowywane są jako liczby całkowite w~tych jednostkach.
+  \item[Załącznik] -- plik (np. zdjęcie paragonu lub faktura) dołączony do wydatku.
+  \item[Szkic wydatku] -- wynik odczytu paragonu przez model sztucznej inteligencji: sprzedawca, data, pozycje i~suma, które użytkownik sprawdza i~poprawia przed utworzeniem wydatku.
+  \item[Pozycja listy zakupów] -- produkt do kupienia, dodany do wspólnej listy gospodarstwa i~oznaczany jako kupiony ręcznie lub na podstawie odczytanego paragonu.
+  \item[Obowiązek] -- zadanie domowe z~opcjonalną osobą odpowiedzialną i~terminem wykonania, oznaczane jako wykonane lub ponownie otwierane.
+  \item[Znajomy] -- użytkownik, z~którym nawiązano relację znajomości przez wysłanie i~przyjęcie zaproszenia.
+\end{description}

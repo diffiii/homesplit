@@ -1,1 +1,69 @@
 \section{Cel i zakres przedsięwzięcia}
+
+\subsection{Opis problemu}
+
+Organizacja wspólnego gospodarstwa domowego wymaga sprawnego zarządzania finansami, planowania zakupów i~koordynowania codziennych obowiązków. W~praktyce zadania te realizuje się za pomocą wielu niezależnych narzędzi: wydatki zapisuje się w~arkuszu kalkulacyjnym lub w~aplikacji do dzielenia kosztów, listę zakupów prowadzi się w~komunikatorze lub notatkach, a~podział obowiązków ustala się ustnie. Prowadzi to do rozproszenia informacji, utrudnia współpracę i~wymusza wielokrotne wprowadzanie tych samych danych.
+
+Szczególnie uciążliwe jest ręczne rejestrowanie wydatków i~ustalanie należności między osobami dzielącymi koszty. Przepisywanie danych z~paragonów jest czasochłonne i~zwiększa ryzyko pomyłek, a~brak wspólnego systemu organizacji zadań prowadzi do nieporozumień i~pomijania obowiązków. Podobne trudności pojawiają się przy planowaniu wspólnych wyjazdów i~rozliczaniu związanych z~nimi kosztów.
+
+Skalę problemu dobrze ilustruje typowy przebieg wspólnych zakupów. Po zakupach według listy papierowy paragon trzeba przechować, przepisać do arkusza lub notatek, ręcznie wyliczyć podział kosztów, a~na końcu uzgodnić, kto komu ile jest winien. Każdy z~tych kroków jest źródłem błędów: od zgubionego paragonu, przez pomyłki przy przepisywaniu, po spory o~wysokość należności. Projekt HomeSplit ma skrócić tę drogę do trzech kroków: zdjęcia paragonu, weryfikacji odczytanych danych i~zapisu wydatku, po którym salda członków są aktualne, a~kupione pozycje zostają odhaczone na liście zakupów.
+
+\subsection{Beneficjenci}
+
+Głównymi beneficjentami projektu są osoby, które dzielą koszty życia codziennego lub organizują wspólne przedsięwzięcia:
+
+\begin{itemize}
+  \item \textbf{pary i~rodziny} -- wspólne koszty życia codziennego i~podział obowiązków domowych;
+  \item \textbf{współlokatorzy} -- wspólne rachunki i~zakupy prowadzone w~jednym miejscu;
+  \item \textbf{grupy znajomych} -- rozliczanie wspólnych wyjazdów i~wydarzeń;
+  \item \textbf{osoby indywidualne} -- kontrola własnych wydatków i~organizacja obowiązków.
+\end{itemize}
+
+Aplikacja zwiększa przejrzystość rozliczeń i~ogranicza ryzyko nieporozumień, a~automatyzacja wybranych czynności, w~tym odczytu danych z~paragonów, skraca czas potrzebny na prowadzenie ewidencji. Pośrednimi beneficjentami są wszyscy uczestnicy wspólnych aktywności, którzy dzięki łatwiejszemu dostępowi do aktualnych informacji mogą sprawniej współpracować, planować działania i~dzielić się odpowiedzialnością.
+
+\subsection{Cel projektu}
+
+Celem projektu jest opracowanie responsywnej aplikacji webowej wspierającej organizację życia domowego przez połączenie funkcji finansowych i~organizacyjnych. Cel główny realizowany jest przez następujące cele szczegółowe:
+
+\begin{enumerate}
+  \item ewidencja wspólnych wydatków i~wzajemnych rozliczeń w~ramach gospodarstwa domowego, z~obsługą różnych sposobów podziału kosztów;
+  \item wspólne listy zakupów i~obowiązków domowych;
+  \item wsparcie sztucznej inteligencji: odczyt danych z~paragonów, sugerowanie kategorii wydatków i~dopasowywanie pozycji paragonu do listy zakupów;
+  \item wygodna obsługa aplikacji na komputerach, tabletach i~telefonach zgodnie z~zasadami RWD.
+\end{enumerate}
+
+\subsection{Zakres przedsięwzięcia}
+
+Zakres funkcjonalny aplikacji obejmuje pięć obszarów:
+
+\begin{description}
+  \item[Konta użytkowników.] Rejestracja z~weryfikacją adresu e-mail, logowanie, resetowanie hasła, edycja profilu i~awatara, zarządzanie zalogowanymi urządzeniami oraz lista znajomych.
+  \item[Gospodarstwa domowe.] Tworzenie gospodarstw, zapraszanie członków, role (właściciel, administrator, członek), włączanie i~wyłączanie modułów, opuszczanie i~usuwanie gospodarstwa.
+  \item[Wydatki i~rozliczenia.] Rejestr wydatków z~kategoriami i~załącznikami, pięć metod podziału kosztów, obsługa wielu walut, salda członków, sugestie rozliczeń oraz rejestrowanie i~potwierdzanie spłat.
+  \item[Organizacja domu.] Wspólna lista zakupów oraz lista obowiązków z~przypisaniem do osób i~terminami wykonania.
+  \item[Sztuczna inteligencja.] Sugerowanie kategorii wydatku, odczyt paragonu do edytowalnego szkicu wydatku, przypisywanie pozycji paragonu do osób i~dopasowywanie ich do listy zakupów.
+\end{description}
+
+Poza zakresem projektu pozostają:
+
+\begin{itemize}
+  \item natywne aplikacje mobilne -- dostęp z~urządzeń mobilnych zapewnia responsywna wersja webowa;
+  \item realizacja płatności -- aplikacja jedynie ewidencjonuje przelewy wykonane poza nią;
+  \item przeliczanie walut -- salda prowadzone są oddzielnie dla każdej waluty;
+  \item trenowanie własnego modelu sztucznej inteligencji -- wykorzystywane są gotowe modele udostępniane przez API.
+\end{itemize}
+
+\subsection{Rezultaty i~kryteria sukcesu}
+
+Końcowym produktem projektu jest działająca aplikacja webowa HomeSplit, przystosowana do komputerów i~urządzeń mobilnych, wraz z~zestawem testów automatycznych umożliwiających sprawdzenie poprawności działania systemu. Aplikacja zostanie wdrożona w~docelowym środowisku uruchomieniowym w~wersji pozwalającej na prezentację i~weryfikację jej funkcjonalności. Kod źródłowy projektu jest dostępny w~repozytorium~\cite{homesplit}.
+
+Rezultaty zostaną zweryfikowane w~następujący sposób:
+
+\begin{itemize}
+  \item \textbf{testy funkcjonalne} -- sprawdzenie działania każdego modułu zgodnie z~wymaganiami;
+  \item \textbf{poprawność obliczeń} -- scenariusze testowe obejmujące podziały kosztów, salda i~sugestie rozliczeń;
+  \item \textbf{responsywność} -- ocena interfejsu na telefonie, tablecie i~komputerze;
+  \item \textbf{jakość odczytu paragonów} -- porównanie wyników z~wartościami referencyjnymi dla sumy, daty, pozycji i~kategorii.
+\end{itemize}
+
+Kryterium sukcesu jest poprawne działanie zaimplementowanych funkcji zgodnie z~przyjętymi wymaganiami i~wynikami testów.

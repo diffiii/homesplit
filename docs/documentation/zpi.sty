@@ -29,6 +29,7 @@
   footskip=0.75cm]{geometry}
 \RequirePackage{indentfirst}
 \RequirePackage{microtype}
+\setlength\emergencystretch{1.5em}
 
 % Headings
 \RequirePackage{titlesec}
@@ -63,15 +64,25 @@
 \RequirePackage{tabularx}
 \RequirePackage{longtable}
 \RequirePackage{array}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\renewcommand\arraystretch{1.25}
 \RequirePackage[shortlabels]{enumitem}
-\setlist{nosep, leftmargin=*}
-\RequirePackage[font=small, labelfont=bf]{caption}
+\setlist{itemsep=2pt, parsep=0pt, topsep=4pt, leftmargin=1.5em}
+\setlist[description]{leftmargin=1.5em, labelindent=0pt, itemsep=3pt}
+\RequirePackage[font=small, labelfont=bf, labelsep=period]{caption}
+\captionsetup[table]{position=top}
+\RequirePackage[section]{placeins}
+\renewcommand\topfraction{0.85}
+\renewcommand\bottomfraction{0.7}
+\renewcommand\textfraction{0.1}
+\renewcommand\floatpagefraction{0.8}
 \RequirePackage{xcolor}
 \RequirePackage{csquotes}
 \RequirePackage[backend=biber, style=numeric-comp, sorting=none]{biblatex}
 \renewcommand*\bibfont{\raggedright}
 \RequirePackage[hidelinks]{hyperref}
 \RequirePackage{etoolbox}
+\AtBeginEnvironment{table}{\small}
 
 % Template hints
 \newif\ifzpi@wskazowki
