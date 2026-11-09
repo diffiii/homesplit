@@ -663,45 +663,86 @@ describe("Better Auth routes", () => {
     });
   });
 
-  it.each([0, 60_000])(
-    "invite again when the previous invitation expired %i ms ago",
-    async (elapsed) => {
-      const time = Date.now();
-      vi.spyOn(Date, "now").mockReturnValue(time);
-      const invitation = db.state.invitations.find(
-        ({ email }) => email === "ewa@example.com"
-      );
-      if (!invitation) {
-        throw new Error("Expected Ewa's seeded invitation");
-      }
-      const input = {
-        householdId: invitation.householdId,
-        email: invitation.email,
-        role: "member" as const,
-      };
-      await expect(failure(households.invite(input))).resolves.toMatchObject({
-        status: 400,
-        code: "USER_IS_ALREADY_INVITED_TO_THIS_ORGANIZATION",
-      });
-
-      invitation.expiresAt = new Date(time - elapsed).toISOString();
-      const replacement = await households.invite(input);
-      expect(replacement).toMatchObject({
-        email: input.email,
-        organizationId: input.householdId,
-        status: "pending",
-      });
-      expect(replacement?.id).not.toBe(invitation.id);
-      expect(new Date(replacement?.expiresAt ?? "").getTime()).toBeGreaterThan(
-        time
-      );
-
-      await expect(failure(households.invite(input))).resolves.toMatchObject({
-        status: 400,
-        code: "USER_IS_ALREADY_INVITED_TO_THIS_ORGANIZATION",
-      });
+  it("replace a pending invitation, or send it again with resend", async () => {
+    const time = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(time);
+    const invitation = db.state.invitations.find(
+      ({ email }) => email === "ewa@example.com"
+    );
+    if (!invitation) {
+      throw new Error("Expected Ewa's seeded invitation");
     }
-  );
+    const input = {
+      householdId: invitation.householdId,
+      email: invitation.email,
+      role: "member" as const,
+    };
+
+    const resent = await households.invite({ ...input, resend: true });
+    expect(resent?.id).toBe(invitation.id);
+    expect(new Date(resent?.expiresAt ?? "").getTime()).toBe(
+      time + 7 * 86_400_000
+    );
+
+    const replacement = await households.invite(input);
+    expect(replacement).toMatchObject({
+      email: input.email,
+      organizationId: input.householdId,
+      status: "pending",
+    });
+    expect(replacement?.id).not.toBe(invitation.id);
+    expect(invitation.status).toBe("canceled");
+  });
+
+  it("replace an expired invitation even with resend", async () => {
+    const invitation = db.state.invitations.find(
+      ({ email }) => email === "ewa@example.com"
+    );
+    if (!invitation) {
+      throw new Error("Expected Ewa's seeded invitation");
+    }
+    invitation.expiresAt = new Date(Date.now() - 60_000).toISOString();
+
+    const replacement = await households.invite({
+      householdId: invitation.householdId,
+      email: invitation.email,
+      role: "member",
+      resend: true,
+    });
+
+    expect(replacement?.id).not.toBe(invitation.id);
+    expect(invitation.status).toBe("canceled");
+  });
+
+  it("preview an invitation for any signed-in user", async () => {
+    const invitation = db.state.invitations.find(
+      ({ email }) => email === "alice@example.com"
+    );
+    const params = { params: { invitationId: invitation?.id ?? "" } };
+    await expect(api("getInvitationPreview", params)).resolves.toMatchObject({
+      household: { name: "Book club" },
+      inviter: { name: "Filip Wójcik" },
+      email: "alice@example.com",
+      role: "member",
+      status: "pending",
+    });
+
+    signInAs("Ewa");
+    await expect(api("getInvitationPreview", params)).resolves.toMatchObject({
+      email: "alice@example.com",
+    });
+    if (invitation) {
+      invitation.expiresAt = new Date(Date.now() - 60_000).toISOString();
+    }
+    await expect(api("getInvitationPreview", params)).resolves.toMatchObject({
+      status: "expired",
+    });
+    await expect(
+      failure(
+        api("getInvitationPreview", { params: { invitationId: OTHER_ID } })
+      )
+    ).resolves.toMatchObject({ status: 404 });
+  });
 
   it("accept an invitation", async () => {
     const invitation = db.state.invitations.find(
