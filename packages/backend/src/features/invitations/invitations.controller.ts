@@ -1,5 +1,6 @@
 import { endpoints, Id, type InvitationPreview } from "@homesplit/contracts";
 import { Controller, Inject, Param } from "@nestjs/common";
+import { Session, type UserSession } from "@thallesp/nestjs-better-auth";
 import { ZodPipe } from "@/http/zod.pipe";
 import { Route } from "@/route.decorator";
 import { InvitationsService } from "./invitations.service";
@@ -16,8 +17,9 @@ export class InvitationsController {
   // signed in with another address which one the invitation is for.
   @Route(endpoints.getInvitationPreview)
   getInvitationPreview(
+    @Session() session: UserSession,
     @Param("invitationId", new ZodPipe(Id)) invitationId: Id
   ): Promise<InvitationPreview> {
-    return this.invitations.preview(invitationId);
+    return this.invitations.preview(invitationId, session.user.email);
   }
 }

@@ -6,6 +6,7 @@ import { invitation, organization } from "@/db/schema";
 import { strongestRole } from "@/features/households/access/roles";
 import { userRole } from "@/features/users/user-projections";
 import { notFound } from "@/http/app-error";
+import { maskEmail } from "./mask-email";
 
 const inviter = userRole("inviter");
 
@@ -28,7 +29,16 @@ function statusAt(
 
 @Injectable()
 export class InvitationsService {
-  async preview(invitationId: string): Promise<InvitationPreview> {
+  /**
+   * The invitation as `viewerEmail` may see it. The ID works like a bearer
+   * token, and a forwarded email or leaked link shouldn't reveal more than
+   * the page needs: anyone but the invitee sees the address masked, and once
+   * the invitation can't be answered, nothing about the household.
+   */
+  async preview(
+    invitationId: string,
+    viewerEmail: string
+  ): Promise<InvitationPreview> {
     const [row] = await db
       .select({
         id: invitation.id,
@@ -47,14 +57,18 @@ export class InvitationsService {
       throw notFound();
     }
 
+    const status = statusAt(row.status, row.expiresAt, new Date());
+    // Better Auth matches the address case-insensitively when accepting.
+    const invitee = row.email.toLowerCase() === viewerEmail.toLowerCase();
+    const details = invitee || status === "pending";
     return {
       id: row.id,
-      household: row.household,
-      inviter: row.inviter,
-      email: row.email,
+      household: details ? row.household : null,
+      inviter: details ? row.inviter : null,
+      email: invitee ? row.email : maskEmail(row.email),
       // Better Auth invites as `member` when no role is given.
       role: strongestRole(row.role ?? "") ?? "member",
-      status: statusAt(row.status, row.expiresAt, new Date()),
+      status,
       expiresAt: row.expiresAt.toISOString(),
     };
   }

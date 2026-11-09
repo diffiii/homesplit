@@ -72,13 +72,72 @@ describe("invitation preview", () => {
     expect(new Date(body.expiresAt).getTime()).toBeGreaterThan(Date.now());
   });
 
-  it("shows the address to a user signed in with another one", async () => {
-    const { bob, invitationId } = await setup();
+  it("masks the address for a user signed in with another one", async () => {
+    const { alice, bob, household, invitationId } = await setup();
     const carol = await createUser(app, "Carol");
 
     const response = await carol.client.get(preview(invitationId)).expect(200);
 
-    expect(response.body.email).toBe(bob.email);
+    expect(response.body).toMatchObject({
+      email: `${bob.email.slice(0, 1)}•••${bob.email.slice(bob.email.indexOf("@"))}`,
+      household: { id: household.id, name: "The Flat" },
+      inviter: { id: alice.id, name: "Alice" },
+      status: "pending",
+    });
+    expect(response.body.email).not.toContain(bob.email.split("@")[0]);
+  });
+
+  it("matches the invitee's address case-insensitively", async () => {
+    const alice = await createUser(app, "Alice");
+    const household = await createHousehold(alice, "The Flat");
+    const bob = await createUser(app, "Bob");
+    const invitationId = await invite(
+      alice,
+      household,
+      bob.email.toUpperCase()
+    );
+
+    const response = await bob.client.get(preview(invitationId)).expect(200);
+
+    expect(response.body.email.toLowerCase()).toBe(bob.email.toLowerCase());
+    expect(response.body.email).not.toContain("•••");
+  });
+
+  it.each([
+    ["accept-invitation", "accepted"],
+    ["reject-invitation", "rejected"],
+  ])(
+    "shows no household to anyone else once answered with %s",
+    async (action, status) => {
+      const { bob, invitationId } = await setup();
+      await answer(bob.client, action, invitationId).expect(200);
+      const carol = await createUser(app, "Carol");
+
+      const response = await carol.client
+        .get(preview(invitationId))
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        household: null,
+        inviter: null,
+        status,
+      });
+      expect(response.body.email).toContain("•••");
+    }
+  );
+
+  it("still shows the invitee everything once it can't be answered", async () => {
+    const { alice, bob, household, invitationId } = await setup();
+    await answer(alice.client, "cancel-invitation", invitationId).expect(200);
+
+    const response = await bob.client.get(preview(invitationId)).expect(200);
+
+    expect(response.body).toMatchObject({
+      email: bob.email,
+      household: { id: household.id },
+      inviter: { id: alice.id },
+      status: "canceled",
+    });
   });
 
   it.each([
