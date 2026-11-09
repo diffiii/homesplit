@@ -2,15 +2,35 @@ import {
   type ConfirmedSettlement,
   type ListSettlementHistoryQuery,
   type ProcessSettlementRequest,
+  planWriteOff,
   type Settlement,
   type SettlementListResponse,
   toSafeInteger,
+  WRITE_OFF_NOTE,
+  type WriteOffRequest,
+  type WriteOffResponse,
 } from "@homesplit/contracts";
 import { Injectable } from "@nestjs/common";
-import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  sql,
+} from "drizzle-orm";
 import { db, type Executor, readSnapshot, type Transaction } from "@/db";
 import { settlements } from "@/db/schema";
-import { lockHouseholdForLedgerWrite } from "@/features/expenses/household-ledger-lock";
+import {
+  currentMembers,
+  householdBalances,
+} from "@/features/expenses/balances/balances.repository";
+import {
+  lockHouseholdForLedgerWrite,
+  lockHouseholdLedger,
+} from "@/features/expenses/household-ledger-lock";
 import type { HouseholdContext } from "@/features/households/access/household.guard";
 import { assertUsersEligible } from "@/features/households/access/household-access";
 import { hasRole } from "@/features/households/access/roles";
@@ -170,6 +190,104 @@ export class SettlementsService {
         })
         .returning({ id: settlements.id });
       return this.find(tx, householdId, id);
+    });
+  }
+
+  /**
+   * Records every payment of `planWriteOff` at once, confirmed by the caller,
+   * with ledger writes held off so the balance can't move in between. Only a
+   * departed member's balance can be written off, and only while it's still
+   * `amountCents` and none of their payments in that currency are pending.
+   */
+  writeOff(
+    { householdId, userId: recorderId }: HouseholdContext,
+    { userId, currency, method, amountCents }: WriteOffRequest
+  ): Promise<WriteOffResponse> {
+    return db.transaction(async (tx) => {
+      await lockHouseholdLedger(tx, householdId);
+      await assertUsersEligible(
+        tx,
+        householdId,
+        [{ userId, path: ["userId"] }],
+        "party"
+      );
+      const members = await currentMembers(tx, householdId);
+      if (members.some(({ id }) => id === userId)) {
+        throw new AppError(
+          409,
+          "MEMBER_NOT_DEPARTED",
+          "Only a departed member's balance can be written off"
+        );
+      }
+
+      const balances = (await householdBalances(tx, householdId))
+        .filter((row) => row.currency === currency)
+        .map((row) => ({
+          user: row.user,
+          amountCents: toSafeInteger(row.amountCents),
+        }));
+      const subject = balances.find(({ user }) => user.id === userId);
+      if (subject?.amountCents !== amountCents) {
+        throw new AppError(
+          409,
+          "BALANCE_CHANGED",
+          "The balance isn't the one given"
+        );
+      }
+
+      const [pending] = await tx
+        .select({ id: settlements.id })
+        .from(settlements)
+        .where(
+          and(
+            eq(settlements.householdId, householdId),
+            eq(settlements.currency, currency),
+            isNull(settlements.confirmedAt),
+            or(eq(settlements.payerId, userId), eq(settlements.payeeId, userId))
+          )
+        )
+        .limit(1);
+      if (pending) {
+        throw new AppError(
+          409,
+          "HAS_PENDING_PAYMENTS",
+          "Their pending payments must be confirmed or deleted first"
+        );
+      }
+
+      const payments = planWriteOff(method, subject, balances, members);
+      const inserted = await tx
+        .insert(settlements)
+        .values(
+          payments.map((payment) => ({
+            householdId,
+            payerId: payment.payer.id,
+            payeeId: payment.payee.id,
+            createdById: recorderId,
+            amountCents: BigInt(payment.amountCents),
+            currency,
+            note: WRITE_OFF_NOTE,
+            confirmedById: recorderId,
+            confirmedAt: sql`now()`,
+          }))
+        )
+        .returning({ id: settlements.id });
+      const ids = inserted.map(({ id }) => id);
+      const rows = await selectSettlements(tx).where(
+        inArray(settlements.id, ids)
+      );
+      const items = rows
+        .map((row) => {
+          const settlement = toSettlement(row);
+          if (settlement.status !== "confirmed") {
+            throw new Error(
+              `Write-off payment ${settlement.id} wasn't confirmed`
+            );
+          }
+          return settlement;
+        })
+        .sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+      return { items };
     });
   }
 
