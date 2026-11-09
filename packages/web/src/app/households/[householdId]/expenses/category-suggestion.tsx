@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Loader2Icon, SparklesIcon } from "lucide-react";
+import { InfoIcon, Loader2Icon, SparklesIcon } from "lucide-react";
 import {
   type ReactNode,
   useEffect,
@@ -17,6 +17,7 @@ import { endpointQuery } from "@/lib/api/queries";
 /** How long the name must stay unchanged before a suggestion is requested. */
 export const SUGGESTION_DELAY_MS = 800;
 const MIN_NAME_LENGTH = 3;
+const NO_SUGGESTION = "No suggestion for this name.";
 /** The AI module went off or the daily limit ran out: asking again won't help. */
 const STOP_STATUSES = new Set([403, 429]);
 
@@ -44,7 +45,7 @@ interface CategorySuggestion {
  * `SUGGESTION_DELAY_MS`, at most once per distinct name, and fills only a
  * `high` confidence answer, only until the member picks a category. A later
  * answer replaces an earlier one; a name without one keeps the category and
- * the hint says it came from an earlier name. Failures are silent.
+ * the hint says there's no suggestion for this one. Failures are silent.
  */
 export function useCategorySuggestion({
   name,
@@ -65,6 +66,8 @@ export function useCategorySuggestion({
     name: string;
   } | null>(null);
   const [initialName] = useState(() => initial.name.trim());
+  /** The last name an answer arrived for, with or without a category. */
+  const [answered, setAnswered] = useState<string | null>(null);
   const picked = useRef(initial.categoryId !== null);
   const stopped = useRef(false);
   /** The category to fill for each name asked about, or `null` for none. */
@@ -94,6 +97,7 @@ export function useCategorySuggestion({
 
   const fill = useEffectEvent((text: string, categoryId: string | null) => {
     setLoading(false);
+    setAnswered(text);
     // A category the picker doesn't list yet would be saved without showing.
     if (
       categoryId === null ||
@@ -136,7 +140,14 @@ export function useCategorySuggestion({
   const suggested = categories.data?.items.find(
     ({ id }) => id === filled?.categoryId
   );
+  const shown = name.trim();
   let hint: ReactNode;
+  let announcement = "";
+  if (suggested && filled?.name === shown) {
+    announcement = `${suggested.name} suggested as the category.`;
+  } else if (suggested && answered === shown) {
+    announcement = `${NO_SUGGESTION} ${suggested.name} is from an earlier name.`;
+  }
   if (loading) {
     hint = (
       <span className="flex items-center gap-1.5">
@@ -144,11 +155,18 @@ export function useCategorySuggestion({
         Finding a category…
       </span>
     );
+  } else if (suggested && filled?.name !== shown && answered === shown) {
+    hint = (
+      <span className="flex items-start gap-1.5">
+        <InfoIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
+        {NO_SUGGESTION} This one is from an earlier name.
+      </span>
+    );
   } else if (suggested) {
     hint = (
       <span className="flex items-center gap-1.5">
         <SparklesIcon aria-hidden className="size-4" />
-        {filled?.name === name.trim()
+        {filled?.name === shown
           ? "Suggested from the name"
           : "Suggested from an earlier name"}
       </span>
@@ -157,9 +175,7 @@ export function useCategorySuggestion({
 
   return {
     hint,
-    announcement: suggested
-      ? `${suggested.name} suggested as the category.`
-      : "",
+    announcement,
     onPick: () => {
       picked.current = true;
       setLoading(false);

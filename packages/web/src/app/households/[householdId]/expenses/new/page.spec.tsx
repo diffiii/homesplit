@@ -591,7 +591,7 @@ describe("NewExpensePage", () => {
       expect(asked).toEqual(["Pizza", "Taxi home"]);
     }, 20_000);
 
-    it("says the category came from an earlier name once the name has no answer", async () => {
+    it("says there's no suggestion once the name has no answer, keeping the category", async () => {
       enableAi();
       const asked = suggestionRequests();
       const { user } = renderForm();
@@ -606,8 +606,15 @@ describe("NewExpensePage", () => {
         SETTLED
       );
 
-      expect(screen.getByText("Suggested from an earlier name")).toBeVisible();
+      expect(
+        await screen.findByText(
+          "No suggestion for this name. This one is from an earlier name."
+        )
+      ).toBeVisible();
       expect(screen.queryByText(SUGGESTED)).not.toBeInTheDocument();
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "No suggestion for this name. Dining out is from an earlier name."
+      );
       expect(categoryPicker()).toHaveTextContent("Dining out");
     });
 
