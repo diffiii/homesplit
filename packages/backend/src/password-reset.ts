@@ -1,5 +1,6 @@
 import { isIP } from "node:net";
 import { APIError } from "better-auth/api";
+import { emailLink, RESET_PASSWORD_PATH } from "./email-links";
 import type { Email } from "./mail";
 import { RateLimiter } from "./rate-limiter";
 
@@ -89,31 +90,13 @@ export function mayEmailResetLink(email: string): boolean {
   return emailsByAddress.tryConsume(email.toLowerCase());
 }
 
-/** A path on the frontend: one `/` and then anything but another `/` or `\`. */
-function isFrontendPath(value: string): boolean {
-  return (
-    value.startsWith("/") && !value.startsWith("//") && !value.startsWith("/\\")
-  );
-}
-
-/**
- * The link to the frontend's reset page, which carries the token and, when
- * the page asked for one, where to continue. `authUrl` is the `url` Better Auth
- * passes to `sendResetPassword`; its `callbackURL` is the page's `redirectTo`,
- * or missing, or the text "undefined", when the page sent none.
- */
+/** The link to the frontend's reset page; see `emailLink`. */
 export function resetLink(
   frontendUrl: string,
   token: string,
   authUrl: string
 ): string {
-  const url = new URL("/reset-password", frontendUrl);
-  url.searchParams.set("token", token);
-  const redirectTo = new URL(authUrl).searchParams.get("callbackURL");
-  if (redirectTo && isFrontendPath(redirectTo)) {
-    url.searchParams.set("redirectTo", redirectTo);
-  }
-  return url.toString();
+  return emailLink(frontendUrl, RESET_PASSWORD_PATH, token, authUrl);
 }
 
 export function passwordResetEmail(to: string, link: string): Email {
