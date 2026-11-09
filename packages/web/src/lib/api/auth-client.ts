@@ -1,3 +1,4 @@
+import type { HouseholdRole as ContractHouseholdRole } from "@homesplit/contracts";
 import { organizationClient } from "better-auth/client/plugins";
 import { type BetterFetchPlugin, createAuthClient } from "better-auth/react";
 import { ApiRequestError } from "./api-error";
@@ -74,7 +75,8 @@ async function unwrap<T>(call: Promise<AuthResult<T>>): Promise<T> {
   return result.data as T;
 }
 
-export type HouseholdRole = "owner" | "admin" | "member";
+/** A household role, from the one list in `@homesplit/contracts`. */
+export type HouseholdRole = ContractHouseholdRole;
 
 export interface AuthClientOptions {
   baseURL?: string;

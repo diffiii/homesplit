@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  HOUSEHOLD_ROLES,
+  HouseholdRole as HouseholdRoleSchema,
+} from "@homesplit/contracts";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -26,12 +30,9 @@ import type { ServerErrors } from "@/lib/form";
 import { INVITATION_DAYS } from "@/lib/invitations";
 import { ROLE_LABEL } from "@/lib/roles";
 
-/** Weakest first, so the default is the first one. */
-const INVITE_ROLES: readonly HouseholdRole[] = ["member", "admin", "owner"];
-
 const InviteValues = z.object({
   email: z.email("Enter a valid email address."),
-  role: z.enum(["member", "admin", "owner"]),
+  role: HouseholdRoleSchema,
 });
 
 /** Better Auth's and HomeSplit's answers to an invitation, explained. */
@@ -68,7 +69,8 @@ export function InviteDialog({
   const { household } = useHousehold();
   const can = usePermissions();
   const queryClient = useQueryClient();
-  const roles = INVITE_ROLES.filter((role) => can.invite(role));
+  // Weakest first, so the default, `member`, comes first.
+  const roles = HOUSEHOLD_ROLES.filter((role) => can.invite(role));
   const invite = useMutation({ mutationFn: households.invite });
   const form = useAppForm({
     defaultValues: { email: "", role: "member" as HouseholdRole },

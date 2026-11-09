@@ -1,7 +1,8 @@
+import { HOUSEHOLD_ROLES } from "@homesplit/contracts";
 import type { HouseholdRole } from "@/lib/api/auth-client";
 
 /** Household roles, strongest first, as menus list them. */
-export const ROLES: readonly HouseholdRole[] = ["owner", "admin", "member"];
+export const ROLES: readonly HouseholdRole[] = [...HOUSEHOLD_ROLES].reverse();
 
 export const ROLE_LABEL: Record<HouseholdRole, string> = {
   owner: "Owner",
