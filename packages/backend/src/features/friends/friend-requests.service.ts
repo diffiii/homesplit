@@ -64,7 +64,7 @@ export class FriendRequestsService {
   /** Deletes the request and creates its friendship in one transaction. */
   accept(userId: string, requestId: string): Promise<Friendship> {
     return db.transaction(async (tx) => {
-      const { requesterId } = await lockForRecipient(tx, userId, requestId);
+      const { requesterId } = await lockAs(tx, "recipient", userId, requestId);
       await tx.delete(friendRequests).where(eq(friendRequests.id, requestId));
       return createFriendship(tx, userId, requesterId);
     });
@@ -72,19 +72,27 @@ export class FriendRequestsService {
 
   async decline(userId: string, requestId: string): Promise<void> {
     await db.transaction(async (tx) => {
-      await lockForRecipient(tx, userId, requestId);
+      await lockAs(tx, "recipient", userId, requestId);
+      await tx.delete(friendRequests).where(eq(friendRequests.id, requestId));
+    });
+  }
+
+  async withdraw(userId: string, requestId: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      await lockAs(tx, "requester", userId, requestId);
       await tx.delete(friendRequests).where(eq(friendRequests.id, requestId));
     });
   }
 }
 
 /**
- * Locks a request the caller is party to, so concurrent accepts and declines
- * act on it one at a time and the later ones answer 404. Only the recipient
- * may act: the requester gets 403, and anyone else 404.
+ * Locks a request the caller is party to, so concurrent accepts, declines, and
+ * withdrawals act on it one at a time and the later ones answer 404. Only the
+ * caller on `side` may act: the other party gets 403, and anyone else 404.
  */
-async function lockForRecipient(
+async function lockAs(
   tx: Transaction,
+  side: "requester" | "recipient",
   userId: string,
   requestId: string
 ) {
@@ -107,7 +115,7 @@ async function lockForRecipient(
   if (!request) {
     throw notFound();
   }
-  if (request.recipientId !== userId) {
+  if (request[`${side}Id`] !== userId) {
     throw forbidden();
   }
   return request;

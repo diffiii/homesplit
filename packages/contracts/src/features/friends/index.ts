@@ -52,7 +52,7 @@ export const CreateFriendRequest = z.object({
 });
 export type CreateFriendRequest = z.infer<typeof CreateFriendRequest>;
 
-/** Path params for friend-request routes (accept / decline). */
+/** Path params for friend-request routes (accept / decline / withdraw). */
 export const FriendRequestIdParams = z.object({
   requestId: Id,
 });
