@@ -61,7 +61,7 @@ A trigger runs in the same statement as every insert, whatever the path, includi
 | Chores | all | all | all | all | complete, reopen: all |
 | Shopping items | all | all | all | all | purchase, unpurchase, clear purchased: all |
 | Profile | self (Better Auth `get-session`) | – | self | – | – |
-| Friends | self | self | – | either friend | accept, decline: recipient |
+| Friends | self | self | – | friendship: either friend · request: sender | accept, decline: recipient |
 
 1. Only while every balance in the household is zero; see [Deleting households](#deleting-households).
 2. Better Auth's rules apply: only an `owner` can invite, promote, demote, or remove an owner, and the last owner can't be demoted or removed. HomeSplit adds that nobody removes themselves; they leave instead.
@@ -197,7 +197,7 @@ Household paths in this table are relative to `/api/households/:householdId`. Ta
 | Chores | `/chores`: `GET`, `POST` · `/chores/:choreId`: `GET`, `PATCH`, `DELETE` · `/chores/:choreId/complete` and `/reopen`: `POST` |
 | Shopping | `/shopping-items`: `GET`, `POST` · `/shopping-items/:itemId`: `GET`, `PATCH`, `DELETE` · `/shopping-items/:itemId/purchase` and `/unpurchase`: `POST` · `/shopping-items/clear-purchased`: `POST` |
 | Profile | `/api/me`: `PATCH` |
-| Friends | `/api/me/friends`: `GET` · `/api/me/friends/:friendshipId`: `DELETE` · `/api/me/friend-requests`: `POST` · `/api/me/friend-requests/incoming` and `/sent`: `GET` · `/api/me/friend-requests/:requestId/accept` and `/decline`: `POST` |
+| Friends | `/api/me/friends`: `GET` · `/api/me/friends/:friendshipId`: `DELETE` · `/api/me/friend-requests`: `POST` · `/api/me/friend-requests/incoming` and `/sent`: `GET` · `/api/me/friend-requests/:requestId`: `DELETE` · `/api/me/friend-requests/:requestId/accept` and `/decline`: `POST` |
 
 ### Better Auth endpoints
 
