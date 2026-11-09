@@ -12,7 +12,7 @@ import {
   type MockFriendship,
   now,
 } from "../db";
-import { badRequest, conflict, notFound } from "../errors";
+import { badRequest, conflict, forbidden, notFound } from "../errors";
 import type { MockRoutes } from "../routes";
 import { listMyBalances } from "./ledger";
 import { asc, desc, removeRow, sortBy, uploadedFile } from "./shared";
@@ -58,21 +58,29 @@ const areFriends = (db: MockDb, a: string, b: string) =>
     ({ userIds }) => userIds.includes(a) && userIds.includes(b)
   );
 
-/** An incoming request to the session user; anyone else's answers 404. */
-function incomingRequest(db: MockDb, requestId: string, userId: string) {
+/**
+ * A request on the session user's `side`. The other party gets 403, as from
+ * the backend, and anyone else 404.
+ */
+function requestAs(
+  db: MockDb,
+  side: "fromId" | "toId",
+  requestId: string,
+  userId: string
+) {
   const request = db.state.friendRequests.find(
-    ({ id, toId }) => id === requestId && toId === userId
+    ({ id, fromId, toId }) =>
+      id === requestId && (fromId === userId || toId === userId)
   );
   if (!request) {
     throw notFound();
   }
+  if (request[side] !== userId) {
+    throw forbidden();
+  }
   return request;
 }
 
-/**
- * The backend hasn't decided the codes for self, duplicate, and crossed
- * requests yet (#31), so these are placeholders.
- */
 export const meRoutes: MockRoutes = {
   updateProfile: {
     resolve: ({ db, userId, body }) => {
@@ -142,19 +150,24 @@ export const meRoutes: MockRoutes = {
         throw badRequest("USER_NOT_FOUND", "No user with this email");
       }
       if (recipient.id === userId) {
-        throw badRequest("CANNOT_FRIEND_YOURSELF", "That's your own email");
+        throw badRequest("SELF_FRIEND_REQUEST", "That's your own email");
       }
       if (areFriends(db, userId, recipient.id)) {
         throw conflict("ALREADY_FRIENDS", "You're friends already");
       }
-      if (
-        db.state.friendRequests.some(
-          ({ fromId, toId }) =>
-            (fromId === userId && toId === recipient.id) ||
-            (fromId === recipient.id && toId === userId)
-        )
-      ) {
+      const pending = db.state.friendRequests.find(
+        ({ fromId, toId }) =>
+          (fromId === userId && toId === recipient.id) ||
+          (fromId === recipient.id && toId === userId)
+      );
+      if (pending?.fromId === userId) {
         throw conflict("FRIEND_REQUEST_EXISTS", "A request is already pending");
+      }
+      if (pending) {
+        throw conflict(
+          "INCOMING_FRIEND_REQUEST_EXISTS",
+          "This user already sent you a request"
+        );
       }
       const request: MockFriendRequest = {
         id: crypto.randomUUID(),
@@ -192,7 +205,7 @@ export const meRoutes: MockRoutes = {
   // Not idempotent: answering deletes the request, so a repeat answers 404.
   acceptFriendRequest: {
     resolve: ({ db, userId, params }) => {
-      const request = incomingRequest(db, params.requestId, userId);
+      const request = requestAs(db, "toId", params.requestId, userId);
       removeRow(db.state.friendRequests, request);
       const friendship: MockFriendship = {
         id: crypto.randomUUID(),
@@ -208,7 +221,16 @@ export const meRoutes: MockRoutes = {
     resolve: ({ db, userId, params }) => {
       removeRow(
         db.state.friendRequests,
-        incomingRequest(db, params.requestId, userId)
+        requestAs(db, "toId", params.requestId, userId)
+      );
+    },
+  },
+
+  withdrawFriendRequest: {
+    resolve: ({ db, userId, params }) => {
+      removeRow(
+        db.state.friendRequests,
+        requestAs(db, "fromId", params.requestId, userId)
       );
     },
   },
