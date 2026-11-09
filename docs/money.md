@@ -23,11 +23,11 @@ Each expense and settlement has one currency, and its payers, allocation amounts
 
 | Constant | Value | Applies to |
 | --- | --- | --- |
-| `MAX_AMOUNT_CENTS` | 10^12 | Expense totals, payer amounts, exact allocation amounts, and settlement payments (at most `MAX_AMOUNT_CENTS`); adjustments (between minus and plus `MAX_AMOUNT_CENTS`) |
+| `MAX_AMOUNT_CENTS` | 10^12 | Expense totals, payer amounts, exact allocation amounts, and payments recorded with `POST /settlements` (at most `MAX_AMOUNT_CENTS`); adjustments (between minus and plus `MAX_AMOUNT_CENTS`) |
 | `MAX_SHARES` | 1,000,000 | Shares held by one participant in a `shares` split |
 | `FULL_PERCENTAGE_BASIS_POINTS` | 10,000 | Percentage splits, which add up to exactly this |
 
-Request schemas use the bounded primitives `BoundedCents`, `BoundedPositiveCents`, and `BoundedPositiveMoney`. Response amounts such as balances and suggestions use the unbounded `Cents` and `PositiveCents`, because they're sums over many entries and can exceed a single request's limit. They're still safe integers.
+Request schemas use the bounded primitives `BoundedCents`, `BoundedPositiveCents`, and `BoundedPositiveMoney`. Response amounts such as balances and suggestions use the unbounded `Cents` and `PositiveCents`, because they're sums over many entries and can exceed a single request's limit. They're still safe integers. A [write-off](api/expenses.md#write-offs)'s `amountCents` is a balance too, so it's an unbounded `Cents`, and the payments a write-off records can exceed `MAX_AMOUNT_CENTS`.
 
 ## Database and API integers
 
