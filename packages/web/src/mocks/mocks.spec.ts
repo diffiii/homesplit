@@ -23,6 +23,7 @@ import { SCENARIOS } from "./scenarios";
 
 const BASE_URL = "http://localhost:3000";
 const OTHER_ID = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
+const IMAGE_URL = /^data:image\//u;
 
 const { db, server } = setupMockServer();
 const onUnauthenticated = vi.fn();
@@ -654,6 +655,132 @@ describe("application routes", () => {
       status: 413,
       body: { code: "PAYLOAD_TOO_LARGE" },
     });
+  });
+
+  it("link, list, download, and unlink an expense's files like the backend", async () => {
+    signInAs("Alice");
+    const expense = (name: string) => {
+      const found = db.state.expenses.find((row) => row.name === name);
+      if (!found) {
+        throw new Error(`No expense ${name}`);
+      }
+      return { params: { ...flat().params, expenseId: found.id } };
+    };
+    const attachment = (household = flat().params.householdId) => {
+      const row = {
+        id: crypto.randomUUID(),
+        householdId: household,
+        mimeType: "image/png" as const,
+        sizeBytes: 10,
+        uploadedById: db.state.users[0]?.id ?? "",
+        createdAt: new Date().toISOString(),
+      };
+      db.state.attachments.push(row);
+      return row;
+    };
+    const link = (name: string, attachmentId: string) =>
+      api("linkExpenseAttachment", {
+        ...expense(name),
+        body: { attachmentId },
+      });
+
+    // The scenario's electricity bill has a photo and a PDF.
+    const electricity = await api("getExpense", expense("Electricity"));
+    expect(electricity.attachments.map(({ mimeType }) => mimeType)).toEqual([
+      "image/jpeg",
+      "application/pdf",
+    ]);
+    const [photo] = electricity.attachments;
+    await expect(
+      api("getAttachmentDownload", {
+        params: { ...flat().params, attachmentId: photo?.id ?? "" },
+      })
+    ).resolves.toMatchObject({ url: expect.stringMatching(IMAGE_URL) });
+
+    const added = attachment();
+    await expect(link("Pizza night", added.id)).resolves.toEqual({
+      id: added.id,
+      mimeType: "image/png",
+      sizeBytes: 10,
+    });
+    await expect(
+      api("listExpenseAttachments", expense("Pizza night"))
+    ).resolves.toEqual({
+      items: [{ id: added.id, mimeType: "image/png", sizeBytes: 10 }],
+    });
+    await expect(failure(link("Pizza night", added.id))).resolves.toMatchObject(
+      { status: 409, code: "ATTACHMENT_ALREADY_LINKED" }
+    );
+    const elsewhere = attachment(householdId("Lake cabin"));
+    await expect(
+      failure(link("Pizza night", elsewhere.id))
+    ).resolves.toMatchObject({
+      status: 400,
+      code: "INVALID_REFERENCE",
+      details: { issues: [{ path: ["attachmentId"] }] },
+    });
+
+    await Promise.all(
+      Array.from({ length: 9 }, () => link("Pizza night", attachment().id))
+    );
+    await expect(
+      failure(link("Pizza night", attachment().id))
+    ).resolves.toMatchObject({
+      status: 409,
+      code: "EXPENSE_ATTACHMENT_LIMIT_REACHED",
+      details: { limit: 10 },
+    });
+
+    const unlink = () =>
+      api("unlinkExpenseAttachment", {
+        params: { ...expense("Pizza night").params, attachmentId: added.id },
+      });
+    await unlink();
+    await expect(failure(unlink())).resolves.toMatchObject({ status: 404 });
+    expect(db.state.attachments.some(({ id }) => id === added.id)).toBe(true);
+
+    // Deleting the expense unlinks its files and keeps them for cleanup.
+    await api("deleteExpense", expense("Electricity"));
+    expect(
+      db.state.expenseAttachments.some(
+        ({ attachmentId }) => attachmentId === photo?.id
+      )
+    ).toBe(false);
+    expect(db.state.attachments.some(({ id }) => id === photo?.id)).toBe(true);
+  });
+
+  it("only lets the author or an admin+ change files, and only while expenses are on", async () => {
+    signInAs("Celina");
+    const electricity = db.state.expenses.find(
+      ({ name }) => name === "Electricity"
+    );
+    const params = { ...flat().params, expenseId: electricity?.id ?? "" };
+    const [link] = db.state.expenseAttachments.filter(
+      ({ expenseId }) => expenseId === electricity?.id
+    );
+    const unlink = () =>
+      api("unlinkExpenseAttachment", {
+        params: { ...params, attachmentId: link?.attachmentId ?? "" },
+      });
+
+    // Bartek added it, and Celina is a member: she can read but not unlink.
+    await expect(
+      api("listExpenseAttachments", { params })
+    ).resolves.toMatchObject({ items: [{}, {}] });
+    await expect(failure(unlink())).resolves.toMatchObject({ status: 403 });
+
+    signInAs("Alice");
+    const household = db.household(params.householdId);
+    if (household) {
+      household.features.expenses = false;
+    }
+    await expect(failure(unlink())).resolves.toMatchObject({
+      status: 403,
+      code: "MODULE_DISABLED",
+    });
+    await expect(
+      api("listExpenseAttachments", { params })
+    ).resolves.toMatchObject({ items: [{}, {}] });
   });
 });
 

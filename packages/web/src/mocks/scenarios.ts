@@ -12,9 +12,10 @@ export interface Scenario {
  * Two households that between them hold every case the UI must handle:
  * - Flat on Piękna: Alice is the owner, Bartek an admin, Celina a member,
  *   and Dawid has left while still owing money. Expenses in PLN and EUR,
- *   over a page of them, with every split method; pending and confirmed
- *   payments; open, overdue, unassigned, and completed chores; bought and
- *   unbought shopping; a pending invitation.
+ *   over a page of them, with every split method, and a photo and a PDF
+ *   on the electricity bill; pending and confirmed payments; open, overdue,
+ *   unassigned, and completed chores; bought and unbought shopping; a
+ *   pending invitation.
  * - Lake cabin: Ewa is the owner and Alice a member, with chores turned off
  *   but still holding chores, and expenses in EUR and PLN.
  * - Book club: Filip's household, where Alice has a pending invitation.
@@ -67,7 +68,7 @@ function households(): MockState {
       daysAgo: 60 - i * 3,
     });
   }
-  f.expense(flat, {
+  const electricity = f.expense(flat, {
     author: bartek,
     name: "Electricity",
     description: "September and October",
@@ -81,6 +82,18 @@ function households(): MockState {
         { userId: celina.id, shares: 1 },
       ],
     },
+    daysAgo: 5,
+  });
+  f.attachment(electricity, {
+    uploadedBy: bartek,
+    mimeType: "image/jpeg",
+    sizeBytes: 1_843_200,
+    daysAgo: 5,
+  });
+  f.attachment(electricity, {
+    uploadedBy: bartek,
+    mimeType: "application/pdf",
+    sizeBytes: 215_040,
     daysAgo: 5,
   });
   f.expense(flat, {

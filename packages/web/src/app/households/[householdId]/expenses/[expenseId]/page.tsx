@@ -25,6 +25,7 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { formatIsoDate, formatIsoDateTime } from "@/lib/dates";
 import { allocationInput, SPLIT_METHOD_LABELS } from "@/lib/expenses";
 import { formatMoney } from "@/lib/money";
+import { ExpenseFiles } from "./expense-files";
 import { ExpenseQueryState, useExpenseRoute } from "./expense-query";
 
 /** One expense: who paid, how it was split and with what inputs, and its details. */
@@ -111,7 +112,7 @@ function ExpenseActions({
       {permissions.deleteExpense(expense) ? (
         <ConfirmDialog
           confirmLabel="Delete"
-          description="Everyone's balances will be recalculated without it. Recorded payments stay as they are. This can't be undone."
+          description={deleteWarning(expense)}
           destructive
           onConfirm={remove}
           title={`Delete “${expense.name}”?`}
@@ -125,6 +126,16 @@ function ExpenseActions({
       ) : null}
     </>
   );
+}
+
+/** What deleting changes, including its files: they're deleted once no other expense has them (#45). */
+function deleteWarning(expense: Expense): string {
+  const files = expense.attachments.length;
+  const attached =
+    files === 0
+      ? ""
+      : ` Its ${files === 1 ? "attached file" : `${files} attached files`} will be deleted too.`;
+  return `Everyone's balances will be recalculated without it. Recorded payments stay as they are.${attached} This can't be undone.`;
 }
 
 function ExpenseDetails({
@@ -254,6 +265,8 @@ function ExpenseDetails({
           </tbody>
         </table>
       </section>
+
+      <ExpenseFiles expense={expense} />
     </>
   );
 }

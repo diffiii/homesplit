@@ -34,6 +34,15 @@ export const ATTACHMENT_ACCEPT = [
     .map((extension) => `.${extension}`),
 ].join(",");
 
+/** What each type is called on screen. */
+export const ATTACHMENT_TYPE_LABELS: Record<AttachmentMimeType, string> = {
+  "image/jpeg": "JPEG image",
+  "image/png": "PNG image",
+  "image/webp": "WebP image",
+  "image/heic": "HEIC image",
+  "application/pdf": "PDF document",
+};
+
 /** The allowed types, for telling users. */
 export const ATTACHMENT_TYPE_NAMES = "JPEG, PNG, WebP, HEIC, or PDF";
 
@@ -89,6 +98,20 @@ export function uploadErrorMessage(error: unknown): string {
     if (error.status === 415) {
       return unsupportedTypeMessage();
     }
+  }
+  return errorMessage(error);
+}
+
+/** A sentence for a file that couldn't be attached to an expense, saying the limit when it was reached. */
+export function attachErrorMessage(error: unknown): string {
+  if (
+    isApiRequestError(error) &&
+    error.code === "EXPENSE_ATTACHMENT_LIMIT_REACHED"
+  ) {
+    const limit = (error.details as { limit?: unknown } | undefined)?.limit;
+    return typeof limit === "number"
+      ? `An expense can have up to ${limit} files.`
+      : "This expense can't have any more files.";
   }
   return errorMessage(error);
 }

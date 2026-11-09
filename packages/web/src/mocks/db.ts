@@ -1,4 +1,5 @@
 import type {
+  AttachmentMimeType,
   ExpenseAllocationInput,
   ExpenseCategory,
   ExpensePayerInput,
@@ -72,6 +73,24 @@ export interface MockExpense {
   updatedAt: string;
 }
 
+/** A stored file. Its content isn't kept in the state; see `mocks/api/attachments.ts`. */
+export interface MockAttachment {
+  createdAt: string;
+  householdId: string;
+  id: string;
+  mimeType: AttachmentMimeType;
+  sizeBytes: number;
+  uploadedById: string;
+}
+
+/** `expense_attachments`: a file linked to an expense. */
+export interface MockExpenseAttachment {
+  attachmentId: string;
+  createdAt: string;
+  expenseId: string;
+  householdId: string;
+}
+
 export interface MockSettlement {
   amount: PositiveMoney;
   confirmedAt: string | null;
@@ -137,8 +156,10 @@ export interface MockFriendRequest {
 
 /** Everything the mocks know, as plain JSON, so the browser can persist it. */
 export interface MockState {
+  attachments: MockAttachment[];
   categories: ExpenseCategory[];
   chores: MockChore[];
+  expenseAttachments: MockExpenseAttachment[];
   expenses: MockExpense[];
   friendRequests: MockFriendRequest[];
   friendships: MockFriendship[];

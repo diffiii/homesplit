@@ -1,9 +1,10 @@
 import { screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { HttpResponse, http } from "msw";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { HouseholdShell } from "@/components/shell/household-shell";
 import { queryKeys } from "@/lib/api/query-keys";
 import { expectNoAxeViolations } from "@/test/axe";
-import { db } from "@/test/mock-server";
+import { db, server } from "@/test/mock-server";
 import { router } from "@/test/navigation";
 import { renderWithProviders } from "@/test/render";
 import ExpensePage from "./page";
@@ -52,6 +53,12 @@ const rowsOf = (name: string) =>
   within(screen.getByRole("region", { name }))
     .getAllByRole(name === "Split" ? "row" : "listitem")
     .map(spokenText);
+
+const DOWNLOAD = /\/attachments\/[^/]+\/download$/u;
+const IMAGE_URL = /^data:image\//u;
+// Node has object URLs, so the mocks' sample PDF is a blob.
+const PDF_URL = /^blob:/u;
+const WHITESPACE = /\s/gu;
 
 describe("ExpensePage", () => {
   it("shows payers, the split with its inputs, and the details", async () => {
@@ -204,5 +211,255 @@ describe("ExpensePage", () => {
     expect(
       await screen.findByRole("heading", { name: "Household not found" })
     ).toBeVisible();
+  });
+
+  describe("files", () => {
+    /** Text with the non-breaking spaces `Intl` puts in sizes made plain. */
+    const plain = (text: string | null | undefined) =>
+      (text ?? "").replace(WHITESPACE, " ");
+
+    /** How many download links were requested from now on. */
+    function countDownloads() {
+      const count = { value: 0 };
+      server.events.on("request:start", ({ request }) => {
+        if (DOWNLOAD.test(new URL(request.url).pathname)) {
+          count.value += 1;
+        }
+      });
+      return count;
+    }
+
+    /** Stands in for the tab `window.open` opens, or for a blocked one with `null`. */
+    function stubNewTab(blocked = false) {
+      const tab = {
+        opener: window as Window | null,
+        location: { href: "" },
+        close: vi.fn(),
+      };
+      const open = vi
+        .spyOn(window, "open")
+        .mockReturnValue(blocked ? null : (tab as unknown as Window));
+      onTestFinished(() => open.mockRestore());
+      return { tab, open };
+    }
+
+    it("lists each file with its type and size", async () => {
+      renderExpense(expenseId("Electricity"));
+
+      const files = await screen.findByRole("region", { name: "Files" });
+      expect(
+        within(files)
+          .getAllByRole("listitem")
+          .map((item) => plain(item.textContent))
+      ).toEqual([
+        "File 1JPEG image · 1.8 MBOpen",
+        "File 2PDF document · 210 kBOpen",
+      ]);
+    });
+
+    it("shows no files section when nothing is attached", async () => {
+      renderExpense(expenseId("Pizza night"));
+
+      expect(
+        await screen.findByRole("heading", { name: "Pizza night" })
+      ).toBeVisible();
+      expect(
+        screen.queryByRole("region", { name: "Files" })
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows an image in a viewer, with a fresh link each time", async () => {
+      const downloads = countDownloads();
+      const { user } = renderExpense(expenseId("Electricity"));
+
+      await user.click(
+        await screen.findByRole("button", { name: "Open File 1" })
+      );
+      const viewer = await screen.findByRole("dialog", { name: "File 1" });
+      const image = await within(viewer).findByRole("img", {
+        name: "File 1, JPEG image",
+      });
+      expect(image.getAttribute("src")).toMatch(IMAGE_URL);
+      expect(
+        within(viewer).getByRole("link", { name: "Download" })
+      ).toHaveAttribute("href", image.getAttribute("src"));
+      await expectNoAxeViolations(document.body, {
+        rules: { "landmark-unique": { enabled: false } },
+      });
+
+      await user.keyboard("{Escape}");
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+      );
+      await user.click(screen.getByRole("button", { name: "Open File 1" }));
+      await screen.findByRole("img", { name: "File 1, JPEG image" });
+      expect(downloads.value).toBe(2);
+    });
+
+    it("opens other files in a new tab", async () => {
+      const { tab, open } = stubNewTab();
+      const { user } = renderExpense(expenseId("Electricity"));
+
+      await user.click(
+        await screen.findByRole("button", { name: "Open File 2" })
+      );
+
+      expect(open).toHaveBeenCalledWith("", "_blank");
+      await waitFor(() => expect(tab.location.href).toMatch(PDF_URL));
+      expect(tab.opener).toBeNull();
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("closes the new tab and explains when the link can't be had", async () => {
+      const { tab } = stubNewTab();
+      server.use(
+        http.get("*/api/households/:householdId/attachments/:id/download", () =>
+          HttpResponse.json(
+            { code: "INTERNAL_ERROR", message: "Down" },
+            { status: 500 }
+          )
+        )
+      );
+      const { user } = renderExpense(expenseId("Electricity"));
+
+      await user.click(
+        await screen.findByRole("button", { name: "Open File 2" })
+      );
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Couldn't open the file."
+      );
+      expect(tab.close).toHaveBeenCalled();
+    });
+
+    it("offers a download in the viewer when the new tab is blocked", async () => {
+      stubNewTab(true);
+      const { user } = renderExpense(expenseId("Electricity"));
+
+      await user.click(
+        await screen.findByRole("button", { name: "Open File 2" })
+      );
+
+      const viewer = await screen.findByRole("dialog", { name: "File 2" });
+      expect(
+        await within(viewer).findByText(
+          "This file can't be shown here. Download it to open it."
+        )
+      ).toBeVisible();
+      expect(
+        within(viewer)
+          .getByRole("link", { name: "Download" })
+          .getAttribute("href")
+      ).toMatch(PDF_URL);
+    });
+
+    it("removes a file after confirming", async () => {
+      const id = expenseId("Electricity");
+      const { user } = renderExpense(id);
+      const [first] = db.state.expenseAttachments.filter(
+        ({ expenseId: linked }) => linked === id
+      );
+
+      await user.click(
+        await screen.findByRole("button", { name: "Remove File 1" })
+      );
+      const dialog = await screen.findByRole("alertdialog", {
+        name: "Remove file 1?",
+      });
+      await user.click(within(dialog).getByRole("button", { name: "Remove" }));
+
+      await waitFor(() =>
+        expect(
+          within(screen.getByRole("region", { name: "Files" })).getAllByRole(
+            "listitem"
+          )
+        ).toHaveLength(1)
+      );
+      expect(screen.getByText("PDF document", { exact: false })).toBeVisible();
+      expect(
+        db.state.expenseAttachments.some(
+          ({ attachmentId }) => attachmentId === first?.attachmentId
+        )
+      ).toBe(false);
+    });
+
+    it("keeps the section after the last file is removed", async () => {
+      const id = expenseId("Electricity");
+      // Leave the bill one file.
+      db.state.expenseAttachments.splice(
+        db.state.expenseAttachments.findIndex(
+          ({ expenseId: linked }) => linked === id
+        ),
+        1
+      );
+      const { user } = renderExpense(id);
+
+      await user.click(
+        await screen.findByRole("button", { name: "Remove File 1" })
+      );
+      await user.click(
+        within(await screen.findByRole("alertdialog")).getByRole("button", {
+          name: "Remove",
+        })
+      );
+
+      expect(await screen.findByText("No files attached.")).toBeVisible();
+      await waitFor(() =>
+        expect(screen.getByRole("heading", { name: "Files" })).toHaveFocus()
+      );
+    });
+
+    it("lets members open but not remove files on others' expenses", async () => {
+      // Alice is a plain member of the cabin, and Ewa added the rental.
+      const cabin = householdNamed("Lake cabin").id;
+      const rental = expenseId("Cabin rental");
+      const time = new Date().toISOString();
+      db.state.attachments.push({
+        id: crypto.randomUUID(),
+        householdId: cabin,
+        mimeType: "image/png",
+        sizeBytes: 1000,
+        uploadedById: db.userByEmail("ewa@example.com")?.id ?? "",
+        createdAt: time,
+      });
+      db.state.expenseAttachments.push({
+        householdId: cabin,
+        expenseId: rental,
+        attachmentId: db.state.attachments.at(-1)?.id ?? "",
+        createdAt: time,
+      });
+      renderExpense(rental, cabin);
+
+      expect(
+        await screen.findByRole("button", { name: "Open File 1" })
+      ).toBeVisible();
+      expect(
+        screen.queryByRole("button", { name: "Remove File 1" })
+      ).not.toBeInTheDocument();
+    });
+
+    it("doesn't offer removing while expenses are turned off", async () => {
+      flat().features.expenses = false;
+      renderExpense(expenseId("Electricity"));
+
+      expect(
+        await screen.findByRole("button", { name: "Open File 1" })
+      ).toBeVisible();
+      expect(
+        screen.queryByRole("button", { name: "Remove File 1" })
+      ).not.toBeInTheDocument();
+    });
+
+    it("says the files are deleted with the expense", async () => {
+      const { user } = renderExpense(expenseId("Electricity"));
+
+      await user.click(await screen.findByRole("button", { name: "Delete" }));
+
+      expect(
+        await screen.findByRole("alertdialog", {
+          name: "Delete “Electricity”?",
+        })
+      ).toHaveTextContent("Its 2 attached files will be deleted too.");
+    });
   });
 });

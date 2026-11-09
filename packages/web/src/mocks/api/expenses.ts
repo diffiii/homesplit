@@ -1,4 +1,5 @@
 import {
+  type AttachmentSummary,
   allocate,
   type ConfirmedSettlement,
   type Expense,
@@ -11,7 +12,13 @@ import {
   WRITE_OFF_NOTE,
 } from "@homesplit/contracts";
 import { type MockDb, type MockExpense, type MockSettlement, now } from "../db";
-import { conflict, forbidden, invalidReference } from "../errors";
+import {
+  conflict,
+  forbidden,
+  invalidReference,
+  MockApiError,
+  notFound,
+} from "../errors";
 import { hasRole, type MockRoutes } from "../routes";
 import { listBalances, suggestSettlements } from "./ledger";
 import {
@@ -26,6 +33,31 @@ import {
 } from "./shared";
 
 const byUser = asc((row: { userId: string }) => row.userId);
+
+/** The backend's default `ATTACHMENT_MAX_PER_EXPENSE`. */
+const ATTACHMENT_MAX_PER_EXPENSE = 10;
+
+/** The files linked to an expense, in the order they were linked. */
+function linkedAttachments(db: MockDb, expenseId: string): AttachmentSummary[] {
+  return sortBy(
+    db.state.expenseAttachments.filter((link) => link.expenseId === expenseId),
+    asc((link) => link.createdAt),
+    asc((link) => link.attachmentId)
+  ).flatMap(({ attachmentId }) => {
+    const attachment = db.state.attachments.find(
+      ({ id }) => id === attachmentId
+    );
+    return attachment
+      ? [
+          {
+            id: attachment.id,
+            mimeType: attachment.mimeType,
+            sizeBytes: attachment.sizeBytes,
+          },
+        ]
+      : [];
+  });
+}
 
 /** Child rows come back sorted by user ID, and splits are calculated on read. */
 export function renderExpense(db: MockDb, expense: MockExpense): Expense {
@@ -51,8 +83,7 @@ export function renderExpense(db: MockDb, expense: MockExpense): Expense {
     splits: sortBy(allocate(expense.total.amountCents, allocation), byUser).map(
       ({ userId, amountCents }) => ({ user: db.summary(userId), amountCents })
     ),
-    // The mocks don't store files yet.
-    attachments: [],
+    attachments: linkedAttachments(db, expense.id),
     createdAt: expense.createdAt,
     updatedAt: expense.updatedAt,
   };
@@ -312,6 +343,89 @@ export const expenseRoutes: MockRoutes = {
       );
       assertAuthorOrAdmin(expense, userId, member.role);
       removeRow(db.state.expenses, expense);
+      // The files stay, unlinked, for the backend's cleanup to delete.
+      db.state.expenseAttachments = db.state.expenseAttachments.filter(
+        (link) => link.expenseId !== expense.id
+      );
+    },
+  },
+
+  listExpenseAttachments: {
+    resolve: ({ db, household, params }) => ({
+      items: linkedAttachments(
+        db,
+        findInHousehold(db.state.expenses, household.id, params.expenseId).id
+      ),
+    }),
+  },
+
+  linkExpenseAttachment: {
+    module: "expenses",
+    resolve: ({ db, household, member, userId, params, body }) => {
+      const expense = findInHousehold(
+        db.state.expenses,
+        household.id,
+        params.expenseId
+      );
+      assertAuthorOrAdmin(expense, userId, member.role);
+      const attachment = db.state.attachments.find(
+        ({ id, householdId }) =>
+          id === body.attachmentId && householdId === household.id
+      );
+      if (!attachment) {
+        throw invalidReference([
+          { path: ["attachmentId"], message: "Unknown attachment" },
+        ]);
+      }
+      const links = db.state.expenseAttachments.filter(
+        (link) => link.expenseId === expense.id
+      );
+      if (links.some((link) => link.attachmentId === attachment.id)) {
+        throw conflict(
+          "ATTACHMENT_ALREADY_LINKED",
+          "The file is already attached to this expense"
+        );
+      }
+      if (links.length >= ATTACHMENT_MAX_PER_EXPENSE) {
+        throw new MockApiError(
+          409,
+          "EXPENSE_ATTACHMENT_LIMIT_REACHED",
+          "The expense has as many files as it can",
+          { limit: ATTACHMENT_MAX_PER_EXPENSE }
+        );
+      }
+      db.state.expenseAttachments.push({
+        householdId: household.id,
+        expenseId: expense.id,
+        attachmentId: attachment.id,
+        createdAt: now(),
+      });
+      return {
+        id: attachment.id,
+        mimeType: attachment.mimeType,
+        sizeBytes: attachment.sizeBytes,
+      };
+    },
+  },
+
+  unlinkExpenseAttachment: {
+    module: "expenses",
+    resolve: ({ db, household, member, userId, params }) => {
+      const expense = findInHousehold(
+        db.state.expenses,
+        household.id,
+        params.expenseId
+      );
+      assertAuthorOrAdmin(expense, userId, member.role);
+      const link = db.state.expenseAttachments.find(
+        (row) =>
+          row.expenseId === expense.id &&
+          row.attachmentId === params.attachmentId
+      );
+      if (!link) {
+        throw notFound();
+      }
+      removeRow(db.state.expenseAttachments, link);
     },
   },
 
