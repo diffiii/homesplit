@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { HouseholdRole } from "@homesplit/contracts";
 import type { INestApplication } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -10,7 +11,6 @@ import {
   organization,
   session,
 } from "@/db/schema";
-import type { HouseholdRole } from "@/features/households/access/roles";
 import { expectApiError } from "./helpers/api";
 import { createTestApp } from "./helpers/app";
 import {

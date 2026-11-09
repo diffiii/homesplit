@@ -1,4 +1,4 @@
-import type { Endpoint, FeatureId } from "@homesplit/contracts";
+import type { Endpoint, FeatureId, HouseholdRole } from "@homesplit/contracts";
 import {
   applyDecorators,
   createParamDecorator,
@@ -14,7 +14,6 @@ import {
   MIN_ROLE,
   REQUIRED_MODULE,
 } from "./household.guard";
-import type { HouseholdRole } from "./roles";
 
 /** `@Route` for a `/api/households/:householdId/...` endpoint, behind `HouseholdGuard`. */
 export const HouseholdRoute = (

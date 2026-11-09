@@ -1,6 +1,5 @@
-/** Better Auth's default roles, weakest first. */
-export const HOUSEHOLD_ROLES = ["member", "admin", "owner"] as const;
-export type HouseholdRole = (typeof HOUSEHOLD_ROLES)[number];
+// One list for the API's responses and the checks here, weakest first.
+import { HOUSEHOLD_ROLES, type HouseholdRole } from "@homesplit/contracts";
 
 /**
  * The strongest role in a `member.role` value. Better Auth stores several
