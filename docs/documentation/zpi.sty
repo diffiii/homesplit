@@ -1,0 +1,137 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{zpi}[2026/11/09 ZPI project documentation]
+
+% Language and fonts
+\RequirePackage[polish]{babel}
+\RequirePackage{fontspec}
+\RequirePackage{unicode-math}
+
+\setmainfont{texgyretermes}[
+  Extension      = .otf,
+  UprightFont    = *-regular,
+  BoldFont       = *-bold,
+  ItalicFont     = *-italic,
+  BoldItalicFont = *-bolditalic,
+]
+\setmathfont{texgyretermes-math.otf}
+
+\newfontfamily\zpi@garamond{EBGaramond}[
+  Ligatures      = TeX,
+  Extension      = .otf,
+  UprightFont    = *-Regular,
+  BoldFont       = *-Bold,
+  ItalicFont     = *-Italic,
+  BoldItalicFont = *-BoldItalic,
+]
+
+% Page layout
+\RequirePackage[a4paper, top=2.5cm, bottom=1.75cm, left=3.5cm, right=2.5cm,
+  footskip=0.75cm]{geometry}
+\RequirePackage{indentfirst}
+\RequirePackage{microtype}
+
+% Headings
+\RequirePackage{titlesec}
+\titleformat{\section}{\fontsize{14}{17}\selectfont\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\itshape}{\thesubsubsection.}{0.5em}{}
+\titlespacing*{\section}{0pt}{18pt plus 4pt minus 2pt}{8pt plus 2pt}
+\titlespacing*{\subsection}{0pt}{12pt plus 3pt minus 2pt}{6pt plus 2pt}
+\titlespacing*{\subsubsection}{0pt}{10pt plus 2pt minus 2pt}{4pt plus 2pt}
+
+\newcommand\zpiczesc[1]{%
+  \clearpage
+  \phantomsection
+  \addcontentsline{toc}{part}{#1}%
+  {\noindent\fontsize{16}{20}\selectfont\bfseries #1\par}%
+  \vspace{12pt}%
+}
+
+% Table of contents
+\RequirePackage[titles]{tocloft}
+\renewcommand\cftsecaftersnum{.}
+\renewcommand\cftsubsecaftersnum{.}
+\renewcommand\cftsubsubsecaftersnum{.}
+\renewcommand\cftpartfont{\bfseries}
+\renewcommand\cftpartpagefont{\bfseries}
+\setlength\cftbeforepartskip{6pt}
+
+% Packages
+\RequirePackage{graphicx}
+\graphicspath{{figures/}}
+\RequirePackage{booktabs}
+\RequirePackage{tabularx}
+\RequirePackage{longtable}
+\RequirePackage{array}
+\RequirePackage[shortlabels]{enumitem}
+\setlist{nosep, leftmargin=*}
+\RequirePackage[font=small, labelfont=bf]{caption}
+\RequirePackage{xcolor}
+\RequirePackage{csquotes}
+\RequirePackage[backend=biber, style=numeric-comp, sorting=none]{biblatex}
+\renewcommand*\bibfont{\raggedright}
+\RequirePackage[hidelinks]{hyperref}
+\RequirePackage{etoolbox}
+
+% Template hints
+\newif\ifzpi@wskazowki
+\zpi@wskazowkitrue
+\newcommand\zpiukryjwskazowki{\zpi@wskazowkifalse}
+\newcommand\wskazowka[1]{%
+  \ifzpi@wskazowki{\par\noindent\color{gray}\itshape #1\par}\fi
+}
+
+% Project metadata
+\newcommand\zpi@uczelnia{Politechnika Wrocławska}
+\newcommand\zpi@wydzial{Wydział Informatyki i Telekomunikacji}
+\newcommand\zpi@przedmiot{ZESPOŁOWE PRZEDSIĘWZIĘCIE INFORMATYCZNE}
+\newcommand\zpi@kierunek{}
+\newcommand\zpi@tytul{}
+\newcommand\zpi@autorzy{}
+\newcommand\zpi@opiekun{}
+\newcommand\zpi@slowakluczowe{}
+\newcommand\zpi@miasto{WROCŁAW}
+\newcommand\zpi@rok{\the\year}
+
+\newcommand\zpiprzedmiot[1]{\renewcommand\zpi@przedmiot{#1}}
+\newcommand\zpikierunek[1]{\renewcommand\zpi@kierunek{#1}}
+\newcommand\zpitytul[1]{\renewcommand\zpi@tytul{#1}}
+\newcommand\zpiautorzy[1]{\renewcommand\zpi@autorzy{#1}}
+\newcommand\zpiopiekun[1]{\renewcommand\zpi@opiekun{#1}}
+\newcommand\zpislowakluczowe[1]{\renewcommand\zpi@slowakluczowe{#1}}
+\newcommand\zpirok[1]{\renewcommand\zpi@rok{#1}}
+
+\AtBeginDocument{%
+  \hypersetup{
+    pdftitle    = {\zpi@tytul},
+    pdfauthor   = {\zpi@autorzy},
+    pdfkeywords = {\zpi@slowakluczowe},
+  }%
+}
+
+% Title page
+\newcommand\zpi@autor[1]{#1\par}
+\newcommand\zpistronatytulowa{%
+  \begin{titlepage}
+    \zpi@garamond
+    \centering
+    {\fontsize{20}{24}\selectfont\bfseries \zpi@uczelnia\par}
+    {\fontsize{16}{20}\selectfont\bfseries \zpi@wydzial\par}
+    \vspace{3pt}\hrule\vspace{20pt}
+    {\raggedright\fontsize{16}{20}\selectfont Kierunek: \zpi@kierunek\par}
+    \vspace{48pt}
+    {\fontsize{22}{27}\selectfont\bfseries \zpi@przedmiot\par}
+    \vspace{48pt}
+    {\fontsize{18}{23}\selectfont\bfseries \zpi@tytul\par}
+    \vspace{36pt}
+    {\fontsize{16}{20}\selectfont
+      \expandafter\forcsvlist\expandafter\zpi@autor\expandafter{\zpi@autorzy}}
+    \vspace{36pt}
+    {\fontsize{14}{18}\selectfont Opiekun pracy\par\bfseries \zpi@opiekun\par}
+    \vfill
+    {\raggedright\fontsize{12}{15}\selectfont Słowa kluczowe: \zpi@slowakluczowe\par}
+    \vspace{16pt}\hrule\vspace{6pt}
+    {\rmfamily\fontsize{12}{15}\selectfont \zpi@miasto\ \zpi@rok\par}
+  \end{titlepage}%
+  \setcounter{page}{2}%
+}
