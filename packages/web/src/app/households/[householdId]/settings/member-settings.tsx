@@ -27,20 +27,7 @@ import type { HouseholdMember } from "@/lib/api/household-queries";
 import { queryKeys } from "@/lib/api/query-keys";
 import { formatLocalDate } from "@/lib/dates";
 import { strongestRole } from "@/lib/permissions";
-
-const ROLES: readonly HouseholdRole[] = ["owner", "admin", "member"];
-
-const ROLE_LABEL: Record<HouseholdRole, string> = {
-  owner: "Owner",
-  admin: "Admin",
-  member: "Member",
-};
-
-const WITH_ARTICLE: Record<HouseholdRole, string> = {
-  owner: "an owner",
-  admin: "an admin",
-  member: "a member",
-};
+import { ROLE_LABEL, ROLES, WITH_ARTICLE } from "@/lib/roles";
 
 /** Better Auth's and HomeSplit's answers to role changes and removals, explained. */
 const MEMBER_ERRORS: Record<string, string> = {

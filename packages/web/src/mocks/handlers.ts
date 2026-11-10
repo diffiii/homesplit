@@ -3,6 +3,7 @@ import { attachmentRoutes } from "./api/attachments";
 import { choreRoutes } from "./api/chores";
 import { expenseRoutes } from "./api/expenses";
 import { householdRoutes } from "./api/households";
+import { invitationRoutes } from "./api/invitations";
 import { meRoutes } from "./api/me";
 import { shoppingRoutes } from "./api/shopping";
 import { createAuthHandlers } from "./auth";
@@ -12,6 +13,7 @@ import { createApiHandlers, type MockNetwork, type MockRoutes } from "./routes";
 /** Every mocked application route, by endpoint name. */
 export const mockRoutes: MockRoutes = {
   ...householdRoutes,
+  ...invitationRoutes,
   ...expenseRoutes,
   ...attachmentRoutes,
   ...choreRoutes,

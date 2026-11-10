@@ -480,7 +480,7 @@ export function UserMenu({ showName = false }: { showName?: boolean }) {
               </>
             ) : null}
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={signOutAndReset}>
+          <DropdownMenuItem onClick={() => signOutAndReset()}>
             <LogOutIcon aria-hidden />
             Sign out
           </DropdownMenuItem>

@@ -1,11 +1,12 @@
+import { INVITATION_EXPIRY_DAYS } from "@homesplit/contracts";
 import { APIError } from "better-auth/api";
 import type { Email } from "./mail";
 import { RateLimiter } from "./rate-limiter";
 
 /** See "Better Auth endpoints" in docs/decisions.md. */
 export const INVITATION = {
-  /** How long an invitation can be accepted. */
-  expiresInSeconds: 7 * 24 * 60 * 60,
+  /** How long an invitation can be accepted, as the web also says. */
+  expiresInSeconds: INVITATION_EXPIRY_DAYS * 24 * 60 * 60,
   /** The period the limits below apply to. */
   windowSeconds: 60 * 60,
   /** Invitation emails one user may trigger, new or sent again. */

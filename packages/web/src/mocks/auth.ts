@@ -1,4 +1,4 @@
-import { DisplayName } from "@homesplit/contracts";
+import { DisplayName, INVITATION_EXPIRY_DAYS } from "@homesplit/contracts";
 import { type HttpHandler, HttpResponse, http } from "msw";
 import { z } from "zod";
 import type { HouseholdRole } from "@/lib/api/auth-client";
@@ -54,7 +54,6 @@ const ERRORS = {
 };
 
 const SESSION_DAYS = 7;
-const INVITATION_HOURS = 48;
 const HOUR_MS = 3_600_000;
 
 function renderUser(user: MockUser) {
@@ -676,22 +675,29 @@ export function createAuthHandlers(
           "User is already a member of this organization"
         );
       }
-      if (
-        db.state.invitations.some(
-          (existing) =>
-            existing.householdId === caller.householdId &&
-            existing.email === email &&
-            existing.status === "pending" &&
-            Date.parse(existing.expiresAt) > Date.now()
-        )
-      ) {
-        throw authError(
-          BAD_REQUEST,
-          "USER_IS_ALREADY_INVITED_TO_THIS_ORGANIZATION",
-          "User is already invited to this organization"
-        );
-      }
       const time = Date.now();
+      const expiresAt = new Date(
+        time + INVITATION_EXPIRY_DAYS * 24 * HOUR_MS
+      ).toISOString();
+      const pending = db.state.invitations.filter(
+        (existing) =>
+          existing.householdId === caller.householdId &&
+          existing.email === email &&
+          existing.status === "pending"
+      );
+      // `resend` sends the unexpired pending invitation again, for longer.
+      const resent = pending.find(
+        (existing) => Date.parse(existing.expiresAt) > time
+      );
+      if (resent && input.resend === true) {
+        resent.expiresAt = expiresAt;
+        return renderInvitation(resent);
+      }
+      // Otherwise the new invitation replaces every pending one, as the
+      // backend's `cancelPendingInvitationsOnReInvite` and trigger do.
+      for (const existing of pending) {
+        existing.status = "canceled";
+      }
       const invitation: MockInvitation = {
         id: crypto.randomUUID(),
         householdId: caller.householdId,
@@ -699,7 +705,7 @@ export function createAuthHandlers(
         role: role.data as HouseholdRole,
         status: "pending",
         inviterId: caller.userId,
-        expiresAt: new Date(time + INVITATION_HOURS * HOUR_MS).toISOString(),
+        expiresAt,
         createdAt: new Date(time).toISOString(),
       };
       db.state.invitations.push(invitation);

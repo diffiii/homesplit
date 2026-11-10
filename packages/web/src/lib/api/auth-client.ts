@@ -1,3 +1,4 @@
+import type { HouseholdRole as ContractHouseholdRole } from "@homesplit/contracts";
 import { organizationClient } from "better-auth/client/plugins";
 import { type BetterFetchPlugin, createAuthClient } from "better-auth/react";
 import { ApiRequestError } from "./api-error";
@@ -74,7 +75,8 @@ async function unwrap<T>(call: Promise<AuthResult<T>>): Promise<T> {
   return result.data as T;
 }
 
-export type HouseholdRole = "owner" | "admin" | "member";
+/** A household role, from the one list in `@homesplit/contracts`. */
+export type HouseholdRole = ContractHouseholdRole;
 
 export interface AuthClientOptions {
   baseURL?: string;
@@ -161,20 +163,28 @@ export function createAuth({ baseURL, fetch }: AuthClientOptions = {}) {
     leave: ({ householdId }: { householdId: string }) =>
       unwrap(organization.leave({ organizationId: householdId })),
 
+    /**
+     * Emails an invitation. A newer one replaces the address's pending
+     * invitation; with `resend`, the pending one is sent again instead, with
+     * its expiry extended. An expired one is replaced either way.
+     */
     invite: ({
       householdId,
       email,
       role,
+      resend = false,
     }: {
       householdId: string;
       email: string;
       role: HouseholdRole;
+      resend?: boolean;
     }) =>
       unwrap(
         organization.inviteMember({
           organizationId: householdId,
           email,
           role,
+          resend,
         })
       ),
 

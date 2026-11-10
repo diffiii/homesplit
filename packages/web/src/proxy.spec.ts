@@ -34,6 +34,16 @@ describe("proxy", () => {
     );
   });
 
+  it("sends visitors without a session cookie from an invitation link to sign-in and back", () => {
+    const response = proxy(
+      request("/invitations/0b6f1f4e-3c1a-4b8e-9a59-1d2f3e4a5b6c")
+    );
+
+    expect(response.headers.get("location")).toBe(
+      "https://homesplit.test/sign-in?redirectTo=%2Finvitations%2F0b6f1f4e-3c1a-4b8e-9a59-1d2f3e4a5b6c"
+    );
+  });
+
   it("lets visitors without a session cookie open signed-out pages", () => {
     const response = proxy(request("/sign-up"));
 
