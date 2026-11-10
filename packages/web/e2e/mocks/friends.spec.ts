@@ -1,5 +1,6 @@
 import { expect } from "@playwright/test";
 import { MOCK_PASSWORD } from "../../src/mocks/factories";
+import { DEFAULT_SCENARIO, SCENARIOS } from "../../src/mocks/scenarios";
 import { openAccountMenu, signIn, signOut } from "../account";
 import { expectNoAxeViolations } from "../axe";
 import { test } from "./fixtures";
@@ -7,8 +8,14 @@ import { test } from "./fixtures";
 const FRIENDS_ITEM = /^Friends/u;
 // Chrome puts a space before the visually hidden count.
 const ONE_REQUEST = /^Friends ?, 1 friend request$/u;
+const DAWID = /Dawid Lewandowski/u;
 
-test("sends, withdraws, and resends a request, which the other user accepts", async ({
+// The fixture starts each test from a fresh build, with the same IDs.
+const flat = SCENARIOS[DEFAULT_SCENARIO]
+  .build()
+  .households.find(({ name }) => name === "Flat on Piękna");
+
+test("sends, withdraws, and resends a request, which the other user accepts, then invites the friend", async ({
   page,
 }) => {
   await page.goto("/households");
@@ -54,4 +61,17 @@ test("sends, withdraws, and resends a request, which the other user accepts", as
   await expect(
     page.getByRole("region", { name: "Requests for you" })
   ).toHaveCount(0);
+
+  await signOut(page, "Dawid Lewandowski");
+  await signIn(page, { email: "alice@example.com", password: MOCK_PASSWORD });
+  await page.goto(`/households/${flat?.id}/settings`);
+  await page.getByRole("button", { name: "Invite", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Invite someone" });
+  await dialog.getByRole("checkbox", { name: DAWID }).check();
+  await expectNoAxeViolations(page);
+  await dialog.getByRole("button", { name: "Send invitation" }).click();
+
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "dawid@example.com" })
+  ).toBeVisible();
 });

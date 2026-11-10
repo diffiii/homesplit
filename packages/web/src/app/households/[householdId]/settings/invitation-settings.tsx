@@ -31,7 +31,7 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { formatLocalDate } from "@/lib/dates";
 import { strongestRole } from "@/lib/permissions";
 import { ROLE_LABEL } from "@/lib/roles";
-import { INVITE_ERRORS, InviteDialog } from "./invite-dialog";
+import { describeInviteError, InviteDialog } from "./invite-dialog";
 
 type Invitation = HouseholdDetails["invitations"][number];
 
@@ -46,13 +46,7 @@ export function describeInvitationError(error: unknown): string {
   if (!isApiRequestError(error)) {
     return errorMessage(error);
   }
-  const invite = INVITE_ERRORS[error.code];
-  return (
-    CANCEL_ERRORS[error.code] ??
-    invite?.form ??
-    Object.values(invite?.fields ?? {})[0] ??
-    errorMessage(error)
-  );
+  return CANCEL_ERRORS[error.code] ?? describeInviteError(error);
 }
 
 const isExpired = (invitation: Invitation, now: number) =>

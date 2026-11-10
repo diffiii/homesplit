@@ -68,6 +68,9 @@ test("invites someone from the household settings", async ({ page }) => {
   await dialog.getByRole("button", { name: "Send invitation" }).click();
 
   await expect(
-    page.getByRole("listitem").filter({ hasText: "zofia@example.com" })
+    page
+      .getByRole("region", { name: "Invitations" })
+      .getByRole("listitem")
+      .filter({ hasText: "zofia@example.com" })
   ).toBeVisible();
 });

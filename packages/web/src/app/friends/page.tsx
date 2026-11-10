@@ -124,7 +124,7 @@ export default function FriendsPage() {
           </h2>
           {friends.data.items.length === 0 ? (
             <EmptyState
-              description="Send a request to someone's email."
+              description="Send a request to someone's email. Once they accept, you can invite them to a household without typing it again."
               icon={UsersIcon}
               title="No friends yet"
             />
