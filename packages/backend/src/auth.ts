@@ -15,6 +15,12 @@ import * as schema from "./db/schema/auth";
 import { emailLink, VERIFY_EMAIL_PATH } from "./email-links";
 import { seedDefaultCategories } from "./features/expense-categories/default-categories";
 import { hasUnsettledBalances } from "./features/expenses/balances/balances.repository";
+import {
+  assertInvitationAllowed,
+  INVITATION,
+  invitationEmail,
+  invitationLink,
+} from "./household-invitations";
 import { createMailer, type Email, loadMailConfig } from "./mail";
 import {
   assertResetRequestAllowed,
@@ -214,6 +220,14 @@ export const auth = betterAuth({
         });
       }
 
+      // Every invitation email, new or sent again, goes through this endpoint,
+      // so the limits on who may send and who may be sent to are checked here,
+      // before Better Auth writes anything.
+      if (ctx.path === "/organization/invite-member") {
+        const session = await getSessionFromCtx(ctx);
+        assertInvitationAllowed(session?.user.id, ctx.body?.email);
+      }
+
       // Members settle up before they leave. `/organization/leave` calls no
       // organization hook, so the check runs here, before Better Auth's write
       // and outside its transaction: an expense committed in between can
@@ -245,6 +259,36 @@ export const auth = betterAuth({
   },
   plugins: [
     organization({
+      invitationExpiresIn: INVITATION.expiresInSeconds,
+      // Inviting an address that already has a pending invitation cancels the
+      // earlier one, so only the newest link works. Better Auth cancels only
+      // the first one it finds and concurrent invitations don't see each
+      // other, so the `invitation_single_pending` trigger enforces the rule
+      // in the database. `resend: true` on `invite-member` sends the same
+      // invitation again instead.
+      cancelPendingInvitationsOnReInvite: true,
+      // The invitation row exists by now. A failed send is logged rather than
+      // thrown, so the invitation stays in `list-invitations` and the inviter
+      // can send it again; see "Better Auth endpoints" in docs/decisions.md.
+      sendInvitationEmail: async ({
+        id,
+        email,
+        organization: household,
+        inviter,
+      }) => {
+        try {
+          await mailer.send(
+            invitationEmail({
+              to: email,
+              household: household.name,
+              inviter: inviter.user.name,
+              link: invitationLink(frontendUrl, id),
+            })
+          );
+        } catch (error) {
+          logger.error(`Invitation email not sent for invitation ${id}`, error);
+        }
+      },
       organizationHooks: {
         // Runs after Better Auth has committed the household, outside any
         // transaction. Default categories are a convenience, so a failure
