@@ -1,5 +1,6 @@
 import type { MockState } from "./db";
 import { MockFactory } from "./factories";
+import { lotsOfExpenses } from "./lots-of-expenses";
 
 export interface Scenario {
   build: () => MockState;
@@ -302,6 +303,12 @@ export const SCENARIOS = {
     description:
       "Signed in as Alice: owner of one household, member of another with chores off, and invited to a third.",
     build: households,
+  },
+  "lots-of-expenses": {
+    label: "Lots of expenses",
+    description:
+      "Signed in as Alice: over a thousand expenses across two households, in five currencies, with every split method.",
+    build: lotsOfExpenses,
   },
   "new-user": {
     label: "New user",
