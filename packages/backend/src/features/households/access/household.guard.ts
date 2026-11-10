@@ -1,4 +1,8 @@
-import { type FeatureId, HouseholdIdParams } from "@homesplit/contracts";
+import {
+  type FeatureId,
+  HouseholdIdParams,
+  type HouseholdRole,
+} from "@homesplit/contracts";
 import {
   type CanActivate,
   type ExecutionContext,
@@ -13,7 +17,7 @@ import { householdFeatures, member } from "@/db/schema";
 import { isModuleEnabled } from "@/features/households/household-features";
 import { forbidden, moduleDisabled, notFound } from "@/http/app-error";
 import { ZodPipe } from "@/http/zod.pipe";
-import { type HouseholdRole, hasRole, strongestRole } from "./roles";
+import { hasRole, strongestRole } from "./roles";
 
 export const MIN_ROLE = Symbol("household:minRole");
 export const REQUIRED_MODULE = Symbol("household:requiredModule");

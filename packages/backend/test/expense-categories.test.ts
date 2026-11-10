@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   ExpenseCategory,
   ExpenseCategoryListResponse,
+  type HouseholdRole,
 } from "@homesplit/contracts";
 import type { INestApplication } from "@nestjs/common";
 import { eq, sql } from "drizzle-orm";
@@ -10,7 +11,6 @@ import { db } from "@/db";
 import { expenseCategories, expenses } from "@/db/schema";
 import { assertCategoryInHousehold } from "@/features/expense-categories/category-reference";
 import { DEFAULT_CATEGORIES } from "@/features/expense-categories/default-categories";
-import type { HouseholdRole } from "@/features/households/access/roles";
 import { expectApiError } from "./helpers/api";
 import { createClient, createTestApp } from "./helpers/app";
 import { insertExpense } from "./helpers/expenses";

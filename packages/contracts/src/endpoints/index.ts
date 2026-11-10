@@ -3,6 +3,7 @@ import { choreEndpoints } from "./chores";
 import type { Endpoint } from "./endpoint";
 import { expenseEndpoints } from "./expenses";
 import { householdEndpoints } from "./households";
+import { invitationEndpoints } from "./invitations";
 import { meEndpoints } from "./me";
 import { shoppingEndpoints } from "./shopping";
 
@@ -16,6 +17,7 @@ export * from "./url";
  */
 export const endpoints = {
   ...householdEndpoints,
+  ...invitationEndpoints,
   ...expenseEndpoints,
   ...attachmentEndpoints,
   ...choreEndpoints,

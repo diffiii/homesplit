@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
+import type { HouseholdRole } from "@homesplit/contracts";
 import type { INestApplication } from "@nestjs/common";
-import type { HouseholdRole } from "@/features/households/access/roles";
 import { sessionCookie } from "./api";
 import { createClient, type TestClient } from "./app";
 import { verificationLink } from "./mail";
