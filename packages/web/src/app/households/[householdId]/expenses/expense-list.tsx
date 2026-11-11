@@ -11,11 +11,10 @@ import { CategoryIcon } from "@/components/category-icon";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { ListSkeleton } from "@/components/list-skeleton";
+import { LoadMore } from "@/components/load-more";
 import { useHousehold } from "@/components/shell/household-context";
 import { householdPath } from "@/components/shell/household-nav";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
-import { useLoadMoreOnScroll } from "@/hooks/use-load-more-on-scroll";
 import { expenseListQuery } from "@/lib/api/expense-queries";
 import {
   type ExpenseFilters,
@@ -38,8 +37,7 @@ interface ExpenseListProps {
 
 /**
  * Expenses newest first, grouped by date, loading the next page as the end of
- * the list scrolls into view. A button does the same for keyboard and screen
- * reader users, and wherever the observer isn't available.
+ * the list scrolls into view.
  */
 export function ExpenseList({
   emptyAction,
@@ -58,9 +56,6 @@ export function ExpenseList({
   useEffect(() => {
     onLoaded?.(expenses);
   }, [expenses, onLoaded]);
-
-  const { hasNextPage, isFetchingNextPage, fetchNextPage } = list;
-  const loadMore = useLoadMoreOnScroll(list);
 
   if (list.status === "pending") {
     return <ListSkeleton label="Loading expenses" rows={6} />;
@@ -109,28 +104,12 @@ export function ExpenseList({
           </ul>
         </section>
       ))}
-      <div className="flex flex-col items-center gap-2">
-        <p aria-live="polite" className="text-muted-foreground text-sm">
-          Showing {expenses.length} of {totalItems}{" "}
-          {totalItems === 1 ? "expense" : "expenses"}
-        </p>
-        {hasNextPage ? (
-          <Button
-            disabled={isFetchingNextPage}
-            onClick={() => fetchNextPage()}
-            ref={loadMore}
-            variant="outline"
-          >
-            {isFetchingNextPage ? <Spinner data-icon="inline-start" /> : null}
-            Load more
-          </Button>
-        ) : null}
-        {list.isFetchNextPageError ? (
-          <p className="text-destructive text-sm" role="alert">
-            Couldn't load more expenses. Try again.
-          </p>
-        ) : null}
-      </div>
+      <LoadMore
+        noun={["expense", "expenses"]}
+        query={list}
+        shown={expenses.length}
+        total={totalItems}
+      />
     </div>
   );
 }

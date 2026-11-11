@@ -97,3 +97,36 @@ export function formatRelativeTime(
   }
   return days < 7 ? relativeFormat.format(-days, "day") : formatLocalDate(then);
 }
+
+const timeFormat = new Intl.DateTimeFormat("en", { timeStyle: "short" });
+
+/** `6:30 PM` for a `HH:MM` time of day. */
+export function formatTimeOfDay(time: string): string {
+  const [hours, minutes] = time.split(":").map(Number);
+  return timeFormat.format(new Date(2000, 0, 1, hours, minutes));
+}
+const dayFormat = new Intl.DateTimeFormat("en", {
+  month: "short",
+  day: "numeric",
+});
+
+/** `Today, 6:30 PM`, `Tomorrow, 9:00 AM`, or `Mar 14, 8:00 PM`, as deadlines are shown. */
+export function formatDueTime(value: IsoDateTime, now = new Date()): string {
+  const due = new Date(value);
+  const days = Math.round(
+    (parseIsoDate(toIsoDate(due)).getTime() -
+      parseIsoDate(toIsoDate(now)).getTime()) /
+      DAY_MS
+  );
+  const names: Record<number, string> = {
+    [-1]: "Yesterday",
+    0: "Today",
+    1: "Tomorrow",
+  };
+  const day =
+    names[days] ??
+    (due.getFullYear() === now.getFullYear()
+      ? dayFormat.format(due)
+      : formatLocalDate(due));
+  return `${day}, ${timeFormat.format(due)}`;
+}

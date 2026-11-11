@@ -1,36 +1,24 @@
 "use client";
 
-import type { ShoppingItem, UserSummary } from "@homesplit/contracts";
+import type { ShoppingItem } from "@homesplit/contracts";
 import {
   useIsMutating,
   useMutationState,
   useQuery,
 } from "@tanstack/react-query";
 import { cn } from "cn";
-import {
-  CheckIcon,
-  EllipsisIcon,
-  PencilIcon,
-  ShoppingCartIcon,
-  Trash2Icon,
-} from "lucide-react";
+import { CheckIcon, ShoppingCartIcon } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { ListSkeleton } from "@/components/list-skeleton";
 import { QueryState } from "@/components/query-state";
+import { RowMenu } from "@/components/row-menu";
 import {
   useFeatureEnabled,
   useHousehold,
-  useIsDeparted,
+  useUserName,
 } from "@/components/shell/household-context";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   createShoppingItemKey,
   shoppingActionKey,
@@ -50,7 +38,6 @@ import { usePurchase, useUnpurchase } from "./use-shopping-actions";
 export function ShoppingList() {
   const { household, members, userId } = useHousehold();
   const enabled = useFeatureEnabled("shopping");
-  const isDeparted = useIsDeparted();
   const acting =
     useIsMutating({ mutationKey: shoppingActionKey(household.id) }) > 0;
   const list = useQuery(shoppingListQuery(household.id, { poll: !acting }));
@@ -73,11 +60,10 @@ export function ShoppingList() {
   const [editing, setEditing] = useState<ShoppingItem | null>(null);
   const [editOpen, setEditOpen] = useState(false);
 
-  const nameOf = (user: UserSummary) =>
-    `${user.name}${isDeparted(user) ? " (left)" : ""}`;
+  const nameOf = useUserName();
   const menuFor = (item: ShoppingItem) =>
     enabled ? (
-      <ItemMenu
+      <RowMenu
         name={item.name}
         onDelete={() => deleteItem(item)}
         onEdit={() => {
@@ -271,42 +257,5 @@ function ItemRow({
           <span aria-hidden className="size-10 shrink-0 sm:size-8" />
         ) : null)}
     </li>
-  );
-}
-
-function ItemMenu({
-  name,
-  onEdit,
-  onDelete,
-}: {
-  name: string;
-  onDelete: () => void;
-  onEdit: () => void;
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            aria-label={`Actions for ${name}`}
-            className="size-10 sm:size-8"
-            size="icon"
-            variant="ghost"
-          />
-        }
-      >
-        <EllipsisIcon aria-hidden />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={onEdit}>
-          <PencilIcon aria-hidden />
-          Edit
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onDelete} variant="destructive">
-          <Trash2Icon aria-hidden />
-          Delete
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
