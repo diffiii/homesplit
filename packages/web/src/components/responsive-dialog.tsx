@@ -148,6 +148,12 @@ export function ResponsiveDialogBody({ children, className }: PartProps) {
 }
 
 export function ResponsiveDialogFooter({ children, className }: PartProps) {
-  const Footer = use(SheetContext) ? DrawerFooter : DialogFooter;
-  return <Footer className={className}>{children}</Footer>;
+  if (use(SheetContext)) {
+    return (
+      <DrawerFooter className={cn("**:data-[slot=button]:h-11", className)}>
+        {children}
+      </DrawerFooter>
+    );
+  }
+  return <DialogFooter className={className}>{children}</DialogFooter>;
 }

@@ -8,7 +8,8 @@ export const CHORE_POLL_INTERVAL = 60_000;
 
 export function choreListQuery(
   householdId: string,
-  query: { assignedToId?: string; includeCompleted: boolean }
+  query: { assignedToId?: string; includeCompleted: boolean },
+  { poll = true } = {}
 ) {
   return infiniteQueryOptions({
     queryKey: [
@@ -26,6 +27,11 @@ export function choreListQuery(
       page * pageSize < totalItems ? page + 1 : undefined,
     // A poll refetches every loaded page, so it stops once the list is long.
     refetchInterval: ({ state }) =>
-      (state.data?.pages.length ?? 1) > 1 ? false : CHORE_POLL_INTERVAL,
+      !poll || (state.data?.pages.length ?? 1) > 1
+        ? false
+        : CHORE_POLL_INTERVAL,
   });
 }
+
+export const choreActionKey = (householdId: string) =>
+  [...queryKeys.household(householdId), "choreAction"] as const;

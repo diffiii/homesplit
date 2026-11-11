@@ -125,7 +125,7 @@ const KIB = 1024;
 const MIB = KIB * KIB;
 
 /** A file size in KB or MB, counting 1024 bytes to a KB as file managers do. */
-export function formatFileSize(bytes: number, locale?: string): string {
+export function formatFileSize(bytes: number, locale = "en"): string {
   const [value, unit] =
     bytes >= MIB ? [bytes / MIB, "megabyte"] : [bytes / KIB, "kilobyte"];
   return new Intl.NumberFormat(locale, {

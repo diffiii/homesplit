@@ -2,6 +2,7 @@
 
 import type { Chore } from "@homesplit/contracts";
 import { cn } from "cn";
+import { useState } from "react";
 import {
   ResponsiveDialog,
   ResponsiveDialogBody,
@@ -25,12 +26,24 @@ import { formatIsoDateTime } from "@/lib/dates";
 interface ChoreDetailsProps {
   chore: Chore | null;
   onOpenChange: (open: boolean) => void;
+  /** Left out while the module is off, which hides the action. */
+  onToggle?: (chore: Chore) => void;
   open: boolean;
 }
 
-/** Everything about one chore, read-only; the list row shows only the gist. */
-export function ChoreDetails({ chore, open, onOpenChange }: ChoreDetailsProps) {
+/** Everything about one chore; the list row shows only the gist. */
+export function ChoreDetails({
+  chore: current,
+  open,
+  onOpenChange,
+  onToggle,
+}: ChoreDetailsProps) {
   const userName = useUserName();
+  // The last chore stays through the closing animation once it leaves the list.
+  const [chore, setChore] = useState(current);
+  if (current && current !== chore) {
+    setChore(current);
+  }
   return (
     <ResponsiveDialog onOpenChange={onOpenChange} open={open}>
       <ResponsiveDialogContent>
@@ -82,6 +95,16 @@ export function ChoreDetails({ chore, open, onOpenChange }: ChoreDetailsProps) {
               <ResponsiveDialogClose render={<Button variant="outline" />}>
                 Close
               </ResponsiveDialogClose>
+              {onToggle ? (
+                <Button
+                  onClick={() => {
+                    onOpenChange(false);
+                    onToggle(chore);
+                  }}
+                >
+                  {chore.isCompleted ? "Reopen" : "Mark as done"}
+                </Button>
+              ) : null}
             </ResponsiveDialogFooter>
           </>
         ) : null}

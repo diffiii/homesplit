@@ -1,11 +1,13 @@
 import type { Chore } from "@homesplit/contracts";
 import { describe, expect, it } from "vitest";
 import {
+  type ChorePages,
   changedFields,
   choreFiltersSearch,
   choreValues,
   isOverdue,
   parseChoreFilters,
+  placeChore,
   toChoreRequest,
   UNASSIGNED,
   validateChore,
@@ -108,6 +110,51 @@ describe("changedFields", () => {
     expect(
       changedFields(original, { ...choreValues(original), dueDate: "" })
     ).toEqual({ dueAt: null });
+  });
+});
+
+describe("placeChore", () => {
+  const pages = (...items: Chore[][]) => ({
+    pageParams: items.map((_, index) => index + 1),
+    pages: items.map((page, index) => ({
+      items: page,
+      page: index + 1,
+      pageSize: 2,
+      totalItems: items.flat().length,
+    })),
+  });
+  const ids = (data: ChorePages) =>
+    data.pages.map((page) => page.items.map((item) => item.id));
+  const done = {
+    isCompleted: true,
+    completedAt: at(2, 9),
+    completedBy: user,
+  } as const;
+
+  const bins = chore("bins", { dueAt: at(11, 9) });
+  const vacuum = chore("vacuum", { dueAt: at(12, 9) });
+  const kettle = chore("kettle");
+  const freezer = chore("freezer", { dueAt: at(1, 9), ...done });
+
+  it("moves a completed chore behind the open ones", () => {
+    const data = pages([bins, vacuum], [kettle, freezer]);
+    expect(ids(placeChore(data, { ...bins, ...done }))).toEqual([
+      ["vacuum"],
+      ["kettle", "freezer", "bins"],
+    ]);
+  });
+
+  it("puts a reopened chore back by its deadline, even when it had gone", () => {
+    const reopened = chore("freezer", { dueAt: at(1, 9) });
+    expect(
+      ids(placeChore(pages([bins, vacuum], [kettle, freezer]), reopened))
+    ).toEqual([["freezer", "bins", "vacuum"], ["kettle"]]);
+    expect(ids(placeChore(pages([bins, kettle]), vacuum))).toEqual([
+      ["bins", "vacuum", "kettle"],
+    ]);
+    expect(ids(placeChore(pages([bins]), kettle))).toEqual([
+      ["bins", "kettle"],
+    ]);
   });
 });
 
