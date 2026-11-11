@@ -24,7 +24,7 @@ import {
   toUpdateExpenseRequest,
   updateExpenseServerErrors,
 } from "@/lib/expense-form";
-import { ExpenseForm } from "../../expense-form";
+import { ExpenseForm, useAttachFiles } from "../../expense-form";
 import { ExpenseQueryState, useExpenseRoute } from "../expense-query";
 
 /** Edit an expense in the form it was added with. */
@@ -94,6 +94,7 @@ function EditExpenseForm({
   const householdId = household.id;
   const router = useRouter();
   const queryClient = useQueryClient();
+  const attachFiles = useAttachFiles();
 
   // The form edits the expense as it was when it opened, and only what
   // differs from that is sent, even if the query refetches meanwhile.
@@ -120,24 +121,27 @@ function EditExpenseForm({
     <ExpenseForm
       defaultValues={defaultValues}
       kept={kept}
-      onSubmit={async (value) => {
+      onSubmit={async (value, attachments) => {
         const body = toUpdateExpenseRequest(value, expense, userId);
         if (!body) {
           return;
         }
-        if (Object.keys(body).length === 0) {
-          // Nothing changed, and the API rejects an empty patch.
-          router.push(expensePath);
-          return;
+        // The API rejects an empty patch, so only files may be saved.
+        if (Object.keys(body).length > 0) {
+          const saved = await update.mutateAsync(body);
+          queryClient.setQueryData(
+            queryKeys.endpoint("getExpense", {
+              params: { householdId, expenseId: saved.id },
+            }),
+            saved
+          );
         }
-        const saved = await update.mutateAsync(body);
-        queryClient.setQueryData(
-          queryKeys.endpoint("getExpense", {
-            params: { householdId, expenseId: saved.id },
-          }),
-          saved
-        );
-        await invalidate(queryClient, ledgerQueryKeys(householdId));
+        if (attachments.length > 0) {
+          await attachFiles(expense.id, attachments);
+        }
+        if (Object.keys(body).length > 0 || attachments.length > 0) {
+          await invalidate(queryClient, ledgerQueryKeys(householdId));
+        }
         router.push(expensePath);
       }}
       serverErrors={(error, value, nameOf) =>

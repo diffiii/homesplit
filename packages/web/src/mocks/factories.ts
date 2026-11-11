@@ -1,4 +1,5 @@
 import type {
+  AttachmentMimeType,
   CurrencyCode,
   ExpenseAllocationInput,
   ExpenseCategory,
@@ -6,6 +7,7 @@ import type {
 } from "@homesplit/contracts";
 import type { HouseholdRole } from "@/lib/api/auth-client";
 import type {
+  MockAttachment,
   MockChore,
   MockExpense,
   MockHousehold,
@@ -68,6 +70,8 @@ export function emptyState(): MockState {
     invitations: [],
     categories: [],
     expenses: [],
+    attachments: [],
+    expenseAttachments: [],
     settlements: [],
     chores: [],
     shoppingItems: [],
@@ -236,6 +240,34 @@ export class MockFactory {
     } satisfies MockExpense;
     this.state.expenses.push(expense);
     return expense;
+  }
+
+  /** A file uploaded by `uploadedBy` and linked to `expense`. */
+  attachment(
+    expense: MockExpense,
+    input: Ago & {
+      mimeType: AttachmentMimeType;
+      sizeBytes: number;
+      uploadedBy: MockUser;
+    }
+  ): MockAttachment {
+    const createdAt = this.time(input);
+    const attachment = {
+      id: this.id(),
+      householdId: expense.householdId,
+      mimeType: input.mimeType,
+      sizeBytes: input.sizeBytes,
+      uploadedById: input.uploadedBy.id,
+      createdAt,
+    };
+    this.state.attachments.push(attachment);
+    this.state.expenseAttachments.push({
+      householdId: expense.householdId,
+      expenseId: expense.id,
+      attachmentId: attachment.id,
+      createdAt,
+    });
+    return attachment;
   }
 
   settlement(

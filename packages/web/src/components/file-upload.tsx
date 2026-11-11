@@ -371,7 +371,8 @@ function Preview({ item }: { item: UploadItem }) {
   );
 }
 
-function fileIcon(type: AttachmentMimeType | null) {
+/** The icon for a file of `type`: a document for PDFs, a picture for images. */
+export function fileIcon(type: AttachmentMimeType | null): LucideIcon {
   if (type === "application/pdf") {
     return FileTextIcon;
   }

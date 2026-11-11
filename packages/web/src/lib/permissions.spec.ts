@@ -105,11 +105,14 @@ describe("permissionsFor", () => {
     for (const caller of [owner, admin, member]) {
       expect(as(caller).editExpense(expense)).toBe(true);
       expect(as(caller).deleteExpense(expense)).toBe(true);
+      expect(as(caller).editExpenseAttachments(expense)).toBe(true);
     }
     const others = { author: user("someone") };
     expect(as(member).editExpense(others)).toBe(false);
     expect(as(member).deleteExpense(others)).toBe(false);
+    expect(as(member).editExpenseAttachments(others)).toBe(false);
     expect(as(admin).editExpense(others)).toBe(true);
+    expect(as(admin).editExpenseAttachments(others)).toBe(true);
   });
 
   describe("payments", () => {
