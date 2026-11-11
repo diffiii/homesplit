@@ -25,7 +25,7 @@ export function BoughtSection({
           <Button
             aria-controls={listId}
             aria-expanded={open}
-            className="-ml-2.5"
+            className="aria-expanded:not-hover:bg-transparent"
             onClick={() => {
               setOpen(!open);
               rememberBoughtOpen(!open);

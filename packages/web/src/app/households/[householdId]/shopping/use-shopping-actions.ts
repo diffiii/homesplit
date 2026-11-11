@@ -37,6 +37,8 @@ function useToggle(
   });
   return useMutation({
     mutationKey,
+    // Taps go out one at a time, in order, so the last one wins on the server.
+    scope: { id: mutationKey.join("/") },
     mutationFn: (item: ShoppingItem) =>
       api(endpoint, { params: { householdId, itemId: item.id } }),
     onMutate: callbacks.onMutate,
