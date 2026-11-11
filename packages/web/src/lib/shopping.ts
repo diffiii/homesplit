@@ -36,7 +36,7 @@ function quantityError(input: string): string | undefined {
     return;
   }
   if (!WHOLE_NUMBER.test(trimmed)) {
-    return "Enter a whole number, like 2.";
+    return "Use a whole number.";
   }
   const quantity = Number(trimmed);
   if (quantity < 1) {
@@ -62,11 +62,11 @@ export function validateShoppingItem(
   return Object.keys(fields).length > 0 ? { fields } : undefined;
 }
 
-export function toShoppingItemRequest(values: ShoppingItemFormValues): {
-  name: string;
-  quantity: number;
-  unit: string | null;
-} {
+export type ShoppingItemBody = Required<CreateShoppingItemRequest>;
+
+export function toShoppingItemRequest(
+  values: ShoppingItemFormValues
+): ShoppingItemBody {
   const quantity = values.quantity.trim();
   return {
     name: values.name.trim(),

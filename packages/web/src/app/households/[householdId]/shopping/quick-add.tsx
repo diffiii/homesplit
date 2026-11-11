@@ -14,18 +14,17 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { createShoppingItemKey } from "@/lib/api/shopping-queries";
 import {
   EMPTY_SHOPPING_ITEM_VALUES,
+  type ShoppingItemBody,
   toShoppingItemRequest,
   validateShoppingItem,
 } from "@/lib/shopping";
-
-type NewItem = ReturnType<typeof toShoppingItemRequest>;
 
 export function QuickAdd() {
   const householdId = useHouseholdId();
   const nameRef = useRef<HTMLInputElement>(null);
   const create = useMutation({
     mutationKey: createShoppingItemKey(householdId),
-    mutationFn: (body: NewItem) =>
+    mutationFn: (body: ShoppingItemBody) =>
       api("createShoppingItem", { params: { householdId }, body }),
     onError: (error, item) => {
       toast.error(`Couldn't add “${item.name}”`, {
@@ -70,7 +69,8 @@ export function QuickAdd() {
             )}
           </form.AppField>
         </div>
-        <div className="row-start-2 sm:col-start-2 sm:row-start-1">
+        {/* The error runs past the narrow column instead of wrapping in it. */}
+        <div className="row-start-2 sm:col-start-2 sm:row-start-1 [&_[data-slot=field-error]]:whitespace-nowrap">
           <form.AppField name="quantity">
             {(field) => (
               <field.TextField

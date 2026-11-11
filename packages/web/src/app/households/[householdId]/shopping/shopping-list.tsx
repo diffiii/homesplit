@@ -30,11 +30,9 @@ import {
   createShoppingItemKey,
   shoppingListQuery,
 } from "@/lib/api/shopping-queries";
-import { formatQuantity, type toShoppingItemRequest } from "@/lib/shopping";
+import { formatQuantity, type ShoppingItemBody } from "@/lib/shopping";
 import { ItemDialog } from "./item-dialog";
 import { useDeferredDelete } from "./use-deferred-delete";
-
-type NewItem = ReturnType<typeof toShoppingItemRequest>;
 
 export function ShoppingList() {
   const { household, members, userId } = useHousehold();
@@ -48,7 +46,7 @@ export function ShoppingList() {
     },
     select: (mutation) => ({
       id: mutation.mutationId,
-      item: mutation.state.variables as NewItem,
+      item: mutation.state.variables as ShoppingItemBody,
     }),
   });
   const me = members.find((member) => member.userId === userId)?.user;

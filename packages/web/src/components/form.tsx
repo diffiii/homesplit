@@ -578,11 +578,15 @@ function UnitField({
 }) {
   const field = useFieldContext<string>();
   const value = useStore(field.store, (state) => state.value);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useValueFromBeforeHydration(field, inputRef);
   return (
     <FieldShell description={description} label={label}>
       {(control) => (
         <UnitPicker
           {...control}
+          inputRef={inputRef}
+          name={field.name}
           onBlur={field.handleBlur}
           onValueChange={field.handleChange}
           value={value}

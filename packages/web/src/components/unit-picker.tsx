@@ -1,5 +1,6 @@
 "use client";
 
+import type { RefObject } from "react";
 import {
   Autocomplete,
   AutocompleteContent,
@@ -13,6 +14,8 @@ interface UnitPickerProps {
   "aria-describedby"?: string;
   "aria-invalid"?: boolean;
   id?: string;
+  inputRef?: RefObject<HTMLInputElement | null>;
+  name?: string;
   onBlur?: () => void;
   onValueChange: (unit: string) => void;
   value: string;
@@ -22,6 +25,7 @@ export function UnitPicker({
   value,
   onValueChange,
   onBlur,
+  inputRef,
   ...input
 }: UnitPickerProps) {
   return (
@@ -30,7 +34,12 @@ export function UnitPicker({
       onValueChange={(next) => onValueChange(next)}
       value={value}
     >
-      <AutocompleteInput {...input} onBlur={onBlur} placeholder="pcs, kg, …" />
+      <AutocompleteInput
+        {...input}
+        onBlur={onBlur}
+        placeholder="pcs, kg, …"
+        ref={inputRef}
+      />
       <AutocompleteContent>
         <AutocompleteList>
           {(unit: string) => (

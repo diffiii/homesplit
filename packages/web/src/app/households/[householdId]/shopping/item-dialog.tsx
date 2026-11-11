@@ -22,6 +22,7 @@ import { invalidate } from "@/lib/api/queries";
 import { queryKeys } from "@/lib/api/query-keys";
 import { applyServerErrors, showServerErrors } from "@/lib/form";
 import {
+  type ShoppingItemBody,
   shoppingItemValues,
   toShoppingItemRequest,
   validateShoppingItem,
@@ -63,7 +64,7 @@ function ItemForm({
       queryKeys.endpoint("listShoppingItems", { params: { householdId } }),
     ]);
   const update = useMutation({
-    mutationFn: (body: ReturnType<typeof toShoppingItemRequest>) =>
+    mutationFn: (body: ShoppingItemBody) =>
       api("updateShoppingItem", {
         params: { householdId, itemId: item.id },
         body,

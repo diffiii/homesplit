@@ -156,9 +156,7 @@ describe("ShoppingPage", () => {
 
     await user.type(screen.getByLabelText("Item"), "Rice");
     await user.type(screen.getByLabelText("Quantity"), "1.5{Enter}");
-    expect(
-      await screen.findByText("Enter a whole number, like 2.")
-    ).toBeVisible();
+    expect(await screen.findByText("Use a whole number.")).toBeVisible();
     expect(screen.getByLabelText("Item")).toHaveValue("   Rice");
     expect(itemsOf(flat().id)).toHaveLength(before);
   });

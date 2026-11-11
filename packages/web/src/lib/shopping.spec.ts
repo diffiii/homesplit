@@ -47,9 +47,9 @@ describe("validateShoppingItem", () => {
 
   it.each([
     ["0", "Enter 1 or more."],
-    ["1.5", "Enter a whole number, like 2."],
-    ["-2", "Enter a whole number, like 2."],
-    ["two", "Enter a whole number, like 2."],
+    ["1.5", "Use a whole number."],
+    ["-2", "Use a whole number."],
+    ["two", "Use a whole number."],
     ["2147483648", "Enter a smaller number."],
   ])("rejects the quantity %s", (quantity, message) => {
     expect(
