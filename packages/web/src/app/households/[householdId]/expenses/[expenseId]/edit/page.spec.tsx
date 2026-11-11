@@ -1,5 +1,5 @@
 import type { UpdateExpenseRequest } from "@homesplit/contracts";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { HouseholdShell } from "@/components/shell/household-shell";
@@ -167,6 +167,27 @@ describe("EditExpensePage", () => {
 
     await waitFor(() => expect(router.push).toHaveBeenCalled());
     expect(patches).toEqual([]);
+  });
+
+  it("attaches files without sending anything else", async () => {
+    const patches = capturePatches();
+    const { id } = expenseNamed("Pizza night");
+    const { user } = renderEdit("Pizza night");
+    await user.upload(
+      await screen.findByLabelText("Choose files"),
+      new File([new Uint8Array(2048)], "receipt.jpg", { type: "image/jpeg" })
+    );
+    await within(screen.getByRole("list", { name: "Files" })).findByText(
+      "Uploaded",
+      { exact: false }
+    );
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(router.push).toHaveBeenCalled());
+    expect(patches).toEqual([]);
+    expect(
+      db.state.expenseAttachments.filter(({ expenseId }) => expenseId === id)
+    ).toHaveLength(1);
   });
 
   it("keeps people who left selectable after unchecking them", async () => {

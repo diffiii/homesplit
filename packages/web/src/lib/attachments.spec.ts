@@ -4,6 +4,7 @@ import { ApiRequestError } from "./api/api-error";
 import {
   ATTACHMENT_ACCEPT,
   ATTACHMENT_MAX_BYTES,
+  attachErrorMessage,
   attachmentFileError,
   attachmentTypeOf,
   formatFileSize,
@@ -96,6 +97,37 @@ describe("uploadErrorMessage", () => {
     expect(
       uploadErrorMessage(ApiRequestError.network("api", new Error("offline")))
     ).toBe("Couldn't reach HomeSplit. Check your connection and try again.");
+  });
+});
+
+describe("attachErrorMessage", () => {
+  const limitReached = (details?: unknown) =>
+    ApiRequestError.fromBody("api", 409, {
+      code: "EXPENSE_ATTACHMENT_LIMIT_REACHED",
+      message: "Limit reached",
+      details,
+    });
+
+  it("says the limit when the expense has as many files as it can", () => {
+    expect(attachErrorMessage(limitReached({ limit: 10 }))).toBe(
+      "An expense can have up to 10 files."
+    );
+    expect(attachErrorMessage(limitReached())).toBe(
+      "This expense can't have any more files."
+    );
+  });
+
+  it("falls back to the shared messages", () => {
+    expect(
+      attachErrorMessage(
+        ApiRequestError.fromBody("api", 403, {
+          code: "MODULE_DISABLED",
+          message: "Disabled",
+        })
+      )
+    ).toBe(
+      "This module is turned off for the household. An admin can turn it back on in settings."
+    );
   });
 });
 

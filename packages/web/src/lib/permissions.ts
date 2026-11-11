@@ -100,6 +100,9 @@ export function permissionsFor(caller: Caller, members: readonly MemberRef[]) {
       admin || self(expense.author),
     deleteExpense: (expense: { author: UserRef }) =>
       admin || self(expense.author),
+    /** Attach files to an expense and detach them. */
+    editExpenseAttachments: (expense: { author: UserRef }) =>
+      admin || self(expense.author),
     recordPayment: (payment: Parties) => admin || isParty(payment),
     /** Nobody confirms their own payment. */
     confirmPayment: (payment: PaymentRef) =>

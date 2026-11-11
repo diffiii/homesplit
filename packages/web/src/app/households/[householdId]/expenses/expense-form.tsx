@@ -1,14 +1,24 @@
 "use client";
 
-import type { UserSummary } from "@homesplit/contracts";
+import type {
+  Attachment,
+  AttachmentSummary,
+  Expense,
+  UserSummary,
+} from "@homesplit/contracts";
 import { revalidateLogic, useStore } from "@tanstack/react-form";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { FileUpload } from "@/components/file-upload";
 import { useAppForm } from "@/components/form";
 import { useHousehold } from "@/components/shell/household-context";
+import { FieldDescription, FieldLegend, FieldSet } from "@/components/ui/field";
 import { isApiRequestError } from "@/lib/api/api-error";
+import { api } from "@/lib/api/client";
 import { invalidate } from "@/lib/api/queries";
 import { queryKeys } from "@/lib/api/query-keys";
+import { attachErrorMessage } from "@/lib/attachments";
 import { type ExpenseFormValues, validateExpense } from "@/lib/expense-form";
 import { type ServerErrors, showServerErrors } from "@/lib/form";
 import { useCategorySuggestion } from "./category-suggestion";
@@ -32,6 +42,56 @@ export function useMemberSummaries(): UserSummary[] {
 
 const NO_ONE: readonly UserSummary[] = [];
 
+/**
+ * Links files uploaded in the form to the saved expense, one at a time so
+ * they keep the order they were added in, and adds them to its cached copy.
+ * The expense is saved by then, so a file that can't be linked is reported
+ * in a toast rather than failing the form.
+ */
+export function useAttachFiles() {
+  const { household } = useHousehold();
+  const queryClient = useQueryClient();
+  return async (expenseId: string, attachments: readonly Attachment[]) => {
+    const params = { householdId: household.id, expenseId };
+    const linked: AttachmentSummary[] = [];
+    const failures: unknown[] = [];
+    for (const { id } of attachments) {
+      try {
+        linked.push(
+          // biome-ignore lint/performance/noAwaitInLoops: one at a time, so the files are linked in the order they were added.
+          await api("linkExpenseAttachment", {
+            params,
+            body: { attachmentId: id },
+          })
+        );
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    queryClient.setQueryData<Expense>(
+      queryKeys.endpoint("getExpense", { params }),
+      (expense) =>
+        expense && {
+          ...expense,
+          attachments: [
+            ...expense.attachments.filter(
+              ({ id }) => !linked.some((summary) => summary.id === id)
+            ),
+            ...linked,
+          ],
+        }
+    );
+    const [failure] = failures;
+    if (failure !== undefined) {
+      const files =
+        failures.length === 1 ? "a file" : `${failures.length} files`;
+      toast.error(
+        `The expense was saved, but ${files} couldn't be attached. ${attachErrorMessage(failure)}`
+      );
+    }
+  };
+}
+
 interface ExpenseFormProps {
   defaultValues: ExpenseFormValues;
   /**
@@ -39,8 +99,14 @@ interface ExpenseFormProps {
    * leaving the household.
    */
   kept?: readonly UserSummary[];
-  /** Saves `values` once they pass `validateExpense`. */
-  onSubmit: (values: ExpenseFormValues) => Promise<void>;
+  /**
+   * Saves `values` once they pass `validateExpense`, and attaches the files
+   * uploaded in the form, in the order they were added.
+   */
+  onSubmit: (
+    values: ExpenseFormValues,
+    attachments: readonly Attachment[]
+  ) => Promise<void>;
   /** Where the server's answer to a failed `onSubmit` goes. */
   serverErrors: (
     error: unknown,
@@ -76,6 +142,10 @@ export function ExpenseForm({
   }, [members]);
   const nameOf = (id: string) => seen.current.get(id)?.name ?? "Someone";
 
+  const [uploading, setUploading] = useState(false);
+  // Read when submitting, which may run after the render that set them.
+  const attachments = useRef<readonly Attachment[]>([]);
+
   const form = useAppForm({
     defaultValues,
     // `CreateExpenseRequest` validates the form, so client and server agree on
@@ -87,7 +157,7 @@ export function ExpenseForm({
     },
     onSubmit: async ({ value, formApi }) => {
       try {
-        await onSubmit(value);
+        await onSubmit(value, attachments.current);
       } catch (error) {
         showServerErrors(formApi, serverErrors(error, value, nameOf));
         if (isApiRequestError(error) && error.code === "INVALID_REFERENCE") {
@@ -173,10 +243,31 @@ export function ExpenseForm({
             )
           }
         </form.Subscribe>
+        <FieldSet className="gap-2">
+          <FieldLegend variant="label">Files</FieldLegend>
+          <FieldDescription>
+            Photos of the receipt, the invoice, or anything else that documents
+            it.
+          </FieldDescription>
+          <FileUpload
+            householdId={household.id}
+            onAttachmentsChange={(uploaded) => {
+              attachments.current = uploaded;
+            }}
+            onPendingChange={setUploading}
+          />
+        </FieldSet>
         <form.FormError />
-        <form.SubmitButton className="self-start">
-          {submitLabel}
-        </form.SubmitButton>
+        <div className="flex flex-wrap items-center gap-3">
+          <form.SubmitButton disabled={uploading}>
+            {submitLabel}
+          </form.SubmitButton>
+          {uploading ? (
+            <p className="text-muted-foreground text-sm">
+              Waiting for the files to upload…
+            </p>
+          ) : null}
+        </div>
       </form.Form>
     </form.AppForm>
   );

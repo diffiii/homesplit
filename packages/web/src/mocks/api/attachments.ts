@@ -1,28 +1,93 @@
 import {
   ATTACHMENT_MIME_TYPES,
   ATTACHMENT_UPLOAD_FIELD,
+  type AttachmentMimeType,
 } from "@homesplit/contracts";
 import { ATTACHMENT_MAX_BYTES, attachmentTypeOf } from "@/lib/attachments";
 import { now } from "../db";
 import type { MockRoutes } from "../routes";
-import { uploadedFile } from "./shared";
+import { findInHousehold, uploadedFile } from "./shared";
+
+/** How long a download link works, as the backend's default TTL. */
+const DOWNLOAD_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * Object URLs of the files uploaded since the page loaded, by attachment ID.
+ * They can't be saved with the state, so after a reload, and for seeded
+ * files, a download gets a sample of the file's type instead.
+ */
+const contents = new Map<string, string>();
+
+const SAMPLE_IMAGE = `data:image/svg+xml,${encodeURIComponent(
+  [
+    '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800">',
+    '<rect width="600" height="800" fill="#fafaf9"/>',
+    '<rect x="60" y="60" width="480" height="680" rx="12" fill="#fff" stroke="#d6d3d1" stroke-width="4"/>',
+    '<text x="300" y="400" fill="#57534e" font-family="sans-serif" font-size="36" text-anchor="middle">Sample receipt</text>',
+    "</svg>",
+  ].join("")
+)}`;
+
+const SAMPLE_PDF = [
+  "%PDF-1.4",
+  "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+  "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
+  "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj",
+  "4 0 obj << /Length 52 >> stream",
+  "BT /F1 24 Tf 72 760 Td (Sample invoice) Tj ET",
+  "endstream endobj",
+  "5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
+  "trailer << /Root 1 0 R >>",
+  "%%EOF",
+].join("\n");
+
+/** A URL with sample content of `type`: an image or a one-page PDF. */
+function sampleUrl(type: AttachmentMimeType): string {
+  if (type !== "application/pdf") {
+    return SAMPLE_IMAGE;
+  }
+  // Browsers won't open a `data:` URL in a tab, but jsdom has no object URLs.
+  if (typeof URL.createObjectURL === "function") {
+    return URL.createObjectURL(new Blob([SAMPLE_PDF], { type }));
+  }
+  return `data:${type};base64,${btoa(SAMPLE_PDF)}`;
+}
 
 export const attachmentRoutes: MockRoutes = {
   uploadAttachment: {
-    // Nothing is stored yet, so the attachment can't be downloaded or linked.
     resolve: ({ db, form, household, userId }) => {
       const { file, type } = uploadedFile(form, ATTACHMENT_UPLOAD_FIELD, {
         allowed: ATTACHMENT_MIME_TYPES,
         maxBytes: ATTACHMENT_MAX_BYTES,
         typeOf: attachmentTypeOf,
       });
-      return {
+      const attachment = {
         id: crypto.randomUUID(),
         householdId: household.id,
         mimeType: type,
         sizeBytes: file.size,
-        uploadedBy: db.summary(userId),
+        uploadedById: userId,
         createdAt: now(),
+      };
+      db.state.attachments.push(attachment);
+      if (typeof URL.createObjectURL === "function") {
+        contents.set(attachment.id, URL.createObjectURL(file));
+      }
+      const { uploadedById, ...rest } = attachment;
+      return { ...rest, uploadedBy: db.summary(uploadedById) };
+    },
+  },
+
+  getAttachmentDownload: {
+    resolve: ({ db, household, params }) => {
+      const attachment = findInHousehold(
+        db.state.attachments,
+        household.id,
+        params.attachmentId
+      );
+      return {
+        url: contents.get(attachment.id) ?? sampleUrl(attachment.mimeType),
+        expiresAt: new Date(Date.now() + DOWNLOAD_TTL_MS).toISOString(),
       };
     },
   },

@@ -51,6 +51,7 @@ const BARTEK_ROW = /^Bartek/u;
 const KWD = /^KWD/u;
 const PLN_63 = /^PLN\s63/u;
 const PLN_60 = /^PLN\s60/u;
+const UPLOADED = /Uploaded/u;
 
 /** A person's checkbox; someone who left also has a badge in its name. */
 const person = (name: string) =>
@@ -247,6 +248,104 @@ describe("NewExpensePage", () => {
       `/households/${householdId}/expenses/${expense?.id}`
     );
     expect(queryClient.getQueryState(balances)?.isInvalidated).toBe(true);
+  });
+
+  describe("files", () => {
+    const photo = () =>
+      new File([new Uint8Array(2048)], "receipt.jpg", { type: "image/jpeg" });
+    const pdf = () =>
+      new File([new Uint8Array(4096)], "invoice.pdf", {
+        type: "application/pdf",
+      });
+
+    async function fillIn() {
+      const rendered = renderForm();
+      const { user } = rendered;
+      await user.type(await screen.findByLabelText("Name"), "Receipts");
+      await user.type(screen.getByLabelText("Amount"), "20");
+      return rendered;
+    }
+
+    it("attaches the uploaded files in the order they were added", async () => {
+      const { user, queryClient } = await fillIn();
+      await user.upload(screen.getByLabelText("Choose files"), [
+        photo(),
+        pdf(),
+      ]);
+      const files = screen.getByRole("list", { name: "Files" });
+      await waitFor(() =>
+        expect(within(files).getAllByText(UPLOADED)).toHaveLength(2)
+      );
+      await user.click(screen.getByRole("button", { name: "Add expense" }));
+
+      await waitFor(() => expect(router.push).toHaveBeenCalled());
+      const expense = db.state.expenses.find(({ name }) => name === "Receipts");
+      const linked = db.state.expenseAttachments
+        .filter(({ expenseId }) => expenseId === expense?.id)
+        .map(
+          ({ attachmentId }) =>
+            db.state.attachments.find(({ id }) => id === attachmentId)?.mimeType
+        );
+      expect(linked).toEqual(["image/jpeg", "application/pdf"]);
+      expect(
+        queryClient.getQueryData<{ attachments: unknown[] }>(
+          queryKeys.endpoint("getExpense", {
+            params: { householdId: flat().id, expenseId: expense?.id ?? "" },
+          })
+        )?.attachments
+      ).toHaveLength(2);
+    });
+
+    it("waits for the files to upload before saving", async () => {
+      server.use(
+        http.post("*/api/households/:householdId/attachments", async () => {
+          await delay("infinite");
+          return HttpResponse.json({});
+        })
+      );
+      const { user } = await fillIn();
+      await user.upload(screen.getByLabelText("Choose files"), photo());
+
+      expect(
+        await screen.findByText("Waiting for the files to upload…")
+      ).toBeVisible();
+      expect(
+        screen.getByRole("button", { name: "Add expense" })
+      ).toBeDisabled();
+    });
+
+    it("saves the expense and says when a file couldn't be attached", async () => {
+      server.use(
+        http.post(
+          "*/api/households/:householdId/expenses/:expenseId/attachments",
+          () =>
+            HttpResponse.json(
+              {
+                code: "EXPENSE_ATTACHMENT_LIMIT_REACHED",
+                message: "Limit reached",
+                details: { limit: 10 },
+              },
+              { status: 409 }
+            )
+        )
+      );
+      const { user } = await fillIn();
+      await user.upload(screen.getByLabelText("Choose files"), photo());
+      await within(screen.getByRole("list", { name: "Files" })).findByText(
+        UPLOADED
+      );
+      await user.click(screen.getByRole("button", { name: "Add expense" }));
+
+      expect(
+        await screen.findByText(
+          "The expense was saved, but a file couldn't be attached. An expense can have up to 10 files."
+        )
+      ).toBeVisible();
+      await waitFor(() => expect(router.push).toHaveBeenCalled());
+      expect(db.state.expenses.some(({ name }) => name === "Receipts")).toBe(
+        true
+      );
+    });
   });
 
   it("names a participant who left meanwhile and saves once they're unchecked", async () => {

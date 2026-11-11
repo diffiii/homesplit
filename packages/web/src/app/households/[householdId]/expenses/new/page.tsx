@@ -29,7 +29,11 @@ import {
   readLastExpenseCurrency,
   rememberExpenseCurrency,
 } from "@/lib/recent-currencies";
-import { ExpenseForm, useMemberSummaries } from "../expense-form";
+import {
+  ExpenseForm,
+  useAttachFiles,
+  useMemberSummaries,
+} from "../expense-form";
 
 /**
  * Add an expense: by default the user paid it all and it's split equally, and
@@ -63,6 +67,7 @@ function NewExpenseForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const members = useMemberSummaries();
+  const attachFiles = useAttachFiles();
 
   const create = useMutation({
     mutationFn: (body: CreateExpenseRequest) =>
@@ -80,7 +85,7 @@ function NewExpenseForm() {
   return (
     <ExpenseForm
       defaultValues={defaultValues}
-      onSubmit={async (value) => {
+      onSubmit={async (value, attachments) => {
         const body = toCreateExpenseRequest(value, userId);
         if (!body) {
           return;
@@ -93,6 +98,7 @@ function NewExpenseForm() {
           }),
           expense
         );
+        await attachFiles(expense.id, attachments);
         await invalidate(queryClient, ledgerQueryKeys(householdId));
         router.push(`${householdPath(householdId, "expenses")}/${expense.id}`);
       }}
