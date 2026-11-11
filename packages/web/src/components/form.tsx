@@ -44,6 +44,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { UnitPicker } from "@/components/unit-picker";
 
 const { fieldContext, formContext, useFieldContext, useFormContext } =
   createFormHookContexts();
@@ -147,13 +148,20 @@ interface TextFieldProps
     "autoComplete" | "disabled" | "inputMode" | "placeholder" | "type"
   > {
   description?: ReactNode;
+  inputRef?: RefObject<HTMLInputElement | null>;
   label: ReactNode;
 }
 
-function TextField({ label, description, ...input }: TextFieldProps) {
+function TextField({
+  label,
+  description,
+  inputRef: givenRef,
+  ...input
+}: TextFieldProps) {
   const field = useFieldContext<string>();
   const value = useStore(field.store, (state) => state.value);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const ownRef = useRef<HTMLInputElement>(null);
+  const inputRef = givenRef ?? ownRef;
   useValueFromBeforeHydration(field, inputRef);
   return (
     <FieldShell description={description} label={label}>
@@ -561,6 +569,33 @@ function CategoryField({
   );
 }
 
+function UnitField({
+  label,
+  description,
+}: {
+  description?: ReactNode;
+  label: ReactNode;
+}) {
+  const field = useFieldContext<string>();
+  const value = useStore(field.store, (state) => state.value);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useValueFromBeforeHydration(field, inputRef);
+  return (
+    <FieldShell description={description} label={label}>
+      {(control) => (
+        <UnitPicker
+          {...control}
+          inputRef={inputRef}
+          name={field.name}
+          onBlur={field.handleBlur}
+          onValueChange={field.handleChange}
+          value={value}
+        />
+      )}
+    </FieldShell>
+  );
+}
+
 /**
  * The `<form>` element: submits through TanStack Form and leaves validation to
  * it. Should the browser submit it before React hydrates, it posts, so what
@@ -645,6 +680,7 @@ export const { useAppForm, withForm } = createFormHook({
     SelectField,
     EmojiField,
     CategoryField,
+    UnitField,
   },
   formComponents: { Form: FormRoot, FormError, SubmitButton },
 });
