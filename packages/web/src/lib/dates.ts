@@ -69,3 +69,31 @@ export function formatLocalDate(value: Date | IsoDateTime): string {
 export function formatIsoDateTime(value: IsoDateTime): string {
   return dateTimeFormat.format(new Date(value));
 }
+
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+const relativeFormat = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
+export function formatRelativeTime(
+  value: IsoDateTime,
+  now = new Date()
+): string {
+  const then = new Date(value);
+  const elapsed = now.getTime() - then.getTime();
+  if (elapsed < MINUTE_MS) {
+    return "just now";
+  }
+  if (elapsed < HOUR_MS) {
+    return relativeFormat.format(-Math.floor(elapsed / MINUTE_MS), "minute");
+  }
+  const days = Math.round(
+    (parseIsoDate(toIsoDate(now)).getTime() -
+      parseIsoDate(toIsoDate(then)).getTime()) /
+      DAY_MS
+  );
+  if (days === 0) {
+    return relativeFormat.format(-Math.floor(elapsed / HOUR_MS), "hour");
+  }
+  return days < 7 ? relativeFormat.format(-days, "day") : formatLocalDate(then);
+}
