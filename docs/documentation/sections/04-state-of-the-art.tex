@@ -32,7 +32,7 @@ Przeanalizowane aplikacje (tab.~\ref{tab:porownanie-aplikacji}) koncentrują si�
 
 \subsection{Automatyczny odczyt danych z~paragonów}
 
-Odczyt paragonów jest dobrze zdefiniowanym problemem badawczym, dla którego istnieją publiczne zbiory danych i~miary oceny. W~konkursie SROIE, zorganizowanym w~ramach konferencji ICDAR 2019, przygotowano zbiór 1000~zeskanowanych paragonów i~trzy zadania: lokalizację tekstu na obrazie, rozpoznawanie tekstu (OCR) oraz ekstrakcję kluczowych informacji -- nazwy sprzedawcy, adresu, daty i~sumy~\cite{huang2019sroie}. Organizatorzy zwrócili uwagę, że jakość ekstrakcji informacji wciąż wyraźnie odbiega od oczekiwań, mimo dobrych wyników w~samym rozpoznawaniu tekstu.
+Dla odczytu paragonów istnieją publiczne zbiory danych i~miary oceny. W~konkursie SROIE, zorganizowanym w~ramach konferencji ICDAR 2019, przygotowano zbiór 1000~zeskanowanych paragonów i~trzy zadania: lokalizację tekstu na obrazie, rozpoznawanie tekstu (OCR) oraz ekstrakcję kluczowych informacji -- nazwy sprzedawcy, adresu, daty i~sumy~\cite{huang2019sroie}. Organizatorzy zwrócili uwagę, że jakość ekstrakcji informacji wciąż wyraźnie odbiega od oczekiwań, mimo dobrych wyników w~samym rozpoznawaniu tekstu.
 
 Zbiór CORD zawiera paragony z~indonezyjskich sklepów i~restauracji, opisane zarówno na potrzeby OCR, jak i~wielopoziomowymi etykietami semantycznymi (np. nazwa pozycji, liczba sztuk, cena, suma). Służy do oceny parsowania struktury paragonu po rozpoznaniu tekstu; publicznie udostępniono 1000~obrazów~\cite{park2019cord}.
 
@@ -70,6 +70,6 @@ Z~przeglądu wynikają następujące wnioski dla projektu:
 
 \begin{itemize}
   \item odczyt paragonów jest w~istniejących aplikacjach funkcją płatną lub niedostępną, dlatego funkcje sztucznej inteligencji (odczyt paragonów, kategorie, dopasowanie do listy zakupów) stanowią wyróżnik HomeSplit;
-  \item odczyt paragonów jest dobrze opisanym zadaniem z~publicznymi zbiorami danych, co pozwala ocenić skuteczność rozwiązania przez porównanie z~wartościami referencyjnymi;
-  \item upraszczanie rozliczeń jest dobrze opisanym problemem; prosty algorytm zachłanny, uzupełniony testami poprawności obliczeń, zapewnia akceptowalną liczbę przelewów.
+  \item skuteczność odczytu paragonów można ocenić, porównując wyniki z~wartościami referencyjnymi, podobnie jak w~zbiorach SROIE i~CORD;
+  \item do wyznaczania sugestii rozliczeń wystarczy algorytm zachłanny, który daje co najwyżej $n-1$ przelewów, a~jego poprawność można sprawdzić testami jednostkowymi.
 \end{itemize}

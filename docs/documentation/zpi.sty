@@ -32,6 +32,7 @@
 \setlength\emergencystretch{1.5em}
 
 % Headings
+\RequirePackage{etoolbox}
 \RequirePackage{titlesec}
 \titleformat{\section}{\fontsize{14}{17}\selectfont\bfseries}{\thesection.}{0.5em}{}
 \titleformat{\subsection}{\normalsize\bfseries}{\thesubsection.}{0.5em}{}
@@ -39,6 +40,9 @@
 \titlespacing*{\section}{0pt}{18pt plus 4pt minus 2pt}{8pt plus 2pt}
 \titlespacing*{\subsection}{0pt}{12pt plus 3pt minus 2pt}{6pt plus 2pt}
 \titlespacing*{\subsubsection}{0pt}{10pt plus 2pt minus 2pt}{4pt plus 2pt}
+\RequirePackage{needspace}
+\preto\subsection{\needspace{6\baselineskip}}
+\preto\subsubsection{\needspace{8\baselineskip}}
 
 \newcommand\zpiczesc[1]{%
   \clearpage
@@ -59,6 +63,8 @@
 
 % Packages
 \RequirePackage{graphicx}
+\RequirePackage{tikz}
+\usetikzlibrary{positioning, arrows.meta, shapes.multipart, calc}
 \graphicspath{{figures/}}
 \RequirePackage{booktabs}
 \RequirePackage{tabularx}
@@ -83,6 +89,27 @@
 \RequirePackage[hidelinks]{hyperref}
 \RequirePackage{etoolbox}
 \AtBeginEnvironment{table}{\small}
+
+% User story tables
+\newenvironment{historyjki}[1]{%
+  \small
+  \begin{longtable}{@{}p{1.2cm}p{13.3cm}@{}}
+    \caption{Historyjki użytkownika: #1}\\
+    \toprule
+    ID & Historyjka \\
+    \midrule
+    \endfirsthead
+    \toprule
+    ID & Historyjka \\
+    \midrule
+    \endhead
+    \midrule
+    \endfoot
+    \bottomrule
+    \endlastfoot
+}{%
+  \end{longtable}%
+}
 
 % Template hints
 \newif\ifzpi@wskazowki

@@ -1,3 +1,171 @@
 \section{Projekt produktu programowego}
 
-\wskazowka{np. opis decyzji architektonicznych, projekt architektury, bazy danych, zastosowane wzorce projektowe}
+\subsection{Architektura systemu}
+
+HomeSplit ma architekturę klient--serwer z~trzema warstwami: aplikacją webową działającą w~przeglądarce, serwerem aplikacji udostępniającym API oraz warstwą danych. Kod wszystkich części znajduje się w~jednym monorepozytorium, podzielonym na trzy pakiety:
+
+\begin{itemize}
+  \item \texttt{web} -- aplikacja webowa w~Next.js i~React,
+  \item \texttt{backend} -- serwer aplikacji w~NestJS,
+  \item \texttt{contracts} -- wspólne kontrakty API: schematy Zod, typy, mapa endpointów oraz logika podziału kwot.
+\end{itemize}
+
+Komponenty systemu i~przepływ danych między nimi przedstawiono na rys.~\ref{fig:architektura}.
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{\textwidth}{!}{%
+  \begin{tikzpicture}[
+      font=\small,
+      box/.style={draw, rounded corners=2pt, align=center, minimum height=1.4cm, text width=3.6cm, inner sep=4pt},
+      ext/.style={draw, rounded corners=2pt, align=center, minimum height=1cm, text width=3.4cm, inner sep=3pt, fill=gray!10},
+      arr/.style={-{Stealth[length=2.5mm]}, thick},
+      lbl/.style={font=\footnotesize, inner sep=2pt, align=center},
+    ]
+    \node[box] (browser) at (0,0) {\textbf{Przeglądarka}\\aplikacja React};
+    \node[box] (next) at (5.6,0) {\textbf{Serwer Next.js}\\strony aplikacji};
+    \node[box] (api) at (11.2,0) {\textbf{Serwer API}\\NestJS, Better Auth};
+    \node[ext] (db) at (17,1.5) {\textbf{PostgreSQL}};
+    \node[ext] (mail) at (17,0) {\textbf{Resend}\\poczta e-mail};
+    \node[ext] (ai) at (17,-1.5) {\textbf{Dostawca AI}\\API zgodne z~OpenAI};
+    \node[ext] (storage) at (5.6,-3.2) {\textbf{Magazyn obiektów}\\zgodny z~S3};
+
+    \draw[arr] (browser) -- node[lbl, above] {HTTPS} (next);
+    \draw[arr] (next) -- node[lbl, above] {\texttt{/api/*}} (api);
+    \draw[arr] (api.east) -- (db.west);
+    \draw[arr] (api.east) -- (mail.west);
+    \draw[arr] (api.east) -- (ai.west);
+    \draw[arr] (api.south) |- node[lbl, pos=0.72, above] {zapis plików} (storage.east);
+    \draw[arr, dashed] (browser.south) |- node[lbl, pos=0.72, above] {pobieranie\\(podpisany URL)} (storage.west);
+  \end{tikzpicture}%
+  }
+  \caption{Architektura systemu HomeSplit}
+  \label{fig:architektura}
+\end{figure}
+
+Przeglądarka komunikuje się wyłącznie z~serwerem Next.js. Ten serwer przekierowuje żądania kierowane pod ścieżkę \texttt{/api/*} do serwera API, dzięki czemu aplikacja i~API mają wspólne pochodzenie (\emph{origin}), a~ciasteczka sesji są traktowane przez przeglądarkę jako własne. Serwer API odpowiada za całą logikę biznesową i~jako jedyny ma dostęp do bazy danych, magazynu plików, usługi poczty i~dostawcy modeli AI. Wyjątkiem jest pobieranie załączników: przeglądarka pobiera je bezpośrednio z~magazynu obiektów, korzystając z~krótko ważnych, podpisanych adresów URL wystawianych przez serwer API.
+
+Aplikacja webowa i~serwer API są wdrażane jako osobne usługi na platformie Render. Lokalnie baza danych i~magazyn plików działają w~kontenerach Docker Compose.
+
+\subsection{Decyzje architektoniczne}
+
+\begin{description}
+  \item[Wspólne kontrakty API.] Każdy endpoint jest opisany raz, w~pakiecie \texttt{contracts}, wraz ze schematami żądania i~odpowiedzi. Serwer waliduje na ich podstawie dane wejściowe, aplikacja webowa generuje z~nich typowane funkcje dostępu do API, a~atrapy API używane w~testach interfejsu korzystają z~tych samych schematów. Zmiana kontraktu jest od razu widoczna jako błąd typów po obu stronach.
+  \item[Wspólna logika podziału kwot.] Silnik podziału kosztów jest częścią pakietu \texttt{contracts}, z~którego korzystają klient i~serwer, więc formularz wydatku pokazuje dokładnie te kwoty, które zapisze serwer.
+  \item[Gospodarstwo jako organizacja Better Auth.] Biblioteka Better Auth dostarcza organizacje z~rolami, członkostwem i~zaproszeniami. Gospodarstwo domowe jest taką organizacją, a~dane aplikacji (ustawienia modułów, historia członkostwa, wydatki, listy) przechowywane są w~osobnych tabelach. Tabele pochodne uzupełniają wyzwalacze bazy danych, więc są aktualne niezależnie od tego, w~jaki sposób dodano członka.
+  \item[Salda liczone na żądanie.] Salda i~sugestie rozliczeń są wyliczane przy każdym żądaniu z~zapisanych wydatków i~potwierdzonych spłat. Brak pamięci podręcznej sald eliminuje ryzyko ich rozbieżności z~danymi źródłowymi.
+  \item[Szeregowanie operacji finansowych.] Każda transakcja zapisująca dane finansowe blokuje wiersz gospodarstwa w~trybie współdzielonym, a~operacje wymagające rozliczonych sald (opuszczenie, usunięcie gospodarstwa, wyłączenie modułu wydatków) -- w~trybie wyłącznym. Sprawdzenie sald i~zmiana, którą ono chroni, wykonują się w~jednej transakcji.
+  \item[Pliki poza bazą danych.] Załączniki i~awatary trafiają do magazynu obiektów zgodnego z~S3, a~baza przechowuje jedynie ich metadane. Załączniki są prywatne i~udostępniane przez podpisane adresy URL, a~awatary są przechowywane w~osobnym, publicznie dostępnym zasobniku.
+  \item[Wymienny dostawca AI.] Funkcje AI korzystają z~jednego wewnętrznego interfejsu, który komunikuje się z~dowolnym API zgodnym z~OpenAI. Dostawcę i~modele wybiera się w~konfiguracji, a~w~testach interfejs zastępuje deterministyczna atrapa.
+\end{description}
+
+\subsection{Architektura serwera API}
+
+Serwer API jest podzielony na moduły NestJS odpowiadające obszarom funkcjonalnym: gospodarstwa, użytkownicy, znajomi, kategorie wydatków, wydatki (z~rozliczeniami i~załącznikami), obowiązki, zakupy, pliki i~sztuczna inteligencja. Każdy moduł zawiera kontrolery, które jedynie wiążą trasy z~kontraktami, oraz serwisy z~logiką biznesową i~dostępem do bazy danych.
+
+Każde żądanie do gospodarstwa przechodzi kontrole w~stałej kolejności (tab.~\ref{tab:kontrole-zadan}), więc żądanie z~kilkoma błędami zawsze otrzymuje ten sam kod odpowiedzi. Wszystkie błędy aplikacji mają wspólny format \texttt{\{ code, message, details \}}, nadawany przez globalny filtr wyjątków.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Kolejność kontroli żądania w~serwerze API}
+  \label{tab:kontrole-zadan}
+  \begin{tabularx}{\textwidth}{@{}clL@{}}
+    \toprule
+    Krok & Kontrola & Odpowiedź przy błędzie \\
+    \midrule
+    1 & ważna sesja użytkownika & 401 \\
+    2 & poprawny identyfikator gospodarstwa i~członkostwo & 400 lub 404 \\
+    3 & włączony moduł (dla zapisów) i~wymagana rola & 403 \\
+    4 & zgodność parametrów i~treści żądania ze schematem & 400 \\
+    5 & przynależność zasobu do gospodarstwa & 404 \\
+    6 & uprawnienie do konkretnego zasobu, np. bycie autorem wydatku & 403 \\
+    7 & poprawność odwołań do innych obiektów, np. członków & 400 \\
+    8 & konflikty stanu i~unikalności & 409 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Kroki 1--3 realizują strażnicy (\emph{guards}) NestJS, krok~4 -- potoki walidujące (\emph{pipes}) oparte na schematach Zod, a~pozostałe kroki -- serwisy. Osobie spoza gospodarstwa serwer odpowiada tak samo jak na zapytanie o~nieistniejące gospodarstwo, aby nie ujawniać istnienia cudzych danych.
+
+\subsection{Architektura aplikacji webowej}
+
+Aplikacja webowa korzysta z~routera App Router frameworka Next.js. Ekrany są pogrupowane według obszarów: strony publiczne, logowanie i~rejestracja, konto, znajomi oraz gospodarstwo, którego podstrony (wydatki, rozliczenia, obowiązki, zakupy, ustawienia) dzielą wspólną powłokę. Powłoka gospodarstwa zna rolę zalogowanego użytkownika, listę członków i~włączone moduły, więc każdy ekran ukrywa niedostępne akcje i~wyłączone moduły.
+
+Dane z~serwera pobierane są przez warstwę API wygenerowaną z~kontraktów i~buforowane przez TanStack Query, który odświeża je po zmianach. Formularze są obsługiwane przez TanStack Form z~walidacją opartą na tych samych schematach co serwer. Interfejs jest zbudowany z~komponentów shadcn/ui i~Tailwind CSS, projektowanych najpierw dla telefonu. Podczas rozwoju i~w~testach aplikacja może działać bez serwera API, ponieważ biblioteka MSW przechwytuje żądania i~odpowiada danymi zgodnymi z~kontraktami.
+
+\subsection{Projekt bazy danych}
+
+Dane przechowywane są w~relacyjnej bazie PostgreSQL. Schemat jest definiowany w~kodzie za pomocą Drizzle ORM, a~zmiany wprowadzane są migracjami. Tabele i~ich przeznaczenie zestawiono w~tab.~\ref{tab:tabele}, a~część finansową schematu przedstawiono na rys.~\ref{fig:erd}.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Tabele bazy danych}
+  \label{tab:tabele}
+  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.17\textwidth}>{\raggedright\arraybackslash}p{0.46\textwidth}L@{}}
+    \toprule
+    Obszar & Tabele & Zawartość \\
+    \midrule
+    Konta i~gospodarstwa (Better Auth) & \texttt{user}, \texttt{session}, \texttt{account}, \texttt{verification}, \texttt{organization}, \texttt{member}, \texttt{invitation} & użytkownicy, sesje, hasła, tokeny, gospodarstwa, członkostwa z~rolami, zaproszenia \\
+    Gospodarstwa & \texttt{household\_features}, \texttt{household\_membership\_history} & włączone moduły, historia członkostwa \\
+    Wydatki & \texttt{expense\_categories}, \texttt{expenses}, \texttt{expense\_payers}, \texttt{expense\_allocation\_participants}, \texttt{expense\_splits} & kategorie, wydatki, płatnicy, dane wejściowe podziału, wyliczone udziały \\
+    Rozliczenia & \texttt{settlements} & spłaty wraz ze statusem potwierdzenia \\
+    Pliki & \texttt{attachments}, \texttt{expense\_attachments}, \texttt{storage\_object\_deletions} & metadane plików, powiązania z~wydatkami, kolejka usuwania obiektów z~magazynu \\
+    Obowiązki i~zakupy & \texttt{chores}, \texttt{shopping\_items} & obowiązki domowe, pozycje listy zakupów \\
+    Znajomi & \texttt{friend\_requests}, \texttt{friendships} & zaproszenia do znajomych, relacje znajomości \\
+    Sztuczna inteligencja & \texttt{ai\_usage} & dzienna liczba zapytań do AI w~gospodarstwie \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{\textwidth}{!}{%
+  \begin{tikzpicture}[
+      ent/.style={draw, rectangle split, rectangle split parts=2, rectangle split part fill={gray!15, white}, align=left, font=\footnotesize\ttfamily, inner sep=3pt, text width=4.6cm},
+      rel/.style={thick},
+      card/.style={font=\footnotesize, inner sep=1.5pt},
+    ]
+    \node[ent, anchor=north] (set) at (0,0) {\textbf{settlements}\nodepart{two}id \hfill PK\\household\_id \hfill FK\\payer\_id, payee\_id \hfill FK\\created\_by\_id \hfill FK\\amount\_cents, currency\\confirmed\_by\_id \hfill FK\\confirmed\_at, note};
+    \node[ent, anchor=north] (att) at (11.6,0) {\textbf{attachments}\nodepart{two}id \hfill PK\\household\_id \hfill FK\\storage\_key\\mime\_type, size\_bytes\\uploaded\_by\_id \hfill FK};
+    \node[ent, anchor=north] (cat) at (0,-4.3) {\textbf{expense\_categories}\nodepart{two}id \hfill PK\\household\_id \hfill FK\\name\\icon};
+    \node[ent, anchor=north] (exp) at (5.8,-4.3) {\textbf{expenses}\nodepart{two}id \hfill PK\\household\_id \hfill FK\\category\_id \hfill FK\\author\_id \hfill FK\\name, description\\total\_amount\_cents\\currency\\allocation\_method\\expense\_date};
+    \node[ent, anchor=north] (ea) at (11.6,-4.3) {\textbf{expense\_attachments}\nodepart{two}expense\_id \hfill PK, FK\\attachment\_id \hfill PK, FK};
+    \node[ent, anchor=north] (pay) at (0,-9.8) {\textbf{expense\_payers}\nodepart{two}expense\_id \hfill PK, FK\\user\_id \hfill PK, FK\\amount\_cents};
+    \node[ent, anchor=north] (part) at (5.8,-9.8) {\textbf{expense\_allocation\_}\\\textbf{participants}\nodepart{two}expense\_id \hfill PK, FK\\user\_id \hfill PK, FK\\allocation\_method\\value};
+    \node[ent, anchor=north] (split) at (11.6,-9.8) {\textbf{expense\_splits}\nodepart{two}expense\_id \hfill PK, FK\\user\_id \hfill PK, FK\\amount\_cents};
+
+    \draw[rel] (cat.east |- exp.text split) -- node[card, above, pos=0.15] {1} node[card, above, pos=0.85] {N} (exp.west |- exp.text split);
+    \draw[rel] (exp.east |- ea.text split) -- node[card, above, pos=0.15] {1} node[card, above, pos=0.85] {N} (ea.west |- ea.text split);
+    \draw[rel] (att.south) -- node[card, right, pos=0.15] {1} node[card, right, pos=0.85] {N} (ea.north);
+    \draw[rel] (exp.south) -- node[card, right, pos=0.15] {1} node[card, right, pos=0.85] {N} (part.north);
+    \draw[rel] (exp.south) ++(-0.6,0) -- ++(0,-0.4) -| node[card, right, pos=0.9] {N} (pay.north);
+    \draw[rel] (exp.south) ++(0.6,0) -- ++(0,-0.4) -| node[card, left, pos=0.9] {N} (split.north);
+  \end{tikzpicture}%
+  }
+  \caption{Schemat części finansowej bazy danych. Kolumny \texttt{household\_id} odwołują się do tabeli \texttt{organization}, a~kolumny identyfikujące osoby -- do tabeli \texttt{user}; tych powiązań nie zaznaczono}
+  \label{fig:erd}
+\end{figure}
+
+Przy projektowaniu schematu przyjęto następujące zasady:
+
+\begin{itemize}
+  \item kwoty są przechowywane w~kolumnach typu \texttt{bigint} jako liczby całkowite w~jednostkach podrzędnych waluty;
+  \item wydatek wraz z~płatnikami, danymi wejściowymi podziału i~wyliczonymi udziałami stanowi jedną całość, zapisywaną i~zastępowaną w~jednej transakcji;
+  \item klucze obce do gospodarstwa usuwają dane kaskadowo, natomiast klucze obce do użytkownika blokują usunięcie (\texttt{RESTRICT}), aby nie utracić historii rozliczeń;
+  \item historia członkostwa przechowuje każdą parę gospodarstwo--użytkownik, która kiedykolwiek wystąpiła, co pozwala rozliczać byłych członków bez nadawania im dostępu;
+  \item spłata nie odwołuje się do wydatku, dlatego edycja lub usunięcie wydatku nie zmienia zarejestrowanych spłat.
+\end{itemize}
+
+Do obsługi odczytu paragonów zaprojektowano dodatkowe tabele: \texttt{receipts} (szkic paragonu ze statusem przetwarzania, sprzedawcą, datą, walutą i~sumą), \texttt{receipt\_items} (pozycje z~ilością, ceną jednostkową, rabatem i~kwotą) oraz \texttt{receipt\_item\_assignments} (przypisanie pozycji do osób z~liczbą udziałów). Paragon jest powiązany z~załącznikiem, z~którego go odczytano, i~po zatwierdzeniu z~utworzonym wydatkiem.
+
+\subsection{Zastosowane wzorce projektowe}
+
+\begin{description}
+  \item[Moduły i~wstrzykiwanie zależności.] Serwer API składa się z~modułów NestJS, które deklarują swoje zależności, a~kontener wstrzykuje je do kontrolerów i~serwisów. Ułatwia to testowanie i~podmianę implementacji.
+  \item[Adapter.] Usługi zewnętrzne (dostawca AI, poczta e-mail i~magazyn plików) są ukryte za wewnętrznymi interfejsami z~wymiennymi sterownikami: produkcyjnym oraz testowym (atrapa AI, zapis wiadomości do dziennika, magazyn w~pamięci).
+  \item[Strategia.] Metody podziału kosztów (równy, procentowy, według udziałów, według kwot, z~korektami) są wymiennymi strategiami wyznaczania wag, po których następuje wspólny krok zaokrąglania metodą największych reszt.
+  \item[Agregat.] Wydatek z~płatnikami, danymi podziału i~udziałami jest traktowany jako jeden agregat: zmiana finansowa zastępuje go w~całości w~jednej transakcji, nigdy częściowo.
+  \item[Obiekt transferu danych.] Dane przesyłane między klientem a~serwerem opisują schematy z~pakietu kontraktów, oddzielone od struktury tabel bazy danych.
+  \item[Łańcuch kontroli żądań.] Strażnicy, potoki walidujące i~filtr wyjątków NestJS tworzą łańcuch, w~którym każdy element sprawdza jeden aspekt żądania (tab.~\ref{tab:kontrole-zadan}).
+  \item[Idempotentne akcje.] Akcje zmieniające stan, takie jak oznaczenie obowiązku jako wykonanego czy zakupu jako kupionego, można bezpiecznie powtórzyć: ponowne wykonanie nie zmienia wyniku.
+\end{description}

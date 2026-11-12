@@ -1,3 +1,172 @@
 \section{Specyfikacja wymagań na produkt programowy}
 
-\wskazowka{np. definicja wymagań funkcjonalnych/niefunkcjonalnych; możliwe formy: diagram wymagań, diagram przypadków użycia, lista historyjek (może być pogrupowana w~epiki)}
+Wymagania są prowadzone jako zgłoszenia w~repozytorium projektu~\cite{homesplit}. Każde zgłoszenie opisuje cel, zakres i~kryteria akceptacji, a~zgłoszenia są grupowane w~epiki odpowiadające obszarom funkcjonalnym. W~tej sekcji wymagania funkcjonalne przedstawiono jako historyjki użytkownika pogrupowane w~epiki, a~następnie zestawiono wymagania niefunkcjonalne i~uprawnienia ról.
+
+\subsection{Aktorzy}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Aktorzy systemu}
+  \label{tab:aktorzy}
+  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.27\textwidth}L@{}}
+    \toprule
+    Aktor & Opis \\
+    \midrule
+    Gość & osoba niezalogowana; może przeglądać strony publiczne, założyć konto i~zalogować się \\
+    Użytkownik & osoba zalogowana z~potwierdzonym adresem e-mail; zarządza swoim kontem i~znajomymi, tworzy gospodarstwa \\
+    Członek & użytkownik należący do gospodarstwa; korzysta z~wydatków, rozliczeń, obowiązków i~listy zakupów \\
+    Administrator & członek z~rolą administratora; dodatkowo zarządza członkami, kategoriami i~modułami gospodarstwa \\
+    Właściciel & członek z~rolą właściciela; ma uprawnienia administratora i~może usunąć gospodarstwo \\
+    Dostawca modeli AI & system zewnętrzny odczytujący paragony i~sugerujący kategorie \\
+    Usługa poczty e-mail & system zewnętrzny dostarczający zaproszenia, linki weryfikacyjne i~linki do resetu hasła \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Wymagania funkcjonalne}
+
+\subsubsection{Konta użytkowników}
+
+\begin{historyjki}{konta użytkowników}
+  KU-1 & Jako gość chcę założyć konto za pomocą adresu e-mail i~hasła, aby korzystać z~aplikacji. \\
+  KU-2 & Jako nowy użytkownik chcę potwierdzić adres e-mail linkiem z~wiadomości, aby aktywować konto. \\
+  KU-3 & Jako użytkownik chcę się zalogować i~wylogować, a~po zalogowaniu wrócić na stronę, którą chciałem otworzyć. \\
+  KU-4 & Jako użytkownik, który zapomniał hasła, chcę otrzymać link do ustawienia nowego hasła, aby odzyskać dostęp do konta. \\
+  KU-5 & Jako użytkownik chcę zmienić imię, hasło i~motyw interfejsu, aby dopasować konto do swoich potrzeb. \\
+  KU-6 & Jako użytkownik chcę dodać zdjęcie profilowe, aby inni członkowie łatwiej mnie rozpoznawali. \\
+  KU-7 & Jako użytkownik chcę widzieć urządzenia, na których jestem zalogowany, i~wylogować je, aby chronić konto. \\
+\end{historyjki}
+
+\subsubsection{Znajomi}
+
+\begin{historyjki}{znajomi}
+  ZN-1 & Jako użytkownik chcę wysłać zaproszenie do grona znajomych na adres e-mail i~widzieć wysłane oraz otrzymane zaproszenia. \\
+  ZN-2 & Jako użytkownik chcę przyjąć lub odrzucić otrzymane zaproszenie oraz usunąć znajomego. \\
+  ZN-3 & Jako użytkownik chcę wycofać zaproszenie wysłane przez pomyłkę. \\
+  ZN-4 & Jako użytkownik chcę zarządzać znajomymi i~zaproszeniami w~jednym miejscu. \\
+  ZN-5 & Jako administrator chcę zaprosić znajomego do gospodarstwa jednym kliknięciem, bez wpisywania jego adresu e-mail. \\
+\end{historyjki}
+
+\subsubsection{Gospodarstwa domowe}
+
+\begin{historyjki}{gospodarstwa domowe}
+  GD-1 & Jako użytkownik chcę tworzyć gospodarstwa, przeglądać te, do których należę, i~szybko się między nimi przełączać. \\
+  GD-2 & Jako administrator chcę zapraszać osoby na adres e-mail, aby mogły dołączyć z~linku, nawet jeśli nie mają jeszcze konta. \\
+  GD-3 & Jako członek chcę widzieć członków gospodarstwa i~ich role, a~jako administrator zmieniać role, usuwać członków i~zmieniać nazwę gospodarstwa. \\
+  GD-4 & Jako administrator chcę włączać i~wyłączać moduły wydatków, obowiązków i~zakupów, znając skutki tej zmiany. \\
+  GD-5 & Jako członek chcę opuścić gospodarstwo, a~jako właściciel usunąć je, i~dowiedzieć się, co zrobić, gdy blokują to nierozliczone salda. \\
+  GD-6 & Jako członek chcę po otwarciu gospodarstwa widzieć swoje saldo, otwarte obowiązki, liczbę pozycji do kupienia i~spłaty czekające na moje potwierdzenie. \\
+\end{historyjki}
+
+\subsubsection{Wydatki}
+
+\begin{historyjki}{wydatki}
+  WY-1 & Jako administrator chcę prowadzić listę kategorii wydatków z~ikonami emoji, z~której wybierają członkowie. \\
+  WY-2 & Jako członek chcę dodać wydatek zapłacony przeze mnie i~dzielony po równo na jednym ekranie telefonu. \\
+  WY-3 & Jako członek chcę wprowadzić dowolny wydatek: z~wieloma płatnikami, w~wybranej walucie i~z~podziałem procentowym, według udziałów, kwot lub z~korektami. \\
+  WY-4 & Jako członek chcę widzieć w~formularzu dokładnie taki podział, jaki zostanie zapisany. \\
+  WY-5 & Jako członek chcę przeglądać wydatki i~szczegóły podziału każdego z~nich. \\
+  WY-6 & Jako członek chcę filtrować wydatki według kategorii, osoby i~okresu. \\
+  WY-7 & Jako autor wydatku lub administrator chcę poprawiać i~usuwać wydatki bez naruszania spójności rozliczeń. \\
+  WY-8 & Jako członek chcę dołączać do wydatku pliki, np. zdjęcia paragonów i~faktury, z~aparatu lub z~dysku. \\
+  WY-9 & Jako członek chcę rozróżniać pliki wydatku po miniaturach. \\
+\end{historyjki}
+
+\subsubsection{Rozliczenia}
+
+\begin{historyjki}{rozliczenia}
+  RO-1 & Jako członek chcę widzieć, ile jestem winien lub ile mi się należy, osobno w~każdej walucie. \\
+  RO-2 & Jako członek chcę otrzymać listę przelewów, które rozliczą wszystkie długi, i~zarejestrować spłatę jednym dotknięciem z~sugestii. \\
+  RO-3 & Jako członek chcę rejestrować spłaty wykonane poza aplikacją. \\
+  RO-4 & Jako odbiorca chcę potwierdzać lub odrzucać zgłoszone spłaty, a~jako członek przeglądać historię spłat. \\
+  RO-5 & Jako administrator chcę rozliczyć dług byłego członka, którego nie da się odzyskać. \\
+\end{historyjki}
+
+\subsubsection{Obowiązki}
+
+\begin{historyjki}{obowiązki}
+  OB-1 & Jako członek chcę dodawać, edytować i~usuwać obowiązki z~osobą odpowiedzialną i~terminem wykonania. \\
+  OB-2 & Jako członek chcę jednym kliknięciem oznaczyć obowiązek jako wykonany, z~zapisem, kto i~kiedy go wykonał, oraz w~razie potrzeby otworzyć go ponownie. \\
+  OB-3 & Jako członek chcę wyświetlić tylko obowiązki przypisane do mnie. \\
+\end{historyjki}
+
+\subsubsection{Lista zakupów}
+
+\begin{historyjki}{lista zakupów}
+  ZA-1 & Jako członek chcę dodawać do wspólnej listy produkty z~ilością i~jednostką, edytować je i~usuwać. \\
+  ZA-2 & Jako członek w~sklepie chcę jednym dotknięciem oznaczać pozycje jako kupione i~cofać to oznaczenie. \\
+  ZA-3 & Jako członek chcę usunąć z~listy wszystkie kupione pozycje naraz. \\
+\end{historyjki}
+
+\subsubsection{Sztuczna inteligencja i~paragony}
+
+\begin{historyjki}{sztuczna inteligencja i~paragony}
+  AI-1 & Jako administrator chcę świadomie zdecydować, czy dane gospodarstwa mogą być przesyłane do dostawcy modeli AI. \\
+  AI-2 & Jako członek chcę, aby kategoria wydatku uzupełniała się sama na podstawie nazwy, opisu lub zdjęcia. \\
+  AI-3 & Jako członek chcę sfotografować paragon i~otrzymać edytowalny szkic z~nazwą sprzedawcy, datą, walutą, sumą i~pozycjami. \\
+  AI-4 & Jako członek chcę przypisać pozycje paragonu do osób i~zatwierdzić paragon jako wydatek z~dokładnym podziałem. \\
+  AI-5 & Jako członek chcę po zatwierdzeniu paragonu w~jednym kroku odhaczyć kupione pozycje listy zakupów na podstawie sugestii. \\
+\end{historyjki}
+
+\subsubsection{Strony publiczne}
+
+\begin{historyjki}{strony publiczne}
+  SP-1 & Jako gość chcę przeczytać krótki opis aplikacji i~przejść do rejestracji. \\
+  SP-2 & Jako gość chcę zapoznać się z~polityką prywatności i~regulaminem, aby wiedzieć, jakie dane są przechowywane i~komu przekazywane. \\
+\end{historyjki}
+
+\subsection{Wymagania niefunkcjonalne}
+
+Wymagania niefunkcjonalne wraz ze sposobem ich weryfikacji zestawiono w~tab.~\ref{tab:wymagania-niefunkcjonalne}.
+
+\begin{small}
+\begin{longtable}{@{}p{1.1cm}>{\raggedright\arraybackslash}p{2.6cm}>{\raggedright\arraybackslash}p{6.7cm}>{\raggedright\arraybackslash}p{3.3cm}@{}}
+  \caption{Wymagania niefunkcjonalne}\label{tab:wymagania-niefunkcjonalne}\\
+  \toprule
+  ID & Kategoria & Wymaganie & Weryfikacja \\
+  \midrule
+  \endfirsthead
+  \toprule
+  ID & Kategoria & Wymaganie & Weryfikacja \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  NF-1 & Responsywność & Interfejs jest w~pełni użyteczny od ekranów o~szerokości 360~px do ekranów komputerów. & testy E2E przy szerokości 360 i~1280~px \\
+  NF-2 & Dostępność & Interfejs spełnia wymagania WCAG 2.2 na poziomach A i~AA, w~motywie jasnym i~ciemnym. & automatyczne testy axe-core w~testach komponentów i~E2E \\
+  NF-3 & Bezpieczeństwo dostępu & Logowanie wymaga potwierdzonego adresu e-mail, a~sesja wygasa po 7 dniach nieużywania. Dane gospodarstwa są dostępne wyłącznie dla jego bieżących członków; dla pozostałych zasób jest nieodróżnialny od nieistniejącego. & testy integracyjne autoryzacji \\
+  NF-4 & Ochrona przed nadużyciami & Liczba żądań resetu hasła i~zaproszeń do znajomych jest ograniczona, a~odpowiedzi nie ujawniają, czy konto o~danym adresie e-mail istnieje. & testy integracyjne \\
+  NF-5 & Prywatność & Moduł AI jest domyślnie wyłączony. Do dostawcy trafiają tylko dane niezbędne do zadania, bez danych osobowych, a~dostawca nie może ich przechowywać. Gospodarstwo może wykonać ograniczoną liczbę zapytań do AI dziennie. & przegląd kodu, testy z~atrapą dostawcy \\
+  NF-6 & Poprawność finansowa & Kwoty są liczbami całkowitymi w~jednostkach podrzędnych waluty. Suma części podziału zawsze równa się kwocie wydatku, suma sald w~każdej walucie wynosi zero, a~wynik nie zależy od kolejności danych wejściowych. & testy jednostkowe silnika podziału, sald i~sugestii \\
+  NF-7 & Spójność danych & Edycja wydatku jest atomowa, a~operacje wymagające rozliczonych sald są szeregowane względem zapisów finansowych, więc nie powstają stany częściowo zapisane. & testy integracyjne na bazie PostgreSQL \\
+  NF-8 & Odporność na błędy AI & Odpowiedź modelu niezgodna ze schematem, niepełna lub przekraczająca limit czasu nie jest zapisywana; użytkownik otrzymuje czytelny komunikat. & testy z~atrapą dostawcy \\
+  NF-9 & Pliki & Pojedynczy plik ma do 10~MiB, a~wydatek do 10 plików. Załączniki są udostępniane wyłącznie przez podpisane adresy URL ważne 5~minut. & testy integracyjne \\
+  NF-10 & Jednolite API & Dane wejściowe są walidowane wspólnymi schematami, a~każdy błąd ma ten sam format odpowiedzi. & testy integracyjne, kontrola typów \\
+  NF-11 & Utrzymywalność & Kod jest statycznie typowany i~zgodny z~jednolitym stylem; każda zmiana przechodzi przegląd w~\emph{pull requeście} i~kontrole CI. & GitHub Actions \\
+  NF-12 & Wdrażanie & Po scaleniu zmian do głównej gałęzi aplikacja jest wdrażana automatycznie, a~migracje bazy danych działają zarówno z~poprzednią, jak i~nową wersją serwera. & GitHub Actions \\
+\end{longtable}
+\end{small}
+
+\subsection{Uprawnienia ról}
+
+Uprawnienia członków gospodarstwa przedstawiono w~tab.~\ref{tab:uprawnienia}. Oznaczenie \enquote{wszyscy} obejmuje każdego bieżącego członka, a~\enquote{admin+} -- administratora lub właściciela. Każdy bieżący członek może odczytywać wszystkie zasoby gospodarstwa. Osoby spoza gospodarstwa, w~tym byli członkowie, nie mają żadnych uprawnień.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Uprawnienia ról w~gospodarstwie domowym}
+  \label{tab:uprawnienia}
+  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.15\textwidth}>{\raggedright\arraybackslash}p{0.15\textwidth}>{\raggedright\arraybackslash}p{0.14\textwidth}>{\raggedright\arraybackslash}p{0.17\textwidth}L@{}}
+    \toprule
+    Zasób & Tworzenie & Edycja & Usuwanie & Akcje \\
+    \midrule
+    Gospodarstwo & każdy zalogowany & admin+ (nazwa) & właściciel, po rozliczeniu & zapraszanie, zmiana ról, usuwanie członków: admin+; opuszczenie: wszyscy, po rozliczeniu \\
+    Moduły & -- & admin+ & -- & -- \\
+    Kategorie & admin+ & admin+ & admin+, gdy nieużywana & -- \\
+    Wydatki & wszyscy & autor lub admin+ & autor lub admin+ & -- \\
+    Spłaty & strona lub admin+ & -- & oczekujące: strona lub admin+ & potwierdzenie: odbiorca lub admin+ niebędący płacącym \\
+    Salda i~sugestie & -- & -- & -- & -- \\
+    Obowiązki & wszyscy & wszyscy & wszyscy & wykonanie, ponowne otwarcie: wszyscy \\
+    Lista zakupów & wszyscy & wszyscy & wszyscy & kupienie, cofnięcie, usunięcie kupionych: wszyscy \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
