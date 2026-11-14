@@ -58,6 +58,9 @@ export function ChoreDetails({ chore, open, onOpenChange }: ChoreDetailsProps) {
                     isOverdue(chore) && "text-destructive font-medium"
                   )}
                 >
+                  {isOverdue(chore) ? (
+                    <span className="sr-only">Overdue: </span>
+                  ) : null}
                   {chore.dueAt ? formatIsoDateTime(chore.dueAt) : "None"}
                 </dd>
                 {chore.isCompleted ? (

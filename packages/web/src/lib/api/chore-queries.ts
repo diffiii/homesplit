@@ -26,8 +26,6 @@ export function choreListQuery(
       page * pageSize < totalItems ? page + 1 : undefined,
     // A poll refetches every loaded page, so it stops once the list is long.
     refetchInterval: ({ state }) =>
-      query.includeCompleted || (state.data?.pages.length ?? 1) > 1
-        ? false
-        : CHORE_POLL_INTERVAL,
+      (state.data?.pages.length ?? 1) > 1 ? false : CHORE_POLL_INTERVAL,
   });
 }

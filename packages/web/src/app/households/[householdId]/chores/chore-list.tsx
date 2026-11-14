@@ -205,6 +205,9 @@ function ChoreRow({ chore, menu, now, onOpen }: ChoreRowProps) {
                     dateTime={chore.dueAt}
                     title={formatIsoDateTime(chore.dueAt)}
                   >
+                    {isOverdue(chore, now) ? (
+                      <span className="sr-only">Overdue: </span>
+                    ) : null}
                     {formatDueTime(chore.dueAt, now)}
                   </time>
                 </>

@@ -68,7 +68,7 @@ describe("ChoresPage", () => {
       "Water the plants",
     ]);
     expect(row("Take out the bins")).toHaveTextContent(
-      "Bartek Kowalski · Yesterday"
+      "Bartek Kowalski · Overdue: Yesterday"
     );
     expect(row("Water the plants")).toHaveTextContent("Unassigned");
     expect(screen.queryByRole("region", { name: "Completed" })).toBeNull();
