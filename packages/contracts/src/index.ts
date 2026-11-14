@@ -16,5 +16,6 @@ export * from "./features/chores";
 export * from "./features/expenses";
 export * from "./features/friends";
 export * from "./features/households";
+export * from "./features/receipts";
 export * from "./features/shopping";
 export * from "./features/users";

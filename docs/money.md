@@ -6,7 +6,7 @@ These rules apply to every task that stores, accepts, or calculates amounts, inc
 
 Every amount is an integer number of the currency's ISO 4217 minor unit, in a field named `amountCents` or ending in `Cents`. The name is historical: `amountCents: 1999` is 19.99 in PLN or EUR, ¥1999 in JPY, and 1.999 in KWD.
 
-The backend never needs the exponent. It adds, compares, and splits integers, and never converts between currencies. Clients format amounts with the ISO 4217 exponent for the currency.
+The backend adds, compares, and splits integers, and never converts between currencies. Clients format amounts with the ISO 4217 exponent for the currency. The one place the backend needs the exponent is reading a receipt (#55): the model replies with decimal amounts, which the server converts with the exponent from `Intl.NumberFormat` (2 while the currency is unknown), rounding half away from zero.
 
 ## Supported currencies
 

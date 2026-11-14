@@ -11,6 +11,7 @@ import { ExpensesModule } from "./features/expenses/expenses.module";
 import { FriendsModule } from "./features/friends/friends.module";
 import { HouseholdsModule } from "./features/households/households.module";
 import { InvitationsModule } from "./features/invitations/invitations.module";
+import { ReceiptsModule } from "./features/receipts/receipts.module";
 import { ShoppingModule } from "./features/shopping/shopping.module";
 import { UsersModule } from "./features/users/users.module";
 
@@ -26,6 +27,7 @@ import { UsersModule } from "./features/users/users.module";
     ChoresModule,
     ExpensesModule,
     AttachmentsModule,
+    ReceiptsModule,
     FriendsModule,
     ShoppingModule,
     UsersModule,

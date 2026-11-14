@@ -148,6 +148,13 @@
       "when": 1794156916074,
       "tag": "0020_invitation_single_pending",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794633679952,
+      "tag": "0021_receipts",
+      "breakpoints": true
     }
   ]
 }

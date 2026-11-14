@@ -383,9 +383,9 @@ erDiagram
     USERS |o..o{ SHOPPING_ITEMS : purchases
 ```
 
-## Proposed attachments and receipts
+## Attachments and receipts
 
-These tables support backlog tasks [4.3](backlog/tasks/4-expenses/4.3-attachments/4.3.0-epic.md) and [7](backlog/tasks/7-ai-receipts/7.0-epic.md) and have no contracts yet. `HOUSEHOLDS`, `USERS`, `EXPENSES`, and `SHOPPING_ITEMS` are the entities from the household diagram. `ATTACHMENTS` and `EXPENSE_ATTACHMENTS` are the implemented `attachments` (#44) and `expense_attachments` (#45) tables.
+These tables support backlog tasks [4.3](backlog/tasks/4-expenses/4.3-attachments/4.3.0-epic.md) and [7](backlog/tasks/7-ai-receipts/7.0-epic.md). `HOUSEHOLDS`, `USERS`, `EXPENSES`, and `SHOPPING_ITEMS` are the entities from the household diagram. `ATTACHMENTS` and `EXPENSE_ATTACHMENTS` are the implemented `attachments` (#44) and `expense_attachments` (#45) tables, and `RECEIPTS` and `RECEIPT_ITEMS` the implemented `receipts` and `receipt_items` (#55; see [Receipts API](api/receipts.md#storage)), except `expense_id`. `expense_id` and `RECEIPT_ITEM_ASSIGNMENTS` are still proposed, for the tasks that confirm and split receipts.
 
 ```mermaid
 erDiagram
@@ -403,12 +403,14 @@ erDiagram
         uuid household_id FK
         uuid attachment_id FK
         text status "processing, ready, failed, confirmed"
+        text failure_code "nullable; set while failed"
+        uuid extraction_id "nullable; set while processing"
         text merchant "nullable"
         date purchased_on "nullable"
         text currency "nullable until extracted; ISO 4217"
         bigint total_cents "nullable until extracted"
         bigint discount_cents "Receipt-level; default 0"
-        uuid expense_id FK "nullable; set on confirm"
+        uuid expense_id FK "Proposed; nullable; set on confirm"
         uuid created_by_id FK
         timestamptz created_at
         timestamptz updated_at
@@ -419,7 +421,7 @@ erDiagram
         uuid receipt_id FK
         integer position
         text name
-        numeric quantity "Decimal for weighed products"
+        numeric quantity "numeric(12, 3), for weighed products"
         bigint unit_price_cents
         bigint discount_cents "Line discount; default 0"
         bigint total_cents "After line discount"
