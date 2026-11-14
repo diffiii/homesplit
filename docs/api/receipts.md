@@ -1,6 +1,6 @@
 # Receipts API
 
-Module flag: `expenses`, plus `ai` for reading receipts · Tasks: #55 · Contracts: [receipts](../../packages/contracts/src/features/receipts/index.ts)
+Module flag: `expenses`, plus `ai` for reading receipts · Tasks: #55, #56 · Contracts: [receipts](../../packages/contracts/src/features/receipts/index.ts), [split](../../packages/contracts/src/features/receipts/split.ts)
 
 ## Routes
 
@@ -12,10 +12,13 @@ Module flag: `expenses`, plus `ai` for reading receipts · Tasks: #55 · Contrac
 | PATCH | `/api/households/:householdId/receipts/:receiptId` | `ReceiptIdParams`, `UpdateReceiptRequest` | `Receipt` | 200 | all |
 | DELETE | `/api/households/:householdId/receipts/:receiptId` | `ReceiptIdParams` | none | 204 | all |
 | POST | `/api/households/:householdId/receipts/:receiptId/retry` | `ReceiptIdParams` | `Receipt` | 200 | all |
+| PUT | `/api/households/:householdId/receipts/:receiptId/assignments` | `ReceiptIdParams`, `AssignReceiptItemsRequest` | `Receipt` | 200 | all |
+| GET | `/api/households/:householdId/receipts/:receiptId/split` | `ReceiptIdParams` | `ReceiptSplit` | 200 | all |
+| POST | `/api/households/:householdId/receipts/:receiptId/confirm` | `ReceiptIdParams`, `ConfirmReceiptRequest` | `ConfirmReceiptResponse` | 200 | all |
 
 ## Rules
 
-A member uploads a photo or a PDF of a receipt as an [attachment](expenses.md#attachments), then scans it with `POST /receipts`. The vision model reads the file directly, without a separate OCR step (see [AI provider](../decisions.md#ai-provider)), and the result is a draft that members check and edit before a later task turns it into an expense.
+A member uploads a photo or a PDF of a receipt as an [attachment](expenses.md#attachments), then scans it with `POST /receipts`. The vision model reads the file directly, without a separate OCR step (see [AI provider](../decisions.md#ai-provider)), and the result is a draft that members check and edit. Members then assign each item to one or more people, and confirming turns the receipt into an expense with `exact` splits.
 
 ### Statuses
 
@@ -28,7 +31,7 @@ A member uploads a photo or a PDF of a receipt as an [attachment](expenses.md#at
 
 - `failureCode` is set only while the receipt is `failed`. It's one of `ReceiptFailureCode`: the AI errors (`MODULE_DISABLED`, `AI_UNAVAILABLE`, `AI_LIMIT_EXCEEDED`, `AI_TIMEOUT`, `AI_PROVIDER_ERROR`, `AI_INVALID_OUTPUT`), `UNSUPPORTED_FILE_TYPE` for an image that can't be decoded, `NOT_A_RECEIPT` when the model finds no receipt in the file, `EXTRACTION_INTERRUPTED`, and `EXTRACTION_FAILED` for anything else.
 - A failed receipt is retried with `POST /retry`, or filled in by hand with `PATCH`.
-- Nothing sets `confirmed` yet; the task that turns a receipt into an expense does.
+- `POST /confirm` sets `confirmed`; see [Confirming](#confirming). Assigning items, like editing, answers 409 `RECEIPT_PROCESSING` or `RECEIPT_CONFIRMED`.
 
 ### Reading a receipt
 
@@ -56,6 +59,44 @@ A member uploads a photo or a PDF of a receipt as an [attachment](expenses.md#at
 - Ordering: the list is `createdAt` desc, then `id` desc, and has no items; `GET /receipts/:receiptId` has them in `position` order.
 - Concurrent requests: every write locks the receipt row, so an edit, a discard, a retry, and the end of a run never interleave.
 
+### Assigning items
+
+Every assignment is a number of shares of one item, a positive integer up to `MAX_SHARES`. One person with 1 share has the whole item; several people with 1 share each split it equally. For an item with a quantity above 1, the client can send each person's number of units as their shares (2 of 3 beers for A and 1 for B); a weighed item only uses shares.
+
+- `PUT /assignments` takes `{ items: [{ itemId, assignees: [{ userId, shares }] }] }`. Each listed item's assignments are replaced as a whole, and an empty `assignees` makes it unassigned; items left out keep theirs. So assigning several selected items at once, or "split everything equally", is one request that lists those items.
+- References: every `itemId` must be one of this receipt's items (400 `INVALID_REFERENCE` at `["items", i, "itemId"]`), and every assignee a current member of the household (400 `INVALID_REFERENCE` at `["items", i, "assignees", j, "userId"]`). An item or a user listed twice answers 400 `VALIDATION_ERROR`.
+- `Receipt` items have `assignments` (`{ user, shares }`, ordered by user ID). Editing items with `PATCH` keeps the assignments of the items it keeps, drops those of the items it removes, and adds new items unassigned. A retry replaces the items, and with them the assignments.
+
+### Splitting
+
+`splitReceipt` in the contracts calculates the split, so clients show the same live totals as `GET /split` answers:
+
+1. Each item's cost after its line discount (`totalCents`) goes to its assignees in proportion to their shares.
+2. The receipt-level discount is spread over the items in proportion to their cost, so what's split is the items' total minus `discountCents`.
+3. Each person's amount is summed as an exact fraction over a common denominator and rounded once at the end with `distributeProportionally`, the allocation engine's remainder rule (see [Money](../money.md#rounding)): leftover units go to the largest remainders, and ties to the lower user ID. So the amounts and the unassigned part add up exactly to what's split.
+
+`GET /split` answers `ReceiptSplit`: `totalCents` (what's split), `people` (one `{ user, amountCents }` per assignee, ordered by user ID), `unassignedCents` and `unassignedItemIds` for items nobody has, and the receipt's own `differenceCents`. Nothing is saved.
+
+For example, beer 3 × 4.99 = 14.97 (A 2 units, B 1 unit) and pizza 30.00 (A, B, and C equally) give A 19.98, B 14.99, and C 10.00, for a total of 44.97.
+
+A line with a negative total, such as a returned deposit, is fine as long as its assignees' other items cover it. When someone would get a negative amount, `GET /split` and `POST /confirm` answer 409 `RECEIPT_NEGATIVE_SHARE`.
+
+### Confirming
+
+`POST /confirm` creates the expense, links the receipt's file to it as an attachment, and marks the receipt `confirmed`, in one transaction, so a failure at any step leaves nothing behind. Any member may confirm, as any member may record an expense.
+
+- The body is optional field by field. `payerId` defaults to who scanned the receipt, `name` and `expenseDate` to its merchant and purchase date, and `description` to none. `categoryId` defaults to the [category suggestion](expenses.md#category-suggestions) for the name and the item names, used only when its confidence is `"high"`, as clients do; without AI, or when the suggestion fails, the expense has no category. `categoryId: null` asks for no category and skips the suggestion.
+- The expense has the receipt's total and currency, one payer who paid it all, and the `exact` allocation method with each person's amount from the split. The caller is its author. It goes through the same checks as `POST /expenses`: the payer must be a current member (400 `INVALID_REFERENCE` at `["payerId"]`), the category one of the household's, and a name or date the request and the receipt both lack answers 400 `VALIDATION_ERROR` at `["name"]` or `["expenseDate"]`.
+- Confirming answers 409 while the receipt can't become an expense: `RECEIPT_PROCESSING`, `RECEIPT_CONFIRMED` (including a second confirm), `RECEIPT_NOT_READY` for a `failed` receipt, `RECEIPT_INCOMPLETE` without a currency or a total (`details.fields`), `RECEIPT_ITEMS_UNASSIGNED` while any item is unassigned (`details.itemIds`), `RECEIPT_TOTAL_MISMATCH` while `differenceCents` isn't zero (`details.differenceCents`), and `RECEIPT_ASSIGNEE_NOT_MEMBER` when someone assigned has left the household since (`details.userIds`).
+- Order: the receipt's status is checked first, before the suggestion, so a receipt that can't be confirmed never uses the AI quota. Then, under the receipt's lock, the payer and the category, the status again, the header, the split, the assignees, and the expense request itself.
+- The answer is `{ receipt, expense }`. The receipt keeps its items and assignments as the record of who had what, `receipt.expenseId` is the expense, and `expense.receiptId` links back to the receipt. The expense's splits stay the only source for balances.
+
+### After confirming
+
+- Editing the expense's name, description, date, or category keeps the link.
+- Editing its amounts (`financial` in `PATCH /expenses/:expenseId`) unlinks the receipt: `expense.receiptId` and `receipt.expenseId` become `null`, and the receipt stays `confirmed` and read-only, as the record of the scan. It can't be confirmed again, so the edited expense and a second one never count the same costs twice. The receipt's file stays linked to the expense until someone unlinks it.
+- Deleting the expense puts the receipt back to `ready` with its items and assignments, so it can be corrected and confirmed again.
+
 ### Discarding
 
 `DELETE` removes the receipt and its items in any status but `confirmed`, even while it's `processing`. The scanned file stays as an attachment, and [cleanup](expenses.md#attachments) deletes it once nothing references it.
@@ -66,16 +107,23 @@ Shared errors from [the decision record](../decisions.md#errors) apply, as do th
 
 | Status | Code | When |
 | --- | --- | --- |
-| 409 | `RECEIPT_PROCESSING` | Editing a receipt the model is still reading |
-| 409 | `RECEIPT_CONFIRMED` | Editing or discarding a confirmed receipt |
+| 409 | `RECEIPT_PROCESSING` | Editing, assigning, or confirming a receipt the model is still reading |
+| 409 | `RECEIPT_CONFIRMED` | Editing, assigning, discarding, or confirming a confirmed receipt |
+| 409 | `RECEIPT_NOT_READY` | Confirming a `failed` receipt |
+| 409 | `RECEIPT_INCOMPLETE` | Confirming a receipt without a currency or a total; `details.fields` lists them |
+| 409 | `RECEIPT_ITEMS_UNASSIGNED` | Confirming while an item has no assignee; `details.itemIds` lists them |
+| 409 | `RECEIPT_TOTAL_MISMATCH` | Confirming while the items don't add up to the total; `details.differenceCents` |
+| 409 | `RECEIPT_ASSIGNEE_NOT_MEMBER` | Confirming with an assignee who has left; `details.userIds` |
+| 409 | `RECEIPT_NEGATIVE_SHARE` | Splitting or confirming when someone would get a negative amount |
 | 409 | `RECEIPT_NOT_FAILED` | Retrying a receipt that isn't `failed` |
 
 ## Storage
 
 - `receipts`: `household_id` cascades from the household. `(attachment_id, household_id)` references `attachments (id, household_id)`, so the file is in the receipt's household; it cascades, which happens only when the household goes, because cleanup deletes only files nothing references. `(household_id, created_by_id)` references `household_membership_history`. Checks keep `status` to the four values, `failure_code` set exactly while `failed`, `extraction_id` set exactly while `processing`, a non-blank `merchant`, a three-letter `currency`, and non-negative `total_cents` and `discount_cents`. `receipts_list_idx (household_id, created_at, id)` serves the list, and `receipts_attachment_idx (attachment_id)` serves cleanup's check and the cascade.
 - `receipt_items`: `receipt_id` cascades from the receipt. `quantity` is `numeric(12, 3)` and amounts are `bigint`. Checks keep a non-blank `name`, a non-negative `position` and `discount_cents`, and a positive `quantity`. `receipt_items_receipt_idx (receipt_id, position)` serves reads; positions aren't unique, so an edit can renumber them freely.
-- The expense a confirmed receipt becomes, and who had which item, are stored by the later receipt tasks.
+- `receipts.expense_id` references `expenses.id` with `ON DELETE SET NULL`, which only a household's deletion reaches, because deleting an expense puts its receipt back to `ready` first. `receipts_expense_id_key` keeps it to one receipt per expense and serves the lookup from the expense, and `receipts_expense` allows it only on a `confirmed` receipt. The confirm route creates the expense in the receipt's own household, so the key needs no `household_id`.
+- `receipt_item_assignments`: the primary key is `(receipt_item_id, user_id)`, and rows cascade from their item. `(household_id, user_id)` references `household_membership_history`, served by `receipt_item_assignments_party_idx`, and `shares` is a positive `integer`.
 
 ## Code
 
-`packages/backend/src/features/receipts/` holds the routes: `receipts.service.ts` has the state rules, `receipts.repository.ts` the queries and the one draft write, `receipt-extraction.ts` the background run, and `receipt-draft.ts` the prompt and the parsing of the model's reply, which need no database.
+`packages/backend/src/features/receipts/` holds the routes: `receipts.service.ts` has the state rules, `receipts.repository.ts` the queries and the one draft write, `receipt-extraction.ts` the background run, `receipt-draft.ts` the prompt and the parsing of the model's reply, which need no database, and `receipt-confirmation.service.ts` assigning items, the split preview, and confirming. The split itself is `splitReceipt` in the contracts.

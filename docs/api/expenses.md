@@ -98,6 +98,8 @@ Files are uploaded through the [attachments API](attachments.md) and then linked
 - Disabled module: `GET /attachments` and the expense reads keep working, and so do downloads. `POST` and `DELETE` answer 403 `MODULE_DISABLED`.
 - Concurrency: linking and unlinking lock the expense row `FOR UPDATE`, like edits, so they wait for an edit or a deletion of the same expense; one that waited for a deletion answers 404. Linking also locks the file's row `FOR KEY SHARE`, which cleanup skips, so cleanup can't delete a file while it's being linked. If cleanup got there first, the link answers 400 `INVALID_REFERENCE`.
 
+An expense made from a scanned receipt (#56) has the receipt's file linked like any other, and `receiptId` names the receipt until the expense's amounts are edited; see [Receipts](receipts.md#after-confirming). Other expenses have `receiptId: null`.
+
 `packages/backend/src/features/expenses/expense-attachments/` holds the routes. `findExpenses` reads the links with the rest of the expense through the `attachments` relation, using `linkedAttachments` from `expenses.repository.ts`, which the list route shares.
 
 #### Filtering the list
@@ -137,12 +139,13 @@ With 2,000 households of 5 members and 100 expenses each, a filtered page and it
 - An empty body answers 400 `EMPTY_PATCH`.
 - References and eligibility, by the [historical-edit rules](../decisions.md#historical-expense-edits): in a financial replacement, a user who is already a payer or allocation participant of the stored expense may stay, in either role, even after leaving. Anyone else must be a current member, checked with `assertUsersEligible(tx, householdId, refs, "current")` at `["financial", "payers", i, "userId"]` and `["financial", "allocation", "participants", i, "userId"]`. Users already on the expense aren't looked up, because the child rows' `<table>_party_fk` keys already make them household parties. A removed departed user is no longer on the expense, so a later replacement can't add them back. A non-null `categoryId` must be one of this household's categories.
 - Rights: the service checks that the caller is the author or an admin+ after finding the expense, so another household's or a missing expense answers 404 before any 403.
+- Receipts: a `financial` replacement unlinks the receipt the expense was made from, in the same transaction; the receipt stays `confirmed` as the record of the scan. A descriptive-only patch keeps the link. See [Receipts](receipts.md#after-confirming).
 
 `update` runs in one transaction: it locks the household with `lockHouseholdForLedgerWrite`, locks the expense row, checks the caller's right and the references, then deletes the old payers, participants, and splits, updates the expense row, and inserts the new child rows with `insertFinancialRows`. The old child rows go first, because changing `allocation_method` cascades to the participants through `expense_allocation_participants_method_fk`, and the old values may not fit the new method. Any failure rolls the whole replacement back, so the expense keeps its old financial state.
 
 #### Deleting
 
-`DELETE` removes the expense; its payers, participants, splits, and attachment links cascade through `<table>_expense_fk` in the same statement and transaction, so a failure leaves all of them in place. Payments reference no expense, so deleting one never changes recorded payments; #41 recalculates balances from what remains. There's no soft delete or undo.
+`DELETE` removes the expense; its payers, participants, splits, and attachment links cascade through `<table>_expense_fk` in the same statement and transaction, so a failure leaves all of them in place. Payments reference no expense, so deleting one never changes recorded payments; #41 recalculates balances from what remains. There's no soft delete or undo. A receipt still linked to the expense goes back to `ready`, with its items and assignments, in the same transaction, so it can be confirmed again.
 
 Linked files aren't deleted with the expense: they're kept unlinked, and [cleanup](attachments.md#cleanup) deletes each one, with its object, once no other expense or receipt references it. A file is usually older than `ATTACHMENT_UNREFERENCED_TTL_HOURS` by then, so the next cleanup run deletes it. Deleting files inside the expense's transaction would need the object storage in that transaction, and a file linked to another expense must stay anyway, so the expense routes leave storage to cleanup.
 

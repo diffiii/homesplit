@@ -7,8 +7,10 @@ import {
   BoundedCents,
   CurrencyCode,
   MAX_AMOUNT_CENTS,
+  MAX_SHARES,
 } from "../../common/money";
 import { Pagination, paginatedResponse } from "../../common/pagination";
+import { Expense } from "../expenses";
 import { UserSummary } from "../users";
 
 /**
@@ -65,6 +67,20 @@ const NonNegativeBoundedCents = z.int().min(0).max(MAX_AMOUNT_CENTS);
 
 const ReceiptText = z.string().trim().min(1).max(MAX_RECEIPT_TEXT_LENGTH);
 
+/** Most people one item may be assigned to. */
+export const MAX_RECEIPT_ITEM_ASSIGNEES = 100;
+
+/**
+ * One person's part of an item, as a number of shares. One share each
+ * splits the item equally; for an item with a quantity above 1, the shares
+ * can be units (2 of 3 beers); a weighed item only uses shares.
+ */
+export const ReceiptItemAssignment = z.object({
+  user: UserSummary,
+  shares: z.int().positive(),
+});
+export type ReceiptItemAssignment = z.infer<typeof ReceiptItemAssignment>;
+
 /**
  * One line of a receipt, amounts in the receipt's minor units. A discount
  * printed as its own line, such as "Rabat", is folded into the item it
@@ -79,6 +95,8 @@ export const ReceiptItem = z.object({
   unitPriceCents: z.int(),
   discountCents: z.int().nonnegative(),
   totalCents: z.int(),
+  /** Who has the item, ordered by user ID. Empty while it's unassigned. */
+  assignments: z.array(ReceiptItemAssignment),
 });
 export type ReceiptItem = z.infer<typeof ReceiptItem>;
 
@@ -95,6 +113,11 @@ const ReceiptFields = z.object({
   totalCents: z.int().nonnegative().nullable(),
   /** Discounts on the whole receipt, apart from the line discounts. */
   discountCents: z.int().nonnegative(),
+  /**
+   * The expense a confirmed receipt became, or `null`: before confirming, and
+   * after the expense's amounts were edited, which unlinks the receipt.
+   */
+  expenseId: Id.nullable(),
   createdBy: UserSummary,
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
@@ -191,3 +214,96 @@ export const ReceiptIdParams = z.object({
   receiptId: Id,
 });
 export type ReceiptIdParams = z.infer<typeof ReceiptIdParams>;
+
+/**
+ * Sets who has the listed items. Each entry replaces that item's
+ * assignments; an empty `assignees` makes it unassigned again, and items
+ * left out keep theirs. So several selected items, or every item for "split
+ * everything equally", are assigned in one request.
+ */
+export const AssignReceiptItemsRequest = z
+  .object({
+    items: z
+      .array(
+        z.object({
+          itemId: Id,
+          assignees: z
+            .array(
+              z.object({
+                userId: Id,
+                shares: z.int().positive().max(MAX_SHARES),
+              })
+            )
+            .max(MAX_RECEIPT_ITEM_ASSIGNEES),
+        })
+      )
+      .min(1)
+      .max(MAX_RECEIPT_ITEMS),
+  })
+  .superRefine(({ items }, ctx) => {
+    const itemIds = new Set<string>();
+    items.forEach(({ itemId, assignees }, index) => {
+      if (itemIds.has(itemId)) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Duplicate item id",
+          path: ["items", index, "itemId"],
+        });
+      }
+      itemIds.add(itemId);
+      const userIds = new Set<string>();
+      assignees.forEach(({ userId }, assignee) => {
+        if (userIds.has(userId)) {
+          ctx.addIssue({
+            code: "custom",
+            message: "Duplicate user id",
+            path: ["items", index, "assignees", assignee, "userId"],
+          });
+        }
+        userIds.add(userId);
+      });
+    });
+  });
+export type AssignReceiptItemsRequest = z.infer<
+  typeof AssignReceiptItemsRequest
+>;
+
+/**
+ * How the receipt would split now, as `splitReceipt` calculates it.
+ * `totalCents` is what's split, the items' total minus the receipt-level
+ * discount; each person's `amountCents` and `unassignedCents` add up to it.
+ * `differenceCents` is the receipt's own, so confirming needs it at zero and
+ * `unassignedItemIds` empty.
+ */
+export const ReceiptSplit = z.object({
+  currency: CurrencyCode.nullable(),
+  totalCents: z.int(),
+  people: z.array(z.object({ user: UserSummary, amountCents: z.int() })),
+  unassignedCents: z.int(),
+  unassignedItemIds: z.array(Id),
+  differenceCents: z.int().nullable(),
+});
+export type ReceiptSplit = z.infer<typeof ReceiptSplit>;
+
+/**
+ * Turns a receipt into an expense. Every field is optional: the payer
+ * defaults to who scanned the receipt, the name and date to its merchant and
+ * purchase date, and the category to a suggestion when AI is on (`null`
+ * means none). The total and the currency are the receipt's, and the splits
+ * are `exact`, from its assignments.
+ */
+export const ConfirmReceiptRequest = z.strictObject({
+  payerId: Id.optional(),
+  name: z.string().trim().min(1).optional(),
+  description: z.string().trim().min(1).nullable().optional(),
+  expenseDate: IsoDate.optional(),
+  categoryId: Id.nullable().optional(),
+});
+export type ConfirmReceiptRequest = z.infer<typeof ConfirmReceiptRequest>;
+
+/** The confirmed receipt and the expense made from it. */
+export const ConfirmReceiptResponse = z.object({
+  receipt: Receipt,
+  expense: Expense,
+});
+export type ConfirmReceiptResponse = z.infer<typeof ConfirmReceiptResponse>;

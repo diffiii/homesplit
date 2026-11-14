@@ -60,7 +60,7 @@ A trigger runs in the same statement as every insert, whatever the path, includi
 | Balances and suggestions | all | – | – | – | – |
 | Chores | all | all | all | all | complete, reopen: all |
 | Shopping items | all | all | all | all | purchase, unpurchase, clear purchased: all |
-| Receipts | all | all | all, until confirmed | all, until confirmed | retry: all |
+| Receipts | all | all | all, until confirmed | all, until confirmed | retry, assign items, confirm: all |
 | Profile | self (Better Auth `get-session`) | – | self | – | – |
 | Friends | self | self | – | friendship: either friend · request: sender | accept, decline: recipient |
 
@@ -198,7 +198,7 @@ Household paths in this table are relative to `/api/households/:householdId`. Ta
 | Balances | `/balances`: `GET` · `/settlement-suggestions`: `GET` |
 | Chores | `/chores`: `GET`, `POST` · `/chores/:choreId`: `GET`, `PATCH`, `DELETE` · `/chores/:choreId/complete` and `/reopen`: `POST` |
 | Shopping | `/shopping-items`: `GET`, `POST` · `/shopping-items/:itemId`: `GET`, `PATCH`, `DELETE` · `/shopping-items/:itemId/purchase` and `/unpurchase`: `POST` · `/shopping-items/clear-purchased`: `POST` |
-| Receipts | `/receipts`: `GET`, `POST` · `/receipts/:receiptId`: `GET`, `PATCH`, `DELETE` · `/receipts/:receiptId/retry`: `POST` |
+| Receipts | `/receipts`: `GET`, `POST` · `/receipts/:receiptId`: `GET`, `PATCH`, `DELETE` · `/receipts/:receiptId/retry` and `/confirm`: `POST` · `/receipts/:receiptId/assignments`: `PUT` · `/receipts/:receiptId/split`: `GET` |
 | Profile | `/api/me`: `PATCH` |
 | Friends | `/api/me/friends`: `GET` · `/api/me/friends/:friendshipId`: `DELETE` · `/api/me/friend-requests`: `POST` · `/api/me/friend-requests/incoming` and `/sent`: `GET` · `/api/me/friend-requests/:requestId`: `DELETE` · `/api/me/friend-requests/:requestId/accept` and `/decline`: `POST` |
 
