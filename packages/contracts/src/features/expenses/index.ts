@@ -166,6 +166,8 @@ export const Expense = z.object({
   allocation: ExpenseAllocationInput,
   splits: z.array(ExpenseSplit),
   attachments: z.array(AttachmentSummary),
+  /** The receipt the expense was made from, until its amounts are edited. */
+  receiptId: Id.nullable(),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });

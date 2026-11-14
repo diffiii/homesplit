@@ -7,8 +7,9 @@ import type {
   UpdateExpenseRequest,
 } from "@homesplit/contracts";
 import { Injectable } from "@nestjs/common";
+import { eq, sql } from "drizzle-orm";
 import { db, type Executor, readSnapshot, type Transaction } from "@/db";
-import { expenses } from "@/db/schema";
+import { expenses, receipts } from "@/db/schema";
 import { assertCategoryInHousehold } from "@/features/expense-categories/category-reference";
 import { lockHouseholdForLedgerWrite } from "@/features/expenses/household-ledger-lock";
 import type { HouseholdContext } from "@/features/households/access/household.guard";
@@ -27,7 +28,7 @@ import {
   updateAggregate,
 } from "./expenses.repository";
 
-async function findExpense(
+export async function findExpense(
   executor: Executor,
   householdId: string,
   expenseId: string
@@ -75,6 +76,24 @@ export async function lockExpenseForWrite(
   }
 }
 
+/**
+ * Creates an expense inside `tx`, as `POST /expenses` does, and returns its
+ * ID. The author is the caller; payers and participants must be current
+ * members, and the splits are calculated here.
+ */
+export async function createExpense(
+  tx: Transaction,
+  { householdId, userId }: HouseholdContext,
+  body: CreateExpenseRequest
+): Promise<string> {
+  await lockHouseholdForLedgerWrite(tx, householdId);
+  await assertUsersEligible(tx, householdId, userRefs(body), "current");
+  if (body.categoryId) {
+    await assertCategoryInHousehold(tx, householdId, body.categoryId);
+  }
+  return insertAggregate(tx, householdId, userId, body);
+}
+
 @Injectable()
 export class ExpensesService {
   list(
@@ -97,18 +116,12 @@ export class ExpensesService {
    * members; the splits are calculated here, never taken from the client.
    */
   create(
-    { householdId, userId }: HouseholdContext,
+    household: HouseholdContext,
     body: CreateExpenseRequest
   ): Promise<Expense> {
     return db.transaction(async (tx) => {
-      await lockHouseholdForLedgerWrite(tx, householdId);
-      await assertUsersEligible(tx, householdId, userRefs(body), "current");
-      if (body.categoryId) {
-        await assertCategoryInHousehold(tx, householdId, body.categoryId);
-      }
-
-      const id = await insertAggregate(tx, householdId, userId, body);
-      return findExpense(tx, householdId, id);
+      const id = await createExpense(tx, household, body);
+      return findExpense(tx, household.householdId, id);
     });
   }
 
@@ -121,6 +134,8 @@ export class ExpensesService {
    * Patches the descriptive fields, and with `financial` replaces the total,
    * payers, allocation, and splits together. Users already on the expense may
    * stay in either role after leaving; anyone else must be a current member.
+   * A financial replacement unlinks the receipt the expense was made from,
+   * which stays `confirmed` with its assignments as the record of the scan.
    */
   update(
     household: HouseholdContext,
@@ -150,16 +165,30 @@ export class ExpensesService {
       }
 
       await updateAggregate(tx, householdId, expenseId, patch);
+      if (patch.financial) {
+        await tx
+          .update(receipts)
+          .set({ expenseId: null, updatedAt: sql`now()` })
+          .where(eq(receipts.expenseId, expenseId));
+      }
       return findExpense(tx, householdId, expenseId);
     });
   }
 
-  /** Deletes the expense; its child rows cascade in the same statement. */
+  /**
+   * Deletes the expense; its child rows cascade in the same statement. A
+   * receipt still linked to it goes back to `ready`, with its items and
+   * assignments, so it can be confirmed again.
+   */
   async delete(household: HouseholdContext, expenseId: string): Promise<void> {
     const { householdId } = household;
     await db.transaction(async (tx) => {
       await lockHouseholdForLedgerWrite(tx, householdId);
       await lockExpenseForWrite(tx, household, expenseId);
+      await tx
+        .update(receipts)
+        .set({ status: "ready", expenseId: null, updatedAt: sql`now()` })
+        .where(eq(receipts.expenseId, expenseId));
       await tx
         .delete(expenses)
         .where(expenseInHousehold(householdId, expenseId));

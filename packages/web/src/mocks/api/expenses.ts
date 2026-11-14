@@ -84,6 +84,7 @@ export function renderExpense(db: MockDb, expense: MockExpense): Expense {
       ({ userId, amountCents }) => ({ user: db.summary(userId), amountCents })
     ),
     attachments: linkedAttachments(db, expense.id),
+    receiptId: null,
     createdAt: expense.createdAt,
     updatedAt: expense.updatedAt,
   };

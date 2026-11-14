@@ -1,10 +1,14 @@
 import { HouseholdIdParams } from "../features/households";
 import {
+  AssignReceiptItemsRequest,
+  ConfirmReceiptRequest,
+  ConfirmReceiptResponse,
   CreateReceiptRequest,
   ListReceiptsQuery,
   Receipt,
   ReceiptIdParams,
   ReceiptListResponse,
+  ReceiptSplit,
   UpdateReceiptRequest,
 } from "../features/receipts";
 import type { Endpoint } from "./endpoint";
@@ -60,5 +64,31 @@ export const receiptEndpoints = {
     params: ReceiptIdParams,
     status: 200,
     response: Receipt,
+  },
+  /** Replaces the assignments of the listed items only. */
+  assignReceiptItems: {
+    method: "PUT",
+    path: `${RECEIPT}/assignments`,
+    params: ReceiptIdParams,
+    body: AssignReceiptItemsRequest,
+    status: 200,
+    response: Receipt,
+  },
+  /** Each person's amount as the receipt would split now. */
+  getReceiptSplit: {
+    method: "GET",
+    path: `${RECEIPT}/split`,
+    params: ReceiptIdParams,
+    status: 200,
+    response: ReceiptSplit,
+  },
+  /** Creates the expense and confirms the receipt, in one transaction. */
+  confirmReceipt: {
+    method: "POST",
+    path: `${RECEIPT}/confirm`,
+    params: ReceiptIdParams,
+    body: ConfirmReceiptRequest,
+    status: 200,
+    response: ConfirmReceiptResponse,
   },
 } as const satisfies Record<string, Endpoint>;

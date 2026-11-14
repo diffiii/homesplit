@@ -240,6 +240,7 @@ describe("receipts", () => {
           unitPriceCents: 499,
           discountCents: 0,
           totalCents: 499,
+          assignments: [],
         },
         {
           position: 1,
@@ -248,6 +249,7 @@ describe("receipts", () => {
           unitPriceCents: 350,
           discountCents: 100,
           totalCents: 600,
+          assignments: [],
         },
         {
           position: 2,
@@ -256,6 +258,7 @@ describe("receipts", () => {
           unitPriceCents: 689,
           discountCents: 0,
           totalCents: 311,
+          assignments: [],
         },
       ]);
       expect(await usage(alice)).toBe(1);
@@ -490,6 +493,7 @@ describe("receipts", () => {
           unitPriceCents: 1000,
           discountCents: 0,
           totalCents: 1000,
+          assignments: [],
         },
         { ...bread, position: 2 },
       ]);
