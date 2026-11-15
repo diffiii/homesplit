@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatDueTime,
   formatIsoDate,
   formatIsoDateTime,
   formatLocalDate,
@@ -92,5 +93,23 @@ describe("formatRelativeTime", () => {
     expect(
       formatRelativeTime(new Date(2026, 2, 3, 12, 0).toISOString(), now)
     ).toBe("Mar 3, 2026");
+  });
+});
+
+describe("formatDueTime", () => {
+  const now = new Date(2026, 2, 10, 12, 0);
+  const at = (...parts: [number, number, number, number, number]) =>
+    new Date(...parts).toISOString();
+
+  it("names the days around today and dates the rest, always with the time", () => {
+    expect(formatDueTime(at(2026, 2, 10, 18, 30), now)).toBe("Today, 6:30 PM");
+    expect(formatDueTime(at(2026, 2, 11, 9, 0), now)).toBe("Tomorrow, 9:00 AM");
+    expect(formatDueTime(at(2026, 2, 9, 18, 0), now)).toBe(
+      "Yesterday, 6:00 PM"
+    );
+    expect(formatDueTime(at(2026, 2, 14, 20, 0), now)).toBe("Mar 14, 8:00 PM");
+    expect(formatDueTime(at(2027, 0, 2, 10, 0), now)).toBe(
+      "Jan 2, 2027, 10:00 AM"
+    );
   });
 });

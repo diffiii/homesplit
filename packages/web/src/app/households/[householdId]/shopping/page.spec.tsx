@@ -4,11 +4,11 @@ import { toast } from "sonner";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HouseholdShell } from "@/components/shell/household-shell";
 import { SHOPPING_POLL_INTERVAL } from "@/lib/api/shopping-queries";
+import { UNDO_DELETE_MS } from "@/lib/use-deferred";
 import { expectNoAxeViolations } from "@/test/axe";
 import { db, server } from "@/test/mock-server";
 import { renderWithProviders } from "@/test/render";
 import ShoppingPage from "./page";
-import { UNDO_DELETE_MS } from "./use-deferred-delete";
 
 const flat = () => {
   const found = db.state.households.find(
