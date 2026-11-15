@@ -17,7 +17,7 @@ import { ErrorState } from "@/components/error-state";
 import { FriendLabel } from "@/components/friend-label";
 import { ListSkeleton } from "@/components/list-skeleton";
 import { PageHeader } from "@/components/page-header";
-import { UserMenu } from "@/components/shell/household-shell";
+import { UserMenu } from "@/components/shell/user-menu";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useRequiredSession } from "@/hooks/use-required-session";
@@ -76,7 +76,7 @@ export default function FriendsPage() {
 
   let content: ReactNode;
   const failed = queries.find(
-    (query) => query.isLoadingError && query.data === undefined
+    (query) => query.status === "error" && query.data === undefined
   );
   if (failed) {
     content = (

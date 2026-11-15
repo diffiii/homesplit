@@ -7,7 +7,6 @@ import { invitationEndpoints } from "./invitations";
 import { meEndpoints } from "./me";
 import { shoppingEndpoints } from "./shopping";
 
-// biome-ignore lint/performance/noBarrelFile: package entry point
 export * from "./endpoint";
 export * from "./url";
 

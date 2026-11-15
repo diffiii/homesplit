@@ -289,21 +289,28 @@ describe("ShoppingPage", () => {
     expect(row("Bread")).toBeUndefined();
   });
 
-  it("brings a deleted item back with Undo, as it was", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    const { user } = renderShopping();
-    await user.click(
-      await screen.findByRole("button", { name: "Actions for Bread" })
-    );
-    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+  // Real timers: under jsdom 31, faking them here leaves the next test's
+  // Base UI menu unable to open.
+  it(
+    "brings a deleted item back with Undo, as it was",
+    async () => {
+      const { user } = renderShopping();
+      await user.click(
+        await screen.findByRole("button", { name: "Actions for Bread" })
+      );
+      await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
 
-    await user.click(await screen.findByRole("button", { name: "Undo" }));
-    await act(() => vi.advanceTimersByTimeAsync(UNDO_DELETE_MS));
+      await user.click(await screen.findByRole("button", { name: "Undo" }));
+      await act(
+        () => new Promise((resolve) => setTimeout(resolve, UNDO_DELETE_MS))
+      );
 
-    expect(row("Bread")).toHaveTextContent("Added by Celina Wiśniewska");
-    expect(rowTexts()[1]).toBe("BreadAdded by Celina Wiśniewska");
-    expect(itemsOf(flat().id).map((item) => item.name)).toContain("Bread");
-  });
+      expect(row("Bread")).toHaveTextContent("Added by Celina Wiśniewska");
+      expect(rowTexts()[1]).toBe("BreadAdded by Celina Wiśniewska");
+      expect(itemsOf(flat().id).map((item) => item.name)).toContain("Bread");
+    },
+    2 * UNDO_DELETE_MS
+  );
 
   it("keeps waiting while the pointer is on the toast, so Undo still works", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });

@@ -3,7 +3,7 @@
 import { SearchXIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { UserMenu } from "@/components/shell/household-shell";
+import { UserMenu } from "@/components/shell/user-menu";
 import { ThemeMenu } from "@/components/theme-menu";
 import { buttonVariants } from "@/components/ui/button";
 import { HOUSEHOLDS_PATH } from "@/lib/last-household";

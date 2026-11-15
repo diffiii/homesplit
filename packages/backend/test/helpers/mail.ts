@@ -1,5 +1,6 @@
 import { mailer } from "@/auth";
-import { type Email, LogMailer } from "@/mail";
+import { LogMailer } from "@/log-mailer";
+import type { Email } from "@/mail";
 import { PASSWORD_RESET_SUBJECT } from "@/password-reset";
 
 export const VERIFICATION_SUBJECT = "Verify your email for HomeSplit";

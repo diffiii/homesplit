@@ -1,6 +1,5 @@
 /** Shared API contracts for HomeSplit. Zod schemas, types, and shared money and allocation logic. */
 
-// biome-ignore lint/performance/noBarrelFile: package entry point
 export * from "./common/api-error";
 export * from "./common/datetime";
 export * from "./common/distribute";
