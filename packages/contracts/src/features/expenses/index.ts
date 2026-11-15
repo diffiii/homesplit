@@ -18,7 +18,6 @@ import {
 } from "./allocation/input";
 import { ExpenseCategory } from "./categories";
 
-// biome-ignore lint/performance/noBarrelFile: package entry point
 export * from "./allocation";
 export * from "./categories";
 export * from "./settlements";
