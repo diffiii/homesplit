@@ -18,7 +18,7 @@ function useAction(
   endpoint: "completeChore" | "reopenChore",
   change: (chore: Chore) => Chore,
   message: (name: string) => string,
-  onSuccess?: (chore: Chore) => void
+  onSuccess?: (result: Chore) => void
 ) {
   const householdId = useHousehold().household.id;
   const mutationKey = choreActionKey(householdId);
@@ -33,7 +33,7 @@ function useAction(
     mutationFn: (chore: Chore) =>
       api(endpoint, { params: { householdId, choreId: chore.id } }),
     onMutate: callbacks.onMutate,
-    onSuccess: (_data, chore) => onSuccess?.(chore),
+    onSuccess: (result) => onSuccess?.(result),
     onError: (error, chore, result) => {
       callbacks.onError(error, chore, result);
       if (isApiRequestError(error) && error.status === 404) {
@@ -84,11 +84,16 @@ export function useChoreActions(listKey: QueryKey) {
       completedBy: actor,
     }),
     (name) => `Couldn't complete “${name}”.`,
-    (chore) =>
+    (chore) => {
+      // Someone else got there first, and Undo would reopen their completion.
+      if (chore.completedBy?.id !== userId) {
+        return;
+      }
       toast(`Completed “${chore.name}”`, {
         duration: UNDO_DELETE_MS,
         action: { label: "Undo", onClick: () => reopen.mutate(chore) },
-      })
+      });
+    }
   );
 
   return { complete: complete.mutate, reopen: reopen.mutate };

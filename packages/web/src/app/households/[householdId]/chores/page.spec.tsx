@@ -228,6 +228,25 @@ describe("ChoresPage", () => {
     );
   });
 
+  it("offers no Undo when someone else completed the chore first", async () => {
+    const { user } = renderChores();
+    await names();
+    const celina = db.userByEmail("celina@example.com");
+    const chore = stored("Water the plants");
+    if (!(celina && chore)) {
+      throw new Error("The scenario has no Celina or Water the plants");
+    }
+    chore.completedAt = new Date().toISOString();
+    chore.completedById = celina.id;
+    await fromDetails(user, "Water the plants", "Mark as done");
+
+    await waitFor(async () =>
+      expect(await names()).not.toContain("Water the plants")
+    );
+    expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+    expect(stored("Water the plants")?.completedById).toBe(celina.id);
+  });
+
   it("shows who completed a chore, and reopens it from the completed ones", async () => {
     const { user } = renderChores("completed=true");
     await names();
