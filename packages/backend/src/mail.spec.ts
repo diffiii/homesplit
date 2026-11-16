@@ -1,12 +1,8 @@
 import { Logger } from "@nestjs/common";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  createMailer,
-  type Email,
-  LogMailer,
-  loadMailConfig,
-  ResendMailer,
-} from "./mail";
+import { LogMailer } from "./log-mailer";
+import { createMailer, type Email, loadMailConfig } from "./mail";
+import { ResendMailer } from "./resend-mailer";
 
 const { send } = vi.hoisted(() => ({ send: vi.fn() }));
 

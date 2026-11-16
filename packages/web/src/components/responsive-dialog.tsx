@@ -6,6 +6,7 @@ import {
   createContext,
   type ReactElement,
   type ReactNode,
+  type RefObject,
   use,
 } from "react";
 import {
@@ -90,22 +91,29 @@ export function ResponsiveDialogContent({
   children,
   className,
   finalFocus,
+  initialFocus,
 }: PartProps & {
   /** Where focus goes on close, when the element that opened the dialog may be gone. */
   finalFocus?: ComponentProps<typeof DialogContent>["finalFocus"];
+  initialFocus?: RefObject<HTMLElement | null>;
 }) {
   if (use(SheetContext)) {
     return (
       <DrawerContent
         className={cn("pb-[env(safe-area-inset-bottom)]", className)}
         finalFocus={finalFocus}
+        initialFocus={initialFocus}
       >
         {children}
       </DrawerContent>
     );
   }
   return (
-    <DialogContent className={className} finalFocus={finalFocus}>
+    <DialogContent
+      className={className}
+      finalFocus={finalFocus}
+      initialFocus={initialFocus}
+    >
       {children}
     </DialogContent>
   );
@@ -140,6 +148,12 @@ export function ResponsiveDialogBody({ children, className }: PartProps) {
 }
 
 export function ResponsiveDialogFooter({ children, className }: PartProps) {
-  const Footer = use(SheetContext) ? DrawerFooter : DialogFooter;
-  return <Footer className={className}>{children}</Footer>;
+  if (use(SheetContext)) {
+    return (
+      <DrawerFooter className={cn("*:h-11", className)}>
+        {children}
+      </DrawerFooter>
+    );
+  }
+  return <DialogFooter className={className}>{children}</DialogFooter>;
 }

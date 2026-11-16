@@ -69,3 +69,64 @@ export function formatLocalDate(value: Date | IsoDateTime): string {
 export function formatIsoDateTime(value: IsoDateTime): string {
   return dateTimeFormat.format(new Date(value));
 }
+
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+const relativeFormat = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
+export function formatRelativeTime(
+  value: IsoDateTime,
+  now = new Date()
+): string {
+  const then = new Date(value);
+  const elapsed = now.getTime() - then.getTime();
+  if (elapsed < MINUTE_MS) {
+    return "just now";
+  }
+  if (elapsed < HOUR_MS) {
+    return relativeFormat.format(-Math.floor(elapsed / MINUTE_MS), "minute");
+  }
+  const days = Math.round(
+    (parseIsoDate(toIsoDate(now)).getTime() -
+      parseIsoDate(toIsoDate(then)).getTime()) /
+      DAY_MS
+  );
+  if (days === 0) {
+    return relativeFormat.format(-Math.floor(elapsed / HOUR_MS), "hour");
+  }
+  return days < 7 ? relativeFormat.format(-days, "day") : formatLocalDate(then);
+}
+
+const timeFormat = new Intl.DateTimeFormat("en", { timeStyle: "short" });
+
+/** `6:30 PM` for a `HH:MM` time of day. */
+export function formatTimeOfDay(time: string): string {
+  const [hours, minutes] = time.split(":").map(Number);
+  return timeFormat.format(new Date(2000, 0, 1, hours, minutes));
+}
+const dayFormat = new Intl.DateTimeFormat("en", {
+  month: "short",
+  day: "numeric",
+});
+
+/** `Today, 6:30 PM`, `Tomorrow, 9:00 AM`, or `Mar 14, 8:00 PM`, as deadlines are shown. */
+export function formatDueTime(value: IsoDateTime, now = new Date()): string {
+  const due = new Date(value);
+  const days = Math.round(
+    (parseIsoDate(toIsoDate(due)).getTime() -
+      parseIsoDate(toIsoDate(now)).getTime()) /
+      DAY_MS
+  );
+  const names: Record<number, string> = {
+    [-1]: "Yesterday",
+    0: "Today",
+    1: "Tomorrow",
+  };
+  const day =
+    names[days] ??
+    (due.getFullYear() === now.getFullYear()
+      ? dayFormat.format(due)
+      : formatLocalDate(due));
+  return `${day}, ${timeFormat.format(due)}`;
+}

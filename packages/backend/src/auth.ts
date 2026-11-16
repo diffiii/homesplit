@@ -10,7 +10,6 @@ import {
 import { organization } from "better-auth/plugins";
 import { z } from "zod";
 import { db } from "./db";
-// biome-ignore lint/performance/noNamespaceImport: drizzle schema bag for better-auth adapter
 import * as schema from "./db/schema/auth";
 import { emailLink, VERIFY_EMAIL_PATH } from "./email-links";
 import { seedDefaultCategories } from "./features/expense-categories/default-categories";

@@ -21,7 +21,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ErrorState } from "@/components/error-state";
 import { NotFoundPage } from "@/components/not-found-page";
 import { householdPath } from "@/components/shell/household-nav";
-import { UserMenu } from "@/components/shell/household-shell";
+import { UserMenu } from "@/components/shell/user-menu";
 import { ThemeMenu } from "@/components/theme-menu";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";

@@ -44,6 +44,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import { UnitPicker } from "@/components/unit-picker";
 
 const { fieldContext, formContext, useFieldContext, useFormContext } =
@@ -93,7 +94,7 @@ function useHydrated(): boolean {
  */
 function useValueFromBeforeHydration(
   field: AnyFieldApi,
-  input: RefObject<HTMLInputElement | null>
+  input: RefObject<HTMLInputElement | HTMLTextAreaElement | null>
 ): void {
   useEffect(() => {
     const typed = input.current?.value;
@@ -168,6 +169,33 @@ function TextField({
       {(control) => (
         <Input
           {...input}
+          {...control}
+          name={field.name}
+          onBlur={field.handleBlur}
+          onChange={(event) => field.handleChange(event.target.value)}
+          ref={inputRef}
+          value={value}
+        />
+      )}
+    </FieldShell>
+  );
+}
+
+function TextareaField({
+  label,
+  description,
+}: {
+  description?: ReactNode;
+  label: ReactNode;
+}) {
+  const field = useFieldContext<string>();
+  const value = useStore(field.store, (state) => state.value);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  useValueFromBeforeHydration(field, inputRef);
+  return (
+    <FieldShell description={description} label={label}>
+      {(control) => (
+        <Textarea
           {...control}
           name={field.name}
           onBlur={field.handleBlur}
@@ -677,6 +705,7 @@ export const { useAppForm, withForm } = createFormHook({
   formContext,
   fieldComponents: {
     TextField,
+    TextareaField,
     MoneyField,
     CurrencyField,
     DateField,

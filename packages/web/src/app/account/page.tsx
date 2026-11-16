@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ErrorState } from "@/components/error-state";
 import { ListSkeleton } from "@/components/list-skeleton";
 import { PageHeader } from "@/components/page-header";
-import { UserMenu } from "@/components/shell/household-shell";
+import { UserMenu } from "@/components/shell/user-menu";
 import { buttonVariants } from "@/components/ui/button";
 import { useRequiredSession } from "@/hooks/use-required-session";
 import { HOME_PATH } from "@/lib/api/session";

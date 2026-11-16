@@ -84,3 +84,11 @@ export function useIsDeparted(): (user: Pick<UserSummary, "id">) => boolean {
   const { members } = useHousehold();
   return (user) => isDeparted(user, members);
 }
+
+/** A user's name as plain text, with " (left)" once they've left the household. */
+export function useUserName(): (
+  user: Pick<UserSummary, "id" | "name">
+) => string {
+  const hasLeft = useIsDeparted();
+  return (user) => `${user.name}${hasLeft(user) ? " (left)" : ""}`;
+}

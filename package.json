@@ -34,5 +34,5 @@
     "lint-staged": "latest",
     "ultracite": "latest"
   },
-  "packageManager": "pnpm@12.4.1"
+  "packageManager": "pnpm@12.21.0"
 }

@@ -3,7 +3,7 @@
 import { revalidateLogic } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
 import { PlusIcon } from "lucide-react";
-import { useRef } from "react";
+import { type RefObject, useRef } from "react";
 import { toast } from "sonner";
 import { useAppForm } from "@/components/form";
 import { useHouseholdId } from "@/components/shell/household-context";
@@ -19,13 +19,21 @@ import {
   validateShoppingItem,
 } from "@/lib/shopping";
 
-export function QuickAdd() {
+export function QuickAdd({
+  onAdded,
+  nameRef: givenRef,
+}: {
+  nameRef?: RefObject<HTMLInputElement | null>;
+  onAdded?: (name: string) => void;
+}) {
   const householdId = useHouseholdId();
-  const nameRef = useRef<HTMLInputElement>(null);
+  const ownRef = useRef<HTMLInputElement>(null);
+  const nameRef = givenRef ?? ownRef;
   const create = useMutation({
     mutationKey: createShoppingItemKey(householdId),
     mutationFn: (body: ShoppingItemBody) =>
       api("createShoppingItem", { params: { householdId }, body }),
+    onSuccess: (_created, item) => onAdded?.(item.name),
     onError: (error, item) => {
       toast.error(`Couldn't add “${item.name}”`, {
         description: errorMessage(error),

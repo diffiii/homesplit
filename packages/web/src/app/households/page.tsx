@@ -10,7 +10,7 @@ import { ListSkeleton } from "@/components/list-skeleton";
 import { PageHeader } from "@/components/page-header";
 import { QueryState } from "@/components/query-state";
 import { householdPath } from "@/components/shell/household-nav";
-import { UserMenu } from "@/components/shell/household-shell";
+import { UserMenu } from "@/components/shell/user-menu";
 import { ThemeMenu } from "@/components/theme-menu";
 import { Button } from "@/components/ui/button";
 import { householdQueries } from "@/lib/api/household-queries";

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatDueTime,
   formatIsoDate,
   formatIsoDateTime,
   formatLocalDate,
+  formatRelativeTime,
   isoToLocalDateTime,
   localDateTimeToIso,
   parseIsoDate,
@@ -67,6 +69,47 @@ describe("IsoDateTime", () => {
     expect(formatLocalDate("2026-03-02T03:30:00Z")).toBe("Mar 1, 2026");
     expect(formatLocalDate(new Date("2026-03-02T03:30:00Z"))).toBe(
       "Mar 1, 2026"
+    );
+  });
+});
+
+describe("formatRelativeTime", () => {
+  const now = new Date(2026, 2, 10, 12, 0);
+  const ago = (ms: number) => new Date(now.getTime() - ms).toISOString();
+
+  it("counts minutes and hours today, then calendar days", () => {
+    expect(formatRelativeTime(ago(30_000), now)).toBe("just now");
+    expect(formatRelativeTime(ago(5 * 60_000), now)).toBe("5 minutes ago");
+    expect(formatRelativeTime(ago(3 * 3_600_000), now)).toBe("3 hours ago");
+    expect(
+      formatRelativeTime(new Date(2026, 2, 9, 23, 0).toISOString(), now)
+    ).toBe("yesterday");
+    expect(
+      formatRelativeTime(new Date(2026, 2, 6, 9, 0).toISOString(), now)
+    ).toBe("4 days ago");
+  });
+
+  it("gives the date from a week back", () => {
+    expect(
+      formatRelativeTime(new Date(2026, 2, 3, 12, 0).toISOString(), now)
+    ).toBe("Mar 3, 2026");
+  });
+});
+
+describe("formatDueTime", () => {
+  const now = new Date(2026, 2, 10, 12, 0);
+  const at = (...parts: [number, number, number, number, number]) =>
+    new Date(...parts).toISOString();
+
+  it("names the days around today and dates the rest, always with the time", () => {
+    expect(formatDueTime(at(2026, 2, 10, 18, 30), now)).toBe("Today, 6:30 PM");
+    expect(formatDueTime(at(2026, 2, 11, 9, 0), now)).toBe("Tomorrow, 9:00 AM");
+    expect(formatDueTime(at(2026, 2, 9, 18, 0), now)).toBe(
+      "Yesterday, 6:00 PM"
+    );
+    expect(formatDueTime(at(2026, 2, 14, 20, 0), now)).toBe("Mar 14, 8:00 PM");
+    expect(formatDueTime(at(2027, 0, 2, 10, 0), now)).toBe(
+      "Jan 2, 2027, 10:00 AM"
     );
   });
 });

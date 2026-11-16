@@ -1,6 +1,6 @@
-import { Logger } from "@nestjs/common";
-import { Resend } from "resend";
 import { z } from "zod";
+import { LogMailer } from "./log-mailer";
+import { ResendMailer } from "./resend-mailer";
 
 export interface Email {
   html: string;
@@ -12,48 +12,6 @@ export interface Email {
 export interface Mailer {
   /** Rejects when the message wasn't accepted for delivery. */
   send: (email: Email) => Promise<void>;
-}
-
-/** Sends through Resend, the production transport. */
-export class ResendMailer implements Mailer {
-  private readonly resend: Resend;
-  private readonly from: string;
-
-  constructor(apiKey: string, from: string) {
-    this.resend = new Resend(apiKey);
-    this.from = from;
-  }
-
-  async send(email: Email): Promise<void> {
-    const { error } = await this.resend.emails.send({
-      from: this.from,
-      ...email,
-    });
-    if (error) {
-      throw new Error(`Resend rejected the email: ${error.message}`);
-    }
-  }
-}
-
-const MAX_LOGGED_EMAILS = 100;
-
-/**
- * Logs each message, links included, instead of sending it, so a developer
- * can follow them locally. Keeps the latest ones in `sent` for tests.
- */
-export class LogMailer implements Mailer {
-  /** The latest messages, oldest first. */
-  readonly sent: Email[] = [];
-  private readonly logger = new Logger("Mail");
-
-  send(email: Email): Promise<void> {
-    this.sent.push(email);
-    if (this.sent.length > MAX_LOGGED_EMAILS) {
-      this.sent.shift();
-    }
-    this.logger.log(`To ${email.to}: ${email.subject}\n${email.text}`);
-    return Promise.resolve();
-  }
 }
 
 /** Unset and empty variables both mean "use the default". */

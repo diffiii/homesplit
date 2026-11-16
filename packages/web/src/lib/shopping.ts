@@ -1,6 +1,10 @@
 import {
   CreateShoppingItemRequest,
+  type IsoDateTime,
+  type PurchasedShoppingItem,
   type ShoppingItem,
+  type UnpurchasedShoppingItem,
+  type UserSummary,
 } from "@homesplit/contracts";
 import type { ServerErrors } from "./form";
 
@@ -83,4 +87,62 @@ export function formatQuantity({
     return `${quantity} ${unit}`;
   }
   return quantity > 1 ? `×${quantity}` : null;
+}
+
+export interface SplitShoppingList {
+  bought: PurchasedShoppingItem[];
+  toBuy: UnpurchasedShoppingItem[];
+}
+
+const newestFirst = (a: string, b: string) => {
+  if (a === b) {
+    return 0;
+  }
+  return a < b ? 1 : -1;
+};
+
+export function splitShoppingList(
+  items: readonly ShoppingItem[]
+): SplitShoppingList {
+  const toBuy: UnpurchasedShoppingItem[] = [];
+  const bought: PurchasedShoppingItem[] = [];
+  for (const item of items) {
+    if (item.isPurchased) {
+      bought.push(item);
+    } else {
+      toBuy.push(item);
+    }
+  }
+  toBuy.sort(
+    (a, b) => newestFirst(a.addedAt, b.addedAt) || newestFirst(a.id, b.id)
+  );
+  bought.sort(
+    (a, b) =>
+      newestFirst(a.purchasedAt, b.purchasedAt) || newestFirst(a.id, b.id)
+  );
+  return { toBuy, bought };
+}
+
+export function markPurchased(
+  items: readonly ShoppingItem[],
+  id: string,
+  buyer: UserSummary,
+  at: IsoDateTime
+): ShoppingItem[] {
+  return items.map((item) =>
+    item.id === id && !item.isPurchased
+      ? { ...item, isPurchased: true, purchasedBy: buyer, purchasedAt: at }
+      : item
+  );
+}
+
+export function markUnpurchased(
+  items: readonly ShoppingItem[],
+  id: string
+): ShoppingItem[] {
+  return items.map((item) =>
+    item.id === id && item.isPurchased
+      ? { ...item, isPurchased: false, purchasedBy: null, purchasedAt: null }
+      : item
+  );
 }
