@@ -1,4 +1,9 @@
-import type { Chore, CreateChoreRequest } from "@homesplit/contracts";
+import type {
+  Chore,
+  ChoreListResponse,
+  CreateChoreRequest,
+} from "@homesplit/contracts";
+import type { InfiniteData } from "@tanstack/react-query";
 import { isoToLocalDateTime, localDateTimeToIso } from "./dates";
 import type { ServerErrors } from "./form";
 
@@ -79,6 +84,35 @@ export function isOverdue(
   return (
     !chore.isCompleted && chore.dueAt !== null && new Date(chore.dueAt) < now
   );
+}
+
+export type ChorePages = InfiniteData<ChoreListResponse>;
+
+const listOrder = (chore: Chore) =>
+  [
+    Number(chore.isCompleted),
+    chore.dueAt ?? "~",
+    chore.createdAt,
+    chore.id,
+  ].join(" ");
+
+/** Puts `chore` where the server's list order has it, replacing its old copy. */
+export function placeChore(data: ChorePages, chore: Chore): ChorePages {
+  const order = listOrder(chore);
+  let placed = false;
+  const pages = data.pages.map((page, index) => {
+    const items = page.items.filter((item) => item.id !== chore.id);
+    let at = placed ? -1 : items.findIndex((item) => listOrder(item) > order);
+    if (at < 0 && !placed && index === data.pages.length - 1) {
+      at = items.length;
+    }
+    if (at >= 0) {
+      placed = true;
+      items.splice(at, 0, chore);
+    }
+    return { ...page, items };
+  });
+  return { ...data, pages };
 }
 
 export interface ChoreFilters {

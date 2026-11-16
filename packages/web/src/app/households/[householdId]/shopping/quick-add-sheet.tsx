@@ -51,9 +51,7 @@ export function QuickAddSheet() {
           </p>
         </ResponsiveDialogBody>
         <ResponsiveDialogFooter>
-          <ResponsiveDialogClose
-            render={<Button className="h-10" variant="outline" />}
-          >
+          <ResponsiveDialogClose render={<Button variant="outline" />}>
             Done
           </ResponsiveDialogClose>
         </ResponsiveDialogFooter>

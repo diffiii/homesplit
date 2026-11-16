@@ -1,7 +1,7 @@
 "use client";
 
 import type { Chore } from "@homesplit/contracts";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useIsMutating } from "@tanstack/react-query";
 import { cn } from "cn";
 import { ListChecksIcon } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
@@ -11,12 +11,13 @@ import { ListSkeleton } from "@/components/list-skeleton";
 import { LoadMore } from "@/components/load-more";
 import { RowMenu } from "@/components/row-menu";
 import {
+  useFeatureEnabled,
   useHousehold,
   useIsDeparted,
   useUserName,
 } from "@/components/shell/household-context";
 import { Badge } from "@/components/ui/badge";
-import { choreListQuery } from "@/lib/api/chore-queries";
+import { choreActionKey, choreListQuery } from "@/lib/api/chore-queries";
 import { type ChoreFilters, isOverdue } from "@/lib/chores";
 import {
   formatDueTime,
@@ -24,6 +25,7 @@ import {
   formatRelativeTime,
 } from "@/lib/dates";
 import { ChoreDetails } from "./chore-details";
+import { useChoreActions } from "./use-chore-actions";
 import { useDeleteChore } from "./use-delete-chore";
 
 interface ChoreListProps {
@@ -36,12 +38,22 @@ interface ChoreListProps {
 
 export function ChoreList({ emptyAction, filters, onEdit }: ChoreListProps) {
   const { household, userId } = useHousehold();
-  const list = useInfiniteQuery(
-    choreListQuery(household.id, {
+  const enabled = useFeatureEnabled("chores");
+  const acting =
+    useIsMutating({ mutationKey: choreActionKey(household.id) }) > 0;
+  const query = choreListQuery(
+    household.id,
+    {
       assignedToId: filters.mine ? userId : undefined,
       includeCompleted: filters.completed,
-    })
+    },
+    { poll: !acting }
   );
+  const list = useInfiniteQuery(query);
+  const { complete, reopen } = useChoreActions(query.queryKey);
+  const toggle = enabled
+    ? (chore: Chore) => (chore.isCompleted ? reopen(chore) : complete(chore))
+    : undefined;
   const { hidden, deleteChore } = useDeleteChore();
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
@@ -67,7 +79,11 @@ export function ChoreList({ emptyAction, filters, onEdit }: ChoreListProps) {
   }
 
   const loaded = list.data.pages.flatMap((page) => page.items);
-  const chores = loaded.filter((chore) => !hidden.has(chore.id));
+  // A chore completed here stays cached until the refetch, so it's left out.
+  const chores = loaded.filter(
+    (chore) =>
+      !hidden.has(chore.id) && (filters.completed || !chore.isCompleted)
+  );
   const open = chores.filter((chore) => !chore.isCompleted);
   const completed = chores.filter((chore) => chore.isCompleted);
   const viewing = chores.find((chore) => chore.id === viewingId) ?? null;
@@ -145,6 +161,7 @@ export function ChoreList({ emptyAction, filters, onEdit }: ChoreListProps) {
       <ChoreDetails
         chore={viewing}
         onOpenChange={setViewOpen}
+        onToggle={toggle}
         open={viewOpen && viewing !== null}
       />
     </div>

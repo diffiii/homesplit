@@ -6,6 +6,7 @@ import type {
   HouseholdFeatures,
 } from "@homesplit/contracts";
 import type { HouseholdRole } from "@/lib/api/auth-client";
+import { toIsoDate } from "@/lib/dates";
 import type {
   MockAttachment,
   MockChore,
@@ -129,9 +130,9 @@ export class MockFactory {
     ).toISOString();
   }
 
-  /** A calendar date, as the user's device would give it in UTC. */
+  /** A calendar date in the device's time zone, as the app compares with today. */
   date(ago: Ago = {}): string {
-    return this.time(ago).slice(0, "YYYY-MM-DD".length);
+    return toIsoDate(new Date(this.time(ago)));
   }
 
   user(name: string, email: string, image: string | null = null): MockUser {
