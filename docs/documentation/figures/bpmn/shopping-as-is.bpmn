@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_shopping-as-is" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_main" name="Wspólne zakupy bez HomeSplit" processRef="Process_shopping-as-is" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_shopping-as-is" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Lane_K" name="Kupujący">
+        <bpmn:flowNodeRef>Shop</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CopyReceipt</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Calculate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>SendSummary</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CheckAccount</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_P" name="Pozostali domownicy">
+        <bpmn:flowNodeRef>Start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AddToChat</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Review</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Agree</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Transfer</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start" name="Brakuje produktów">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:manualTask id="AddToChat" name="Dopisz produkty do listy w komunikatorze">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:manualTask>
+    <bpmn:manualTask id="Shop" name="Zrób zakupy i zapłać">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:manualTask>
+    <bpmn:manualTask id="CopyReceipt" name="Przepisz paragon do arkusza">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:manualTask>
+    <bpmn:manualTask id="Calculate" name="Wylicz podział kosztów">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:manualTask>
+    <bpmn:manualTask id="SendSummary" name="Wyślij rozliczenie domownikom">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+    </bpmn:manualTask>
+    <bpmn:manualTask id="Review" name="Sprawdź wyliczenie">
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:manualTask>
+    <bpmn:exclusiveGateway id="Agree" name="Wyliczenie poprawne?">
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:manualTask id="Transfer" name="Wykonaj przelew">
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+    </bpmn:manualTask>
+    <bpmn:manualTask id="CheckAccount" name="Sprawdź wpływy na koncie">
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+      <bpmn:outgoing>Flow_11</bpmn:outgoing>
+    </bpmn:manualTask>
+    <bpmn:endEvent id="End" name="Koszty rozliczone">
+      <bpmn:incoming>Flow_11</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start" targetRef="AddToChat" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="AddToChat" targetRef="Shop" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Shop" targetRef="CopyReceipt" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="CopyReceipt" targetRef="Calculate" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Calculate" targetRef="SendSummary" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="SendSummary" targetRef="Review" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Review" targetRef="Agree" />
+    <bpmn:sequenceFlow id="Flow_8" name="tak" sourceRef="Agree" targetRef="Transfer" />
+    <bpmn:sequenceFlow id="Flow_9" name="nie" sourceRef="Agree" targetRef="Calculate" />
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="Transfer" targetRef="CheckAccount" />
+    <bpmn:sequenceFlow id="Flow_11" sourceRef="CheckAccount" targetRef="End" />
+    <bpmn:textAnnotation id="Annotation_1">
+      <bpmn:text>Ryzyko zgubienia paragonu i pomyłek przy przepisywaniu</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Association_1" associationDirection="None" sourceRef="CopyReceipt" targetRef="Annotation_1" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_1">
+      <bpmndi:BPMNShape id="Participant_main_di" bpmnElement="Participant_main" isHorizontal="true"><dc:Bounds x="0" y="0" width="1432" height="400" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_K_di" bpmnElement="Lane_K" isHorizontal="true"><dc:Bounds x="30" y="0" width="1402" height="180" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_P_di" bpmnElement="Lane_P" isHorizontal="true"><dc:Bounds x="30" y="180" width="1402" height="220" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_di" bpmnElement="Start"><dc:Bounds x="97" y="222" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="65" y="262" width="100" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AddToChat_di" bpmnElement="AddToChat"><dc:Bounds x="172" y="200" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shop_di" bpmnElement="Shop"><dc:Bounds x="306" y="20" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CopyReceipt_di" bpmnElement="CopyReceipt"><dc:Bounds x="440" y="20" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Calculate_di" bpmnElement="Calculate"><dc:Bounds x="574" y="20" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SendSummary_di" bpmnElement="SendSummary"><dc:Bounds x="708" y="20" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Review_di" bpmnElement="Review"><dc:Bounds x="842" y="200" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Agree_di" bpmnElement="Agree" isMarkerVisible="true"><dc:Bounds x="989" y="215" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="964" y="183" width="100" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Transfer_di" bpmnElement="Transfer"><dc:Bounds x="1076" y="200" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CheckAccount_di" bpmnElement="CheckAccount"><dc:Bounds x="1210" y="20" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_di" bpmnElement="End"><dc:Bounds x="1359" y="42" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1327" y="82" width="100" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Annotation_1_di" bpmnElement="Annotation_1"><dc:Bounds x="430" y="125" width="130" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1"><di:waypoint x="133" y="240" /><di:waypoint x="172" y="240" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2"><di:waypoint x="282" y="240" /><di:waypoint x="361" y="240" /><di:waypoint x="361" y="100" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3"><di:waypoint x="416" y="60" /><di:waypoint x="440" y="60" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4"><di:waypoint x="550" y="60" /><di:waypoint x="574" y="60" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5"><di:waypoint x="684" y="60" /><di:waypoint x="708" y="60" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6"><di:waypoint x="818" y="60" /><di:waypoint x="897" y="60" /><di:waypoint x="897" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7"><di:waypoint x="952" y="240" /><di:waypoint x="989" y="240" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8"><di:waypoint x="1039" y="240" /><di:waypoint x="1076" y="240" /><bpmndi:BPMNLabel><dc:Bounds x="1045" y="220" width="27" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9"><di:waypoint x="1014" y="265" /><di:waypoint x="1014" y="340" /><di:waypoint x="629" y="340" /><di:waypoint x="629" y="100" /><bpmndi:BPMNLabel><dc:Bounds x="1019" y="269" width="27" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10"><di:waypoint x="1186" y="240" /><di:waypoint x="1265" y="240" /><di:waypoint x="1265" y="100" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11"><di:waypoint x="1320" y="60" /><di:waypoint x="1359" y="60" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_1_di" bpmnElement="Association_1"><di:waypoint x="495" y="100" /><di:waypoint x="495" y="125" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

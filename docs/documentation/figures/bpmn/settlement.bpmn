@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_settlement" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_main" name="Rozliczenie spłaty" processRef="Process_settlement" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_settlement" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Lane_D" name="Dłużnik">
+        <bpmn:flowNodeRef>Start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Suggestions</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Transfer</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Record</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_S" name="System HomeSplit">
+        <bpmn:flowNodeRef>Pending</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Apply</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndSettled</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_O" name="Odbiorca">
+        <bpmn:flowNodeRef>CheckAccount</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Arrived</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Confirm</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Reject</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndRejected</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start" name="Ujemne saldo">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="Suggestions" name="Sprawdź sugestie przelewów">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:manualTask id="Transfer" name="Wykonaj przelew poza aplikacją">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:manualTask>
+    <bpmn:userTask id="Record" name="Zgłoś spłatę">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Pending" name="Zapisz spłatę jako oczekującą">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:manualTask id="CheckAccount" name="Sprawdź wpływ na koncie">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+    </bpmn:manualTask>
+    <bpmn:exclusiveGateway id="Arrived" name="Przelew dotarł?">
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Confirm" name="Potwierdź spłatę">
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Reject" name="Odrzuć spłatę">
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_11</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Apply" name="Uwzględnij spłatę w saldach">
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="EndSettled" name="Spłata rozliczona">
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="EndRejected" name="Spłata odrzucona">
+      <bpmn:incoming>Flow_11</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start" targetRef="Suggestions" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Suggestions" targetRef="Transfer" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Transfer" targetRef="Record" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Record" targetRef="Pending" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Pending" targetRef="CheckAccount" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="CheckAccount" targetRef="Arrived" />
+    <bpmn:sequenceFlow id="Flow_7" name="tak" sourceRef="Arrived" targetRef="Confirm" />
+    <bpmn:sequenceFlow id="Flow_8" name="nie" sourceRef="Arrived" targetRef="Reject" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="Confirm" targetRef="Apply" />
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="Apply" targetRef="EndSettled" />
+    <bpmn:sequenceFlow id="Flow_11" sourceRef="Reject" targetRef="EndRejected" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_1">
+      <bpmndi:BPMNShape id="Participant_main_di" bpmnElement="Participant_main" isHorizontal="true"><dc:Bounds x="0" y="0" width="1298" height="460" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_D_di" bpmnElement="Lane_D" isHorizontal="true"><dc:Bounds x="30" y="0" width="1268" height="120" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_S_di" bpmnElement="Lane_S" isHorizontal="true"><dc:Bounds x="30" y="120" width="1268" height="120" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_O_di" bpmnElement="Lane_O" isHorizontal="true"><dc:Bounds x="30" y="240" width="1268" height="220" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_di" bpmnElement="Start"><dc:Bounds x="97" y="42" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="65" y="82" width="100" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Suggestions_di" bpmnElement="Suggestions"><dc:Bounds x="172" y="20" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Transfer_di" bpmnElement="Transfer"><dc:Bounds x="306" y="20" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Record_di" bpmnElement="Record"><dc:Bounds x="440" y="20" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Pending_di" bpmnElement="Pending"><dc:Bounds x="574" y="140" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CheckAccount_di" bpmnElement="CheckAccount"><dc:Bounds x="708" y="260" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Arrived_di" bpmnElement="Arrived" isMarkerVisible="true"><dc:Bounds x="855" y="275" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="830" y="243" width="100" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Confirm_di" bpmnElement="Confirm"><dc:Bounds x="942" y="260" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Reject_di" bpmnElement="Reject"><dc:Bounds x="942" y="360" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Apply_di" bpmnElement="Apply"><dc:Bounds x="1076" y="140" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndSettled_di" bpmnElement="EndSettled"><dc:Bounds x="1225" y="162" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1193" y="202" width="100" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndRejected_di" bpmnElement="EndRejected"><dc:Bounds x="1113" y="382" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1081" y="422" width="100" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1"><di:waypoint x="133" y="60" /><di:waypoint x="172" y="60" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2"><di:waypoint x="282" y="60" /><di:waypoint x="306" y="60" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3"><di:waypoint x="416" y="60" /><di:waypoint x="440" y="60" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4"><di:waypoint x="550" y="60" /><di:waypoint x="629" y="60" /><di:waypoint x="629" y="140" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5"><di:waypoint x="684" y="180" /><di:waypoint x="763" y="180" /><di:waypoint x="763" y="260" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6"><di:waypoint x="818" y="300" /><di:waypoint x="855" y="300" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7"><di:waypoint x="905" y="300" /><di:waypoint x="942" y="300" /><bpmndi:BPMNLabel><dc:Bounds x="911" y="280" width="27" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8"><di:waypoint x="880" y="325" /><di:waypoint x="880" y="400" /><di:waypoint x="942" y="400" /><bpmndi:BPMNLabel><dc:Bounds x="885" y="329" width="27" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9"><di:waypoint x="1052" y="300" /><di:waypoint x="1131" y="300" /><di:waypoint x="1131" y="220" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10"><di:waypoint x="1186" y="180" /><di:waypoint x="1225" y="180" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11"><di:waypoint x="1052" y="400" /><di:waypoint x="1113" y="400" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

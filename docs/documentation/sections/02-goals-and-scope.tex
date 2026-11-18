@@ -8,6 +8,19 @@ Szczególnie uciążliwe jest ręczne rejestrowanie wydatków i~ustalanie należ
 
 Dobrze widać to na przykładzie wspólnych zakupów. Po zakupach według listy papierowy paragon trzeba przechować, przepisać do arkusza lub notatek, ręcznie wyliczyć podział kosztów, a~na końcu uzgodnić, kto komu ile jest winien. Na każdym etapie można się pomylić: zgubić paragon, źle przepisać kwotę albo błędnie wyliczyć należności. Projekt HomeSplit ma skrócić tę drogę do trzech kroków: zdjęcia paragonu, weryfikacji odczytanych danych i~zapisu wydatku, po którym salda członków są aktualne, a~kupione pozycje zostają odhaczone na liście zakupów.
 
+Oba przebiegi przedstawiono w~notacji BPMN na rys.~\ref{fig:bpmn-as-is} i~\ref{fig:bpmn-to-be}. Dodanie wydatku z~paragonu i~rozliczenie spłaty są na rys.~\ref{fig:bpmn-to-be} podprocesami, które opisano w~sekcji~\ref{sec:procesy}.
+
+\begin{sidewaysfigure}
+  \centering
+  \includegraphics[width=0.9\linewidth]{bpmn/shopping-as-is}
+  \caption{Wspólne zakupy i~rozliczenie kosztów bez aplikacji}
+  \label{fig:bpmn-as-is}
+  \bigskip
+  \includegraphics[width=0.587\linewidth]{bpmn/shopping-to-be}
+  \caption{Wspólne zakupy i~rozliczenie kosztów w~aplikacji HomeSplit}
+  \label{fig:bpmn-to-be}
+\end{sidewaysfigure}
+
 \subsection{Beneficjenci}
 
 Głównymi beneficjentami projektu są osoby, które dzielą koszty życia codziennego lub organizują wspólne przedsięwzięcia:

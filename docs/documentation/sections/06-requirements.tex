@@ -23,6 +23,44 @@ Wymagania są prowadzone jako zgłoszenia w~repozytorium projektu~\cite{homespli
   \end{tabularx}
 \end{table}
 
+\subsection{Procesy biznesowe}
+\label{sec:procesy}
+
+Procesy, w~których uczestniczy więcej niż jeden aktor, przedstawiono w~notacji BPMN. Tory odpowiadają aktorom z~tab.~\ref{tab:aktorzy}, a~usługi zewnętrzne pokazano jako osobne pule. Ikona osoby oznacza czynność użytkownika w~aplikacji, ikona dłoni - czynność wykonywaną poza aplikacją, a~ikona kół zębatych - zadanie systemu.
+
+\subsubsection{Zaproszenie do gospodarstwa}
+
+Administrator zaprasza osobę na adres e-mail albo wybiera ją z~listy znajomych (rys.~\ref{fig:bpmn-zaproszenie}). System sprawdza uprawnienia i~limity zaproszeń, zapisuje zaproszenie i~wysyła wiadomość z~linkiem. Osoba bez konta zakłada je i~potwierdza adres e-mail, a~osoba z~kontem loguje się. Po przyjęciu zaproszenia system dodaje ją do gospodarstwa jako członka. Proces realizuje historyjki GD-2 i~ZN-5.
+
+\begin{sidewaysfigure}
+  \centering
+  \includegraphics[width=\linewidth]{bpmn/household-invitation}
+  \caption{Proces zaproszenia do gospodarstwa}
+  \label{fig:bpmn-zaproszenie}
+\end{sidewaysfigure}
+
+\subsubsection{Dodanie wydatku z~paragonu}
+
+Proces na rys.~\ref{fig:bpmn-paragon} obejmuje historyjki AI-3, AI-4 i~AI-5. Członek fotografuje paragon, a~system przesyła zdjęcie do modelu AI i~zapisuje odczytane dane jako szkic. Jeśli odczyt się nie powiedzie, członek uzupełnia dane ręcznie. Po sprawdzeniu szkicu członek przypisuje pozycje do osób. Paragon można zatwierdzić dopiero wtedy, gdy wszystkie pozycje są przypisane, a~ich suma zgadza się z~sumą paragonu. Zatwierdzenie tworzy wydatek, a~model proponuje, które pozycje listy zakupów zostały kupione.
+
+\begin{sidewaysfigure}
+  \centering
+  \includegraphics[width=\linewidth]{bpmn/receipt-expense}
+  \caption{Proces dodania wydatku z~paragonu}
+  \label{fig:bpmn-paragon}
+\end{sidewaysfigure}
+
+\subsubsection{Rozliczenie spłaty}
+
+Dłużnik wybiera jedną z~sugestii przelewów, wykonuje przelew w~swoim banku i~zgłasza spłatę w~aplikacji (rys.~\ref{fig:bpmn-splata}). Spłata pozostaje oczekująca, dopóki odbiorca nie sprawdzi, czy pieniądze dotarły. Potwierdzona spłata zmienia salda obu osób, a~odrzucona jest usuwana. Proces realizuje historyjki RO-2, RO-3 i~RO-4.
+
+\begin{sidewaysfigure}
+  \centering
+  \includegraphics[width=\linewidth]{bpmn/settlement}
+  \caption{Proces rozliczenia spłaty}
+  \label{fig:bpmn-splata}
+\end{sidewaysfigure}
+
 \subsection{Wymagania funkcjonalne}
 
 \subsubsection{Konta użytkowników}

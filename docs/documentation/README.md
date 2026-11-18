@@ -9,6 +9,7 @@ HomeSplit project documentation in LaTeX, based on the [ZPI documentation templa
 | `sections/` | sections 1–9 |
 | `references.bib` | bibliography |
 | `figures/` | figures |
+| `figures/bpmn/` | BPMN diagrams: `.bpmn` sources and their PDF exports |
 
 ## Building
 
