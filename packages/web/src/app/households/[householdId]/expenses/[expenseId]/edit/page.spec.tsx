@@ -9,6 +9,7 @@ import { expectNoAxeViolations } from "@/test/axe";
 import { db, server } from "@/test/mock-server";
 import { router } from "@/test/navigation";
 import { renderWithProviders } from "@/test/render";
+import { SUGGESTION_DELAY_MS } from "../../category-suggestion";
 import EditExpensePage from "./page";
 
 const householdNamed = (name: string) => {
@@ -117,6 +118,44 @@ describe("EditExpensePage", () => {
     expect(router.push).toHaveBeenCalledWith(
       `/households/${flat().id}/expenses/${id}`
     );
+  });
+
+  it("suggests a category for an uncategorised expense only once it's renamed", async () => {
+    const household = flat();
+    household.features = { ...household.features, ai: true };
+    const expense = expenseNamed("Pizza night");
+    const diningOut = expense.categoryId;
+    expense.categoryId = null;
+    const asked: string[] = [];
+    server.events.on("request:start", async ({ request }) => {
+      if (request.url.endsWith("/expense-categories/suggestion")) {
+        asked.push((await request.clone().json()).name);
+      }
+    });
+    const patches = capturePatches();
+    const { user } = renderEdit("Pizza night");
+
+    const name = await screen.findByLabelText("Name");
+    await new Promise((resolve) =>
+      setTimeout(resolve, SUGGESTION_DELAY_MS + 300)
+    );
+    expect(asked).toEqual([]);
+
+    await user.type(name, " out");
+    expect(
+      await screen.findByText(
+        "Suggested from the name",
+        {},
+        { timeout: SUGGESTION_DELAY_MS + 2000 }
+      )
+    ).toBeVisible();
+    expect(asked).toEqual(["Pizza night out"]);
+
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(router.push).toHaveBeenCalled());
+    expect(patches).toEqual([
+      { name: "Pizza night out", categoryId: diningOut },
+    ]);
   });
 
   it("sends nothing when nothing changed", async () => {

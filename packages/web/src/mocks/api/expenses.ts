@@ -183,6 +183,19 @@ function matchesFilters(
   );
 }
 
+/**
+ * Words that put an expense in one of the default categories. The mock
+ * "model" is `high` on these and on a category's own name, and otherwise
+ * guesses Other with `low`.
+ */
+const CATEGORY_KEYWORDS: Record<string, readonly string[]> = {
+  groceries: ["grocer", "supermarket", "milk", "bread"],
+  utilities: ["electricity", "water", "internet", "heating"],
+  transport: ["fuel", "taxi", "bus", "train", "ticket"],
+  "dining out": ["pizza", "restaurant", "dinner", "lunch"],
+  entertainment: ["cinema", "movie", "concert", "netflix"],
+};
+
 const isParty = (settlement: MockSettlement, userId: string) =>
   settlement.payerId === userId || settlement.payeeId === userId;
 
@@ -243,6 +256,41 @@ export const expenseRoutes: MockRoutes = {
         throw conflict("CATEGORY_IN_USE", "An expense uses this category");
       }
       removeRow(db.state.categories, category);
+    },
+  },
+
+  suggestExpenseCategory: {
+    module: "expenses",
+    // Only the text is looked at: the mocks don't read attachments.
+    resolve: ({ db, household, body }) => {
+      if (!household.features.ai) {
+        throw new MockApiError(
+          403,
+          "MODULE_DISABLED",
+          "The ai module is disabled",
+          { module: "ai" }
+        );
+      }
+      const text = `${body.name ?? ""} ${body.description ?? ""}`.toLowerCase();
+      const categories = db.state.categories.filter(
+        ({ householdId }) => householdId === household.id
+      );
+      const match = categories.find(({ name }) => {
+        const key = name.toLowerCase();
+        return (
+          text.includes(key) ||
+          CATEGORY_KEYWORDS[key]?.some((word) => text.includes(word))
+        );
+      });
+      if (match) {
+        return { suggestion: { categoryId: match.id, confidence: "high" } };
+      }
+      const other = categories.find(
+        ({ name }) => name.toLowerCase() === "other"
+      );
+      return {
+        suggestion: other ? { categoryId: other.id, confidence: "low" } : null,
+      };
     },
   },
 
