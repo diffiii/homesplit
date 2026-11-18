@@ -1,3 +1,101 @@
 \section{Implementacja}
 
-\wskazowka{np. opis nietrywialnych rozwiązań implementacyjnych, w~tym algorytmów (jeżeli ma zastosowanie)}
+\subsection{Podział kwot}
+
+Każdy podział kosztów sprowadza się do rozdzielenia kwoty $T$, wyrażonej w~jednostkach podrzędnych waluty, między $k$~uczestników o~wagach $w_1, \dots, w_k$. Dokładne udziały $T w_i / W$, gdzie $W = \sum_j w_j$, zwykle nie są liczbami całkowitymi, a~niezależne zaokrąglenie każdego z~nich może dać sumę różną od $T$. Funkcja \texttt{distributeProportionally} rozwiązuje ten problem metodą największych reszt:
+
+\begin{enumerate}
+  \item każdy uczestnik otrzymuje część całkowitą $a_i = \lfloor T w_i / W \rfloor$;
+  \item dla każdego uczestnika wyznaczana jest reszta $r_i = T w_i - a_i W$;
+  \item brakujące jednostki, których jest $T - \sum_i a_i < k$, otrzymują po jednej osoby o~największych resztach; przy równych resztach pierwszeństwo ma uczestnik o~mniejszym identyfikatorze.
+\end{enumerate}
+
+Wynik zależy wyłącznie od par (identyfikator, waga), a~nie od kolejności uczestników w~żądaniu, więc ten sam wydatek zawsze daje te same udziały. Przykładowo kwota 100,00~zł podzielona równo między trzy osoby daje udziały 33,34~zł, 33,33~zł i~33,33~zł, przy czym dodatkowy grosz trafia do osoby o~najmniejszym identyfikatorze.
+
+Obliczenia wykonywane są na typie \texttt{bigint}, ponieważ iloczyn $T w_i$ może przekroczyć zakres liczb całkowitych, które JavaScript reprezentuje dokładnie ($2^{53}-1$). Wynik jest zamieniany z~powrotem na liczbę dopiero na końcu, a~funkcja \texttt{toSafeInteger} zgłasza błąd zamiast po cichu utracić precyzję. Ta sama funkcja zamienia wartości kolumn \texttt{bigint} i~sum zwracanych przez PostgreSQL, które sterownik bazy danych przekazuje jako tekst.
+
+Pięć metod podziału różni się tylko sposobem wyznaczania wag:
+
+\begin{itemize}
+  \item \textbf{równy} - każdy uczestnik ma wagę 1;
+  \item \textbf{procentowy} - wagami są punkty bazowe (1\% to 100 punktów), których suma musi wynosić dokładnie 10\,000;
+  \item \textbf{według udziałów} - wagami są liczby udziałów;
+  \item \textbf{według kwot} - kwoty są przyjmowane bez zmian i~muszą sumować się do kwoty wydatku;
+  \item \textbf{z~korektami} - od kwoty wydatku odejmowana jest suma korekt, resztę dzieli się równo, a~następnie do udziału każdego uczestnika dodaje się jego korektę.
+\end{itemize}
+
+\zpitodo{Opisać sprawdzanie, czy w~metodzie z~korektami żaden udział nie wychodzi poniżej zera, po wprowadzeniu poprawki tego podziału.}
+
+Silnik podziału znajduje się w~pakiecie \texttt{contracts}. Serwer wylicza nim udziały przy każdym zapisie wydatku i~nigdy nie przyjmuje ich od klienta, a~formularz wydatku korzysta z~niego do podglądu podziału przed zapisem. Z~tego samego kodu korzystają atrapy API używane w~testach interfejsu.
+
+\subsection{Salda i~sugestie rozliczeń}
+
+Salda nie są przechowywane, tylko wyliczane jednym zapytaniem SQL. Zapytanie łączy operatorem \texttt{UNION ALL} cztery zbiory wierszy ze znakiem:
+
+\begin{itemize}
+  \item kwoty zapłacone przez płatników (\texttt{expense\_payers}) ze znakiem dodatnim;
+  \item udziały w~wydatkach (\texttt{expense\_splits}) ze znakiem ujemnym;
+  \item potwierdzone spłaty wysłane (\texttt{settlements}, strona płacąca) ze znakiem dodatnim;
+  \item potwierdzone spłaty otrzymane (\texttt{settlements}, strona odbierająca) ze znakiem ujemnym.
+\end{itemize}
+
+Saldo osoby w~danej walucie to suma jej wierszy, pogrupowana według waluty i~użytkownika. Każdy zbiór jest łączony tylko z~tabelą wydatków (w~celu odczytania waluty), więc wiersze płatników i~udziałów nie mnożą się nawzajem, a~warunek na gospodarstwo trafia do każdej gałęzi zapytania osobno i~korzysta z~jej indeksu. Na tej samej konstrukcji oparte są saldo użytkownika we wszystkich jego gospodarstwach oraz sprawdzenie, czy gospodarstwo jest rozliczone; to ostatnie kończy się po znalezieniu pierwszego niezerowego salda.
+
+Sugestie rozliczeń wyznacza algorytm zachłanny opisany w~sekcji~\ref{sec:upraszczanie-rozliczen}, uruchamiany osobno dla każdej waluty. Wierzyciele i~dłużnicy są sortowani malejąco według kwoty, a~przy równych kwotach według identyfikatora użytkownika, więc wynik nie zależy od kolejności wierszy zwróconych przez bazę. Jeśli po przejściu obu list któraś z~nich nie jest pusta, salda w~danej walucie nie sumują się do zera. Taki stan oznacza błąd w~danych, dlatego funkcja zgłasza wyjątek zamiast zwracać niepełne sugestie.
+
+\subsection{Równoległe zapisy finansowe}
+
+Kilku członków gospodarstwa może jednocześnie dodawać wydatki, edytować ten sam wydatek albo zmieniać ustawienia gospodarstwa. Bez dodatkowej synchronizacji mogłoby dojść np. do sytuacji, w~której administrator wyłącza moduł wydatków po sprawdzeniu, że wszystkie salda wynoszą zero, a~w~tym samym czasie inna osoba dodaje wydatek.
+
+Synchronizacja opiera się na blokadach wierszy PostgreSQL zakładanych na wiersz gospodarstwa w~tabeli \texttt{organization}:
+
+\begin{itemize}
+  \item każda transakcja zapisująca wydatek lub spłatę zakłada blokadę współdzieloną (\texttt{SELECT \dots{} FOR SHARE}), więc zwykłe zapisy finansowe nie czekają na siebie nawzajem;
+  \item usunięcie gospodarstwa i~wyłączenie modułu wydatków zakładają blokadę wyłączną (\texttt{SELECT \dots{} FOR UPDATE}), sprawdzają salda i~wykonują zmianę w~tej samej transakcji; blokadę wyłączną zakłada też rozliczenie długu byłego członka, które wylicza spłaty z~bieżących sald.
+\end{itemize}
+
+Blokada wyłączna czeka na zakończenie trwających zapisów i~wstrzymuje nowe do końca transakcji, więc salda odczytane po jej założeniu pozostają prawdziwe do chwili zatwierdzenia zmiany. Zapis, który czekał na blokadę usuwanego gospodarstwa, po jej zwolnieniu nie znajduje już wiersza i~kończy się odpowiedzią 404.
+
+Edycja i~usunięcie wydatku dodatkowo blokują wiersz samego wydatku (\texttt{FOR UPDATE}). Dwie równoległe edycje tego samego wydatku wykonują się więc kolejno, a~druga z~nich odczytuje dane zapisane przez pierwszą, zanim sprawdzi, którzy uczestnicy są nowi i~muszą być bieżącymi członkami. Zmiana kwoty, płatników lub podziału usuwa i~ponownie zapisuje wszystkie wiersze podrzędne wydatku w~jednej transakcji.
+
+\subsection{Wyzwalacze bazy danych}
+
+Członkostwo w~gospodarstwie obsługuje biblioteka Better Auth, która dodaje wiersze do tabeli \texttt{member} na kilka sposobów: przy tworzeniu gospodarstwa, przyjęciu zaproszenia lub bezpośrednim dodaniu członka. Zamiast uzupełniać historię członkostwa w~każdym z~tych miejsc, zastosowano wyzwalacz \texttt{AFTER INSERT} na tabeli \texttt{member}, który dopisuje parę gospodarstwo-użytkownik do tabeli \texttt{household\_membership\_history} (instrukcja \texttt{ON CONFLICT DO NOTHING} pomija pary już zapisane). Historia jest dzięki temu kompletna także dla ścieżek dodanych w~przyszłych wersjach biblioteki. W~ten sam sposób tworzony jest wiersz z~ustawieniami modułów dla każdego nowego gospodarstwa.
+
+Drugi wyzwalacz, \texttt{AFTER DELETE} na tabeli \texttt{attachments}, dopisuje klucz usuniętego pliku do kolejki \texttt{storage\_object\_deletions}. Działa on również wtedy, gdy załączniki są usuwane kaskadowo razem z~gospodarstwem, więc żaden plik w~magazynie nie zostaje bez wiersza, który by go opisywał.
+
+\subsection{Załączniki}
+
+Typ przesłanego pliku jest rozpoznawany na podstawie jego zawartości (sygnatury pliku), a~typ zadeklarowany przez przeglądarkę jest ignorowany. Akceptowane są obrazy JPEG, PNG, WebP i~HEIC oraz dokumenty PDF o~rozmiarze do 10~MiB.
+
+Zapis pliku obejmuje dwa systemy, magazyn obiektów i~bazę danych, których nie da się objąć jedną transakcją. Dlatego plik trafia najpierw do magazynu, a~wiersz z~metadanymi jest wstawiany do bazy dopiero po udanym zapisie. Jeśli wstawienie wiersza się nie powiedzie, serwer usuwa plik z~magazynu, a~gdy i~to się nie uda, dopisuje jego klucz do kolejki usuwania.
+
+Plik jest przesyłany od razu po wybraniu, jeszcze przed zapisaniem wydatku. Formularz może dzięki temu pokazać postęp przesyłania i~miniaturę, a~zapis wydatku nie czeka na przesłanie plików. Plik musi też istnieć na serwerze, zanim powstanie wydatek, aby model AI mógł zaproponować na jego podstawie kategorię lub odczytać paragon. Jeśli użytkownik prześle plik, ale nie zapisze formularza, plik pozostaje bez powiązania z~wydatkiem. Takie pliki usuwa okresowo uruchamiane zadanie porządkowe, gdy od przesłania minie 24~godziny, a~następnie usuwa z~magazynu obiekty z~kolejki \texttt{storage\_object\_deletions}.
+
+Załączniki pobierane są przez podpisane adresy URL ważne 5~minut. Czas ważności liczony jest przed podpisaniem adresu, więc podany klientowi termin nigdy nie jest późniejszy niż faktyczne wygaśnięcie adresu.
+
+\subsection{Integracja z~modelami językowymi}
+
+Funkcje sztucznej inteligencji korzystają z~jednego serwisu, który przed każdym zapytaniem do modelu sprawdza, czy moduł AI jest włączony w~gospodarstwie i~czy dostawca jest skonfigurowany, a~następnie zużywa jedno zapytanie z~dziennego limitu. Limit (domyślnie 50~zapytań na gospodarstwo) jest realizowany jedną instrukcją \texttt{INSERT \dots{} ON CONFLICT DO UPDATE} na tabeli \texttt{ai\_usage}, która zwiększa licznik tylko wtedy, gdy jest on mniejszy od limitu. Równoległe zapytania nie mogą więc go przekroczyć, a~gdy instrukcja nie zwróci wiersza, serwer odpowiada kodem 429 wraz z~godziną odnowienia limitu.
+
+Odpowiedź modelu musi mieć ustaloną strukturę. Każde zadanie definiuje schemat odpowiedzi w~Zod, który jest przekazywany dostawcy jako ścisły schemat JSON (\emph{structured outputs}), a~odpowiedź jest ponownie sprawdzana na serwerze. Odpowiedź niezgodna ze schematem lub odmowa modelu daje błąd 502, przekroczenie czasu (domyślnie 30~s) - błąd 504. W~dzienniku zapisywany jest tylko rodzaj błędu, bez jego treści, ponieważ komunikat może cytować odpowiedź zawierającą dane gospodarstwa.
+
+Przy połączeniu z~OpenRouter serwer dołącza do zapytania wymagania dotyczące wyboru dostawcy: zakaz wykorzystywania danych do trenowania, brak przechowywania danych (\emph{zero data retention}) oraz obsługa wszystkich przekazanych parametrów, w~tym schematu odpowiedzi. Zapytanie z~obrazem lub plikiem PDF trafia do modelu wizyjnego, a~zapytanie tekstowe do modelu tekstowego.
+
+Zdjęcia przed wysłaniem do modelu są obracane zgodnie z~orientacją zapisaną przez aparat, zmniejszane tak, aby dłuższy bok miał najwyżej 2048~pikseli, i~zapisywane jako JPEG. Nowy plik nie zawiera metadanych EXIF, w~tym współrzędnych GPS. Zdjęcia w~formacie HEIC, domyślnym na telefonach iPhone, są dekodowane biblioteką libheif skompilowaną do WebAssembly. Przed dekodowaniem sprawdzana jest liczba pikseli (najwyżej 50~milionów), aby mały, specjalnie spreparowany plik nie zajął gigabajtów pamięci.
+
+Pierwszą zrealizowaną funkcją jest sugerowanie kategorii wydatku. Model otrzymuje listę kategorii gospodarstwa w~postaci ponumerowanej, nazwę i~opis wydatku (przycięte do ustalonej długości) oraz opcjonalnie załącznik. Zwraca numer kategorii albo wartość \texttt{null} i~poziom pewności. Model nie zna identyfikatorów kategorii, a~numer spoza listy jest odrzucany, więc odpowiedź nie może wskazać kategorii innego gospodarstwa. Instrukcja dla modelu zaznacza, że treść wiadomości użytkownika to dane, a~nie polecenia, co ogranicza skutki prób wstrzyknięcia instrukcji w~nazwie lub opisie wydatku. Gospodarstwo bez kategorii otrzymuje pustą odpowiedź bez zapytania do modelu i~bez zużycia limitu.
+
+Odczyt paragonu korzysta z~tego samego serwisu. Członek przesyła zdjęcie paragonu jako załącznik, a~serwer tworzy szkic paragonu ze statusem \emph{przetwarzany} i~zleca odczyt w~tle; aplikacja webowa okresowo sprawdza status szkicu. Model wizyjny zwraca bezpośrednio, bez osobnego etapu OCR, nazwę sprzedawcy, datę, walutę, sumę i~pozycje z~ilością, ceną jednostkową, rabatem i~kwotą. Serwer zapisuje je jako szkic do edycji i~podaje różnicę między sumą pozycji a~sumą z~paragonu, aby użytkownik mógł poprawić błędnie odczytane wartości.
+
+Pozycje paragonu przypisuje się do osób jako udziały: jedna osoba z~jednym udziałem płaci za całą pozycję, kilka osób po jednym udziale dzieli ją równo, a~przy pozycji z~kilkoma sztukami udziałem jest liczba sztuk. Kwota każdej pozycji po rabacie jest dzielona między przypisane osoby proporcjonalnie do udziałów, a~rabaty dla całego paragonu rozkładane proporcjonalnie do kwot pozycji. Kwoty przypadające na osoby są sumowane bez zaokrąglania i~zaokrąglane raz, metodą największych reszt, więc ich suma zawsze równa się sumie paragonu. Zatwierdzenie paragonu tworzy w~jednej transakcji wydatek z~podziałem według kwot, dołącza do niego zdjęcie paragonu i~oznacza paragon jako zatwierdzony.
+
+Po zatwierdzeniu model porównuje pozycje paragonu z~niekupionymi pozycjami listy zakupów gospodarstwa i~proponuje dopasowania, np. pozycję \enquote{Mleko 2\% 1L} do pozycji \enquote{mleko}. Podobnie jak przy kategoriach, dopasowania wskazujące nieznane pozycje są odrzucane. Członek zatwierdza wybrane dopasowania, a~serwer oznacza pozycje jako kupione przez płatnika paragonu, pomijając te, które ktoś kupił lub usunął w~międzyczasie.
+
+\zpitodo{Zweryfikować opis odczytu paragonów, przypisywania pozycji i~dopasowania do listy zakupów po ich implementacji.}
+
+\subsection{Natychmiastowa reakcja interfejsu}
+
+Najczęstsze czynności na liście obowiązków i~liście zakupów, takie jak oznaczenie obowiązku jako wykonanego, są wykonywane optymistycznie: interfejs zmienia dane w~pamięci podręcznej TanStack Query od razu po dotknięciu, nie czekając na odpowiedź serwera. Jeśli serwer zwróci błąd, zmiana jest wycofywana, a~użytkownik dostaje komunikat; gdy obowiązek został w~międzyczasie usunięty przez inną osobę, komunikat o~tym informuje.
+
+Szybkie, kolejne dotknięcia wymagały dwóch zabezpieczeń. Żądania z~jednej listy są wysyłane kolejno, więc cofnięcie wykonania zawsze dociera do serwera po samym wykonaniu. Dane listy są ponownie pobierane z~serwera dopiero po zakończeniu ostatniego z~oczekujących żądań, ponieważ wcześniejsze pobranie przywróciłoby na ekranie stan sprzed zmian, których żądania są jeszcze w~drodze.

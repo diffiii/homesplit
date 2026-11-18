@@ -2,12 +2,12 @@
 
 \subsection{Architektura systemu}
 
-HomeSplit ma architekturę klient--serwer z~trzema warstwami: aplikacją webową działającą w~przeglądarce, serwerem aplikacji udostępniającym API oraz warstwą danych. Kod wszystkich części znajduje się w~jednym monorepozytorium, podzielonym na trzy pakiety:
+HomeSplit ma architekturę klient-serwer z~trzema warstwami: aplikacją webową działającą w~przeglądarce, serwerem aplikacji udostępniającym API oraz warstwą danych. Kod wszystkich części znajduje się w~jednym monorepozytorium, podzielonym na trzy pakiety:
 
 \begin{itemize}
-  \item \texttt{web} -- aplikacja webowa w~Next.js i~React,
-  \item \texttt{backend} -- serwer aplikacji w~NestJS,
-  \item \texttt{contracts} -- wspólne kontrakty API: schematy Zod, typy, mapa endpointów oraz logika podziału kwot.
+  \item \texttt{web} - aplikacja webowa w~Next.js i~React,
+  \item \texttt{backend} - serwer aplikacji w~NestJS,
+  \item \texttt{contracts} - wspólne kontrakty API: schematy Zod, typy, mapa endpointów oraz logika podziału kwot.
 \end{itemize}
 
 Komponenty systemu i~przepływ danych między nimi przedstawiono na rys.~\ref{fig:architektura}.
@@ -54,7 +54,7 @@ Aplikacja webowa i~serwer API są wdrażane jako osobne usługi na platformie Re
   \item[Wspólna logika podziału kwot.] Silnik podziału kosztów jest częścią pakietu \texttt{contracts}, z~którego korzystają klient i~serwer, więc formularz wydatku pokazuje dokładnie te kwoty, które zapisze serwer.
   \item[Gospodarstwo jako organizacja Better Auth.] Biblioteka Better Auth dostarcza organizacje z~rolami, członkostwem i~zaproszeniami. Gospodarstwo domowe jest taką organizacją, a~dane aplikacji (ustawienia modułów, historia członkostwa, wydatki, listy) przechowywane są w~osobnych tabelach. Tabele pochodne uzupełniają wyzwalacze bazy danych, więc są aktualne niezależnie od tego, w~jaki sposób dodano członka.
   \item[Salda liczone na żądanie.] Salda i~sugestie rozliczeń są wyliczane przy każdym żądaniu z~zapisanych wydatków i~potwierdzonych spłat. Brak pamięci podręcznej sald eliminuje ryzyko ich rozbieżności z~danymi źródłowymi.
-  \item[Szeregowanie operacji finansowych.] Każda transakcja zapisująca dane finansowe blokuje wiersz gospodarstwa w~trybie współdzielonym, a~operacje wymagające rozliczonych sald (opuszczenie, usunięcie gospodarstwa, wyłączenie modułu wydatków) -- w~trybie wyłącznym. Sprawdzenie sald i~zmiana, którą ono chroni, wykonują się w~jednej transakcji.
+  \item[Szeregowanie operacji finansowych.] Każda transakcja zapisująca dane finansowe blokuje wiersz gospodarstwa w~trybie współdzielonym. Usunięcie gospodarstwa i~wyłączenie modułu wydatków, które wymagają rozliczonych sald, blokują ten wiersz w~trybie wyłącznym. Sprawdzenie sald i~zmiana, którą ono chroni, wykonują się w~jednej transakcji.
   \item[Pliki poza bazą danych.] Załączniki i~awatary trafiają do magazynu obiektów zgodnego z~S3, a~baza przechowuje jedynie ich metadane. Załączniki są prywatne i~udostępniane przez podpisane adresy URL, a~awatary są przechowywane w~osobnym, publicznie dostępnym zasobniku.
   \item[Wymienny dostawca AI.] Funkcje AI korzystają z~jednego wewnętrznego interfejsu, który komunikuje się z~dowolnym API zgodnym z~OpenAI. Dostawcę i~modele wybiera się w~konfiguracji, a~w~testach interfejs zastępuje deterministyczna atrapa.
 \end{description}
@@ -85,7 +85,7 @@ Każde żądanie do gospodarstwa przechodzi kontrole w~stałej kolejności (tab.
   \end{tabularx}
 \end{table}
 
-Kroki 1--3 realizują strażnicy (\emph{guards}) NestJS, krok~4 -- potoki walidujące (\emph{pipes}) oparte na schematach Zod, a~pozostałe kroki -- serwisy. Osobie spoza gospodarstwa serwer odpowiada tak samo jak na zapytanie o~nieistniejące gospodarstwo, aby nie ujawniać istnienia cudzych danych.
+Kroki 1-3 realizują strażnicy (\emph{guards}) NestJS, krok~4 - potoki walidujące (\emph{pipes}) oparte na schematach Zod, a~pozostałe kroki - serwisy. Osobie spoza gospodarstwa serwer odpowiada tak samo jak na zapytanie o~nieistniejące gospodarstwo, aby nie ujawniać istnienia cudzych danych.
 
 \subsection{Architektura aplikacji webowej}
 
@@ -142,7 +142,7 @@ Dane przechowywane są w~relacyjnej bazie PostgreSQL. Schemat jest definiowany w
     \draw[rel] (exp.south) ++(0.6,0) -- ++(0,-0.4) -| node[card, left, pos=0.9] {N} (split.north);
   \end{tikzpicture}%
   }
-  \caption{Schemat części finansowej bazy danych. Kolumny \texttt{household\_id} odwołują się do tabeli \texttt{organization}, a~kolumny identyfikujące osoby -- do tabeli \texttt{user}; tych powiązań nie zaznaczono}
+  \caption{Schemat części finansowej bazy danych. Kolumny \texttt{household\_id} odwołują się do tabeli \texttt{organization}, a~kolumny identyfikujące osoby - do tabeli \texttt{user}; tych powiązań nie zaznaczono}
   \label{fig:erd}
 \end{figure}
 
@@ -152,7 +152,7 @@ Przy projektowaniu schematu przyjęto następujące zasady:
   \item kwoty są przechowywane w~kolumnach typu \texttt{bigint} jako liczby całkowite w~jednostkach podrzędnych waluty;
   \item wydatek wraz z~płatnikami, danymi wejściowymi podziału i~wyliczonymi udziałami stanowi jedną całość, zapisywaną i~zastępowaną w~jednej transakcji;
   \item klucze obce do gospodarstwa usuwają dane kaskadowo, natomiast klucze obce do użytkownika blokują usunięcie (\texttt{RESTRICT}), aby nie utracić historii rozliczeń;
-  \item historia członkostwa przechowuje każdą parę gospodarstwo--użytkownik, która kiedykolwiek wystąpiła, co pozwala rozliczać byłych członków bez nadawania im dostępu;
+  \item historia członkostwa przechowuje każdą parę gospodarstwo-użytkownik, która kiedykolwiek wystąpiła, co pozwala rozliczać byłych członków bez nadawania im dostępu;
   \item spłata nie odwołuje się do wydatku, dlatego edycja lub usunięcie wydatku nie zmienia zarejestrowanych spłat.
 \end{itemize}
 

@@ -32,7 +32,7 @@ Przeanalizowane aplikacje (tab.~\ref{tab:porownanie-aplikacji}) koncentrują si�
 
 \subsection{Automatyczny odczyt danych z~paragonów}
 
-Dla odczytu paragonów istnieją publiczne zbiory danych i~miary oceny. W~konkursie SROIE, zorganizowanym w~ramach konferencji ICDAR 2019, przygotowano zbiór 1000~zeskanowanych paragonów i~trzy zadania: lokalizację tekstu na obrazie, rozpoznawanie tekstu (OCR) oraz ekstrakcję kluczowych informacji -- nazwy sprzedawcy, adresu, daty i~sumy~\cite{huang2019sroie}. Organizatorzy zwrócili uwagę, że jakość ekstrakcji informacji wciąż wyraźnie odbiega od oczekiwań, mimo dobrych wyników w~samym rozpoznawaniu tekstu.
+Dla odczytu paragonów istnieją publiczne zbiory danych i~miary oceny. W~konkursie SROIE, zorganizowanym w~ramach konferencji ICDAR 2019, przygotowano zbiór 1000~zeskanowanych paragonów i~trzy zadania: lokalizację tekstu na obrazie, rozpoznawanie tekstu (OCR) oraz ekstrakcję kluczowych informacji - nazwy sprzedawcy, adresu, daty i~sumy~\cite{huang2019sroie}. Organizatorzy zwrócili uwagę, że jakość ekstrakcji informacji wciąż wyraźnie odbiega od oczekiwań, mimo dobrych wyników w~samym rozpoznawaniu tekstu.
 
 Zbiór CORD zawiera paragony z~indonezyjskich sklepów i~restauracji, opisane zarówno na potrzeby OCR, jak i~wielopoziomowymi etykietami semantycznymi (np. nazwa pozycji, liczba sztuk, cena, suma). Służy do oceny parsowania struktury paragonu po rozpoznaniu tekstu; publicznie udostępniono 1000~obrazów~\cite{park2019cord}.
 
@@ -40,7 +40,7 @@ Klasyczne podejście do tego zadania składa się z~dwóch etapów: silnik OCR o
 
 Rozwinięciem podejścia bez osobnego etapu OCR są multimodalne duże modele językowe (LLM), które przyjmują obraz i~zwracają odpowiedź w~zadanym formacie, np. jako dokument JSON zgodny ze schematem. Pozwalają one odczytać paragon bez trenowania własnego modelu, kosztem zależności od zewnętrznego dostawcy i~ryzyka błędnych odpowiedzi. Z~tego powodu wynik takiego odczytu musi zostać sprawdzony programowo i~zatwierdzony przez użytkownika.
 
-\subsection{Upraszczanie rozliczeń}
+\subsection{Upraszczanie rozliczeń}\label{sec:upraszczanie-rozliczen}
 
 Po zarejestrowaniu wydatków każda osoba w~grupie ma saldo netto: różnicę między tym, co zapłaciła, a~tym, co przypada na nią w~podziałach. Suma sald w~grupie wynosi zero. Rozliczanie każdej pary osób osobno może w~grupie $n$~osób wymagać nawet $n(n-1)/2$ przelewów. Przelewy wyznaczone na podstawie sald netto ograniczają tę liczbę do co najwyżej $n-1$, ponieważ każdy przelew zeruje saldo co najmniej jednej osoby.
 
