@@ -43,9 +43,96 @@ Komponenty systemu i~przepływ danych między nimi przedstawiono na rys.~\ref{fi
   \label{fig:architektura}
 \end{figure}
 
-Przeglądarka komunikuje się wyłącznie z~serwerem Next.js. Ten serwer przekierowuje żądania kierowane pod ścieżkę \texttt{/api/*} do serwera API, dzięki czemu aplikacja i~API mają wspólne pochodzenie (\emph{origin}), a~ciasteczka sesji są traktowane przez przeglądarkę jako własne. Serwer API odpowiada za całą logikę biznesową i~jako jedyny ma dostęp do bazy danych, magazynu plików, usługi poczty i~dostawcy modeli AI. Wyjątkiem jest pobieranie załączników: przeglądarka pobiera je bezpośrednio z~magazynu obiektów, korzystając z~krótko ważnych, podpisanych adresów URL wystawianych przez serwer API.
+Przeglądarka komunikuje się wyłącznie z~serwerem Next.js. Ten serwer przekierowuje żądania kierowane pod ścieżkę \texttt{/api/*} do serwera API, dzięki czemu aplikacja i~API mają wspólne pochodzenie (\emph{origin}), a~ciasteczka sesji są traktowane przez przeglądarkę jako własne. Serwer API odpowiada za całą logikę biznesową i~jako jedyny ma dostęp do bazy danych, magazynu plików, usługi poczty i~dostawcy modeli AI. Wyjątkiem są pliki: przeglądarka pobiera załączniki bezpośrednio z~magazynu obiektów, korzystając z~krótko ważnych, podpisanych adresów URL wystawianych przez serwer API, a~awatary z~publicznie dostępnego zasobnika.
 
-Aplikacja webowa i~serwer API są wdrażane jako osobne usługi na platformie Render. Lokalnie baza danych i~magazyn plików działają w~kontenerach Docker Compose.
+Rozmieszczenie tych komponentów w~środowisku produkcyjnym opisano w~punkcie~\ref{sec:wdrozenie}. Lokalnie baza danych i~magazyn plików działają w~kontenerach Docker Compose.
+
+\subsection{Wdrożenie}
+\label{sec:wdrozenie}
+
+Środowisko produkcyjne korzysta z~usług kilku dostawców (rys.~\ref{fig:wdrozenie}):
+
+\begin{itemize}
+  \item \textbf{Render} - dwie osobne usługi: aplikacja webowa (serwer Next.js) i~serwer API (NestJS);
+  \item \textbf{Neon} - zarządzana baza danych PostgreSQL;
+  \item \textbf{Cloudflare R2} - magazyn obiektów zgodny z~S3, z~dwoma zasobnikami: prywatnym na załączniki i~publicznym na awatary;
+  \item \textbf{Resend} - wysyłka wiadomości e-mail;
+  \item \textbf{OpenRouter} - dostęp do modeli AI.
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{\textwidth}{!}{%
+  \begin{tikzpicture}[
+      font=\small,
+      box/.style={draw, rounded corners=2pt, align=center, minimum height=1.3cm, text width=3.4cm, inner sep=4pt, fill=white},
+      ext/.style={box, text width=3cm},
+      grp/.style={draw, dashed, rounded corners=4pt, inner sep=9pt, fill=gray!8},
+      glbl/.style={font=\small\bfseries, anchor=north west, inner sep=4pt},
+      arr/.style={-{Stealth[length=2.5mm]}, thick},
+      lbl/.style={font=\footnotesize, inner sep=2pt, align=center},
+    ]
+    \node[box] (repo) at (2.6,4.6) {\textbf{Repozytorium}\\kod źródłowy};
+    \node[box] (actions) at (8.2,4.6) {\textbf{GitHub Actions}\\kontrole, migracje i~wdrożenia};
+    \node[box] (browser) at (0,0) {\textbf{Przeglądarka}\\aplikacja React};
+    \node[box] (web) at (5.4,0) {\textbf{Aplikacja webowa}\\Next.js};
+    \node[box] (api) at (10.4,0) {\textbf{Serwer API}\\NestJS};
+    \node[box] (att) at (5.4,-3.9) {\textbf{Załączniki}\\zasobnik prywatny};
+    \node[box] (av) at (10.4,-3.9) {\textbf{Awatary}\\zasobnik publiczny};
+    \node[ext] (db) at (16.6,2.3) {\textbf{PostgreSQL}};
+    \node[ext] (mail) at (16.6,0) {\textbf{Resend}\\poczta e-mail};
+    \node[ext] (ai) at (16.6,-2.1) {\textbf{OpenRouter}\\modele AI};
+
+    \coordinate (ghtop) at ($(repo.north)+(0,0.45)$);
+    \coordinate (rendertop) at ($(web.north)+(0,0.45)$);
+    \coordinate (r2bottom) at ($(att.south)+(0,-0.45)$);
+    \coordinate (neontop) at ($(db.north)+(0,0.45)$);
+    \begin{scope}[on background layer]
+      \node[grp, fit=(repo)(actions)(ghtop)] (gh) {};
+      \node[grp, fit=(web)(api)(rendertop)] (render) {};
+      \node[grp, fit=(att)(av)(r2bottom)] (r2) {};
+      \node[grp, fit=(db)(neontop)] (neon) {};
+    \end{scope}
+    \node[glbl] at (gh.north west) {GitHub};
+    \node[glbl] at (render.north west) {Render};
+    \node[glbl, anchor=south west] at (r2.south west) {Cloudflare R2};
+    \node[glbl] at (neon.north west) {Neon};
+
+    \draw[arr] (repo) -- node[lbl, above] {push} (actions);
+    \draw[arr] (actions.east) -| node[lbl, pos=0.25, above] {migracje} (neon.north);
+    \draw[arr] (actions.south) -- ++(0,-1.05) coordinate (d) -| (web.north);
+    \draw[arr] (d) -| (api.north);
+    \node[lbl, right] at ($(d)+(0.1,0.25)$) {wdrożenia};
+
+    \draw[arr] (browser) -- node[lbl, above] {HTTPS} (web);
+    \draw[arr] (web) -- node[lbl, above] {\texttt{/api/*}} (api);
+    \draw[thick] (api.east) -- ++(0.8,0) coordinate (bus);
+    \draw[arr] (bus) |- node[lbl, pos=0.75, above] {SQL} (db.west);
+    \draw[arr] (bus) -- node[lbl, above] {HTTPS} (mail.west);
+    \draw[arr] (bus) |- node[lbl, pos=0.75, above] {HTTPS} (ai.west);
+
+    \draw[arr] (api.south) -- ++(0,-1.25) coordinate (s) -| (att.north);
+    \draw[arr] (s) -- (av.north);
+    \node[lbl, right] at ($(s)+(0.1,0.25)$) {zapis plików};
+    \draw[arr, dashed] ($(browser.south)+(0.5,0)$) |- node[lbl, pos=0.75, above] {podpisany URL} (att.west);
+    \draw[arr, dashed] ($(browser.south)+(-0.5,0)$) -- ++(0,-5.4) -| node[lbl, pos=0.25, below] {publiczny URL} (av.south);
+  \end{tikzpicture}%
+  }
+  \caption{Wdrożenie systemu HomeSplit}
+  \label{fig:wdrozenie}
+\end{figure}
+
+Awatary i~załączniki są przechowywane w~osobnych zasobnikach ze względu na model dostępu w~R2. W~Amazon S3 dostęp publiczny można ograniczyć do części zasobnika, np. jednego prefiksu, za pomocą polityki zasobnika lub list kontroli dostępu do obiektów. R2 nie obsługuje ani jednego, ani drugiego, a~dostęp publiczny włącza się dla całego zasobnika, przez domenę \texttt{r2.dev} lub własną domenę. Zasobnik z~awatarami jest więc udostępniony pod własną domeną i~przeglądarka pobiera z~niego pliki bez podpisu, a~zasobnik z~załącznikami pozostaje w~całości prywatny. Dzięki temu ustawienie publiczne nie obejmie przez pomyłkę załączników. Oba zasobniki obsługuje ten sam klient S3 z~jednym zestawem kluczy dostępu.
+
+Wdrożenie jest automatyczne. Po scaleniu zmian do głównej gałęzi GitHub Actions wykonuje kontrole: styl kodu, typy, budowanie oraz testy jednostkowe, integracyjne i~E2E. Gdy wszystkie przejdą, kolejne kroki wykonują się w~ustalonej kolejności:
+
+\begin{enumerate}
+  \item zastosowanie migracji na produkcyjnej bazie danych w~Neon;
+  \item wdrożenie nowej wersji serwera API na Render i~oczekiwanie, aż zacznie obsługiwać żądania;
+  \item wdrożenie nowej wersji aplikacji webowej.
+\end{enumerate}
+
+Kroki dotyczące serwera są pomijane, gdy zmiana nie obejmuje jego kodu, a~krok aplikacji webowej, gdy nie obejmuje jej kodu. Do chwili uruchomienia nowej wersji poprzednia wersja serwera obsługuje żądania na już zmienionym schemacie bazy, dlatego każda migracja musi działać z~obiema wersjami (wymaganie NF-12).
 
 \subsection{Decyzje architektoniczne}
 

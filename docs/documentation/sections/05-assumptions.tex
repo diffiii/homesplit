@@ -31,11 +31,11 @@ Cały system napisano w~języku TypeScript, co pozwala współdzielić typy i~lo
     Uwierzytelnianie & Better Auth & sesje, weryfikacja adresu e-mail, reset hasła, organizacje z~rolami i~zaproszeniami odwzorowujące gospodarstwa \\
     Baza danych & PostgreSQL, Drizzle ORM & transakcje i~więzy integralności dla danych finansowych; typowany dostęp do danych i~migracje \\
     Kontrakty API & Zod & wspólne schematy walidacji i~typy dla klienta i~serwera \\
-    Pliki & magazyn obiektów zgodny z~S3 & przechowywanie załączników i~awatarów \\
+    Pliki & Cloudflare R2 (API zgodne z~S3) & przechowywanie załączników i~awatarów \\
     Poczta e-mail & Resend & wysyłka zaproszeń, linków weryfikacyjnych i~resetujących hasło \\
     Sztuczna inteligencja & biblioteka \texttt{openai}, API zgodne z~OpenAI (domyślnie OpenRouter) & dostęp do multimodalnych modeli językowych; możliwość zmiany dostawcy i~modelu bez zmian w~kodzie \\
     Testy & Vitest, Testing Library, MSW, Playwright, axe-core & testy jednostkowe, komponentów, integracyjne i~E2E, w~tym kontrola dostępności \\
-    Infrastruktura & Docker Compose, GitHub Actions, Render & lokalne uruchamianie bazy danych i~magazynu plików; ciągła integracja i~automatyczne wdrażanie \\
+    Infrastruktura & Docker Compose, GitHub Actions, Render, Neon & lokalne uruchamianie bazy danych i~magazynu plików; ciągła integracja, automatyczne wdrażanie, hosting aplikacji i~bazy danych \\
     Organizacja pracy & Git, GitHub, Biome, Husky, commitlint, Figma & wersjonowanie, przeglądy kodu, jednolity styl kodu i~komunikatów zmian, projekt interfejsu \\
     \bottomrule
   \end{tabularx}
