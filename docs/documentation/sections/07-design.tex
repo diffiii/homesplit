@@ -12,7 +12,7 @@ HomeSplit ma architekturę klient-serwer z~trzema warstwami: aplikacją webową 
 
 Komponenty systemu i~przepływ danych między nimi przedstawiono na rys.~\ref{fig:architektura}.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
   \centering
   \resizebox{\textwidth}{!}{%
   \begin{tikzpicture}[
@@ -60,7 +60,7 @@ Rozmieszczenie tych komponentów w~środowisku produkcyjnym opisano w~punkcie~\r
   \item \textbf{OpenRouter} - dostęp do modeli AI.
 \end{itemize}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
   \centering
   \resizebox{\textwidth}{!}{%
   \begin{tikzpicture}[
@@ -152,7 +152,7 @@ Serwer API jest podzielony na moduły NestJS odpowiadające obszarom funkcjonaln
 
 Każde żądanie do gospodarstwa przechodzi kontrole w~stałej kolejności (tab.~\ref{tab:kontrole-zadan}), więc żądanie z~kilkoma błędami zawsze otrzymuje ten sam kod odpowiedzi. Wszystkie błędy aplikacji mają wspólny format \texttt{\{ code, message, details \}}, nadawany przez globalny filtr wyjątków.
 
-\begin{table}[htbp]
+\begin{table}[H]
   \centering
   \caption{Kolejność kontroli żądania w~serwerze API}
   \label{tab:kontrole-zadan}
@@ -174,6 +174,43 @@ Każde żądanie do gospodarstwa przechodzi kontrole w~stałej kolejności (tab.
 
 Kroki 1-3 realizują strażnicy (\emph{guards}) NestJS, krok~4 - potoki walidujące (\emph{pipes}) oparte na schematach Zod, a~pozostałe kroki - serwisy. Osobie spoza gospodarstwa serwer odpowiada tak samo jak na zapytanie o~nieistniejące gospodarstwo, aby nie ujawniać istnienia cudzych danych.
 
+Współpracę opisanych elementów pokazuje przykład dodania nowego wydatku (rys.~\ref{fig:sekwencja-wydatek}). Wybrano to żądanie, ponieważ przechodzi przez wszystkie kontrole z~tab.~\ref{tab:kontrole-zadan}, a~jego obsługa obejmuje wyliczenie udziałów silnikiem podziału i~transakcję z~blokadą gospodarstwa, opisane w~punktach~\ref{sec:podzial-kwot} i~\ref{sec:rownolegle-zapisy}. Pozostałe żądania zapisujące dane gospodarstwa przebiegają według tego samego schematu, różnią się jedynie operacjami wykonywanymi przez serwis. Jeśli którakolwiek kontrola się nie powiedzie, filtr wyjątków zamienia błąd na odpowiedź z~odpowiednim kodem, a~transakcja, jeśli została rozpoczęta, jest wycofywana.
+
+\begin{figure}[H]
+  \centering
+  \resizebox{\textwidth}{!}{%
+  \begin{tikzpicture}
+    \def\xB{0}\def\xN{3.2}\def\xG{6.4}\def\xP{9.6}\def\xS{12.8}\def\xD{17.6}
+    \sdparticipant{\xB}{Przeglądarka}{-11.6}
+    \sdparticipant{\xN}{Serwer Next.js}{-11.6}
+    \sdparticipant{\xG}{Strażnik\\gospodarstwa}{-11.6}
+    \sdparticipant{\xP}{Potok\\walidujący}{-11.6}
+    \sdparticipant{\xS}{Serwis\\wydatków}{-11.6}
+    \sdparticipant{\xD}{PostgreSQL}{-11.6}
+
+    \sdcall{\xB}{\xN}{-1.0}{\texttt{POST \dots/expenses}}
+    \sdcall{\xN}{\xG}{-1.6}{przekazanie \texttt{/api/*}}
+    \sdframe{-1.3}{-2.0}{18.9}{-11.2}{alt}{[kontrole przechodzą]}
+    \sdself{\xG}{-2.9}{sesja, członkostwo, moduł, rola}
+    \sdcall{\xG}{\xP}{-3.7}{dane żądania}
+    \sdself{\xP}{-4.3}{walidacja schematem Zod}
+    \sdcall{\xP}{\xS}{-5.1}{\texttt{create(dane)}}
+    \sdcall{\xS}{\xD}{-5.7}{\texttt{BEGIN}, \texttt{FOR SHARE}}
+    \sdcall{\xS}{\xD}{-6.3}{członkowie i~kategoria}
+    \sdself{\xS}{-6.9}{\texttt{allocate()}: udziały}
+    \sdcall{\xS}{\xD}{-7.7}{\texttt{INSERT} wydatku}
+    \sdcall{\xS}{\xD}{-8.3}{\texttt{COMMIT}}
+    \sdreply{\xS}{\xN}{-8.9}{201 Created, wydatek}
+    \sdreply{\xN}{\xB}{-9.5}{201 Created}
+    \sdelse{-1.3}{18.9}{-9.9}{[błąd kontroli]}
+    \sdreply{\xG}{\xN}{-10.5}{4xx \texttt{\{ code, message, details \}}}
+    \sdreply{\xN}{\xB}{-10.9}{4xx}
+  \end{tikzpicture}%
+  }
+  \caption{Diagram sekwencji dodania wydatku}
+  \label{fig:sekwencja-wydatek}
+\end{figure}
+
 \subsection{Architektura aplikacji webowej}
 
 Aplikacja webowa korzysta z~routera App Router frameworka Next.js. Ekrany są pogrupowane według obszarów: strony publiczne, logowanie i~rejestracja, konto, znajomi oraz gospodarstwo, którego podstrony (wydatki, rozliczenia, obowiązki, zakupy, ustawienia) dzielą wspólną powłokę. Powłoka gospodarstwa zna rolę zalogowanego użytkownika, listę członków i~włączone moduły, więc każdy ekran ukrywa niedostępne akcje i~wyłączone moduły.
@@ -184,7 +221,7 @@ Dane z~serwera pobierane są przez warstwę API wygenerowaną z~kontraktów i~bu
 
 Dane przechowywane są w~relacyjnej bazie PostgreSQL. Schemat jest definiowany w~kodzie za pomocą Drizzle ORM, a~zmiany wprowadzane są migracjami. Tabele i~ich przeznaczenie zestawiono w~tab.~\ref{tab:tabele}, a~część finansową schematu przedstawiono na rys.~\ref{fig:erd}.
 
-\begin{table}[htbp]
+\begin{table}[H]
   \centering
   \caption{Tabele bazy danych}
   \label{tab:tabele}
@@ -204,7 +241,7 @@ Dane przechowywane są w~relacyjnej bazie PostgreSQL. Schemat jest definiowany w
   \end{tabularx}
 \end{table}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
   \centering
   \resizebox{\textwidth}{!}{%
   \begin{tikzpicture}[

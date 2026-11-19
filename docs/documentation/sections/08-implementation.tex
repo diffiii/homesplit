@@ -1,6 +1,7 @@
 \section{Implementacja}
 
 \subsection{Podział kwot}
+\label{sec:podzial-kwot}
 
 Każdy podział kosztów sprowadza się do rozdzielenia kwoty $T$, wyrażonej w~jednostkach podrzędnych waluty, między $k$~uczestników o~wagach $w_1, \dots, w_k$. Dokładne udziały $T w_i / W$, gdzie $W = \sum_j w_j$, zwykle nie są liczbami całkowitymi, a~niezależne zaokrąglenie każdego z~nich może dać sumę różną od $T$. Funkcja \texttt{distributeProportionally} rozwiązuje ten problem metodą największych reszt:
 
@@ -28,6 +29,69 @@ Pięć metod podziału różni się tylko sposobem wyznaczania wag:
 
 Silnik podziału znajduje się w~pakiecie \texttt{contracts}. Serwer wylicza nim udziały przy każdym zapisie wydatku i~nigdy nie przyjmuje ich od klienta, a~formularz wydatku korzysta z~niego do podglądu podziału przed zapisem. Z~tego samego kodu korzystają atrapy API używane w~testach interfejsu.
 
+Przebieg funkcji \texttt{allocate}, która wybiera wagi według metody podziału i~wywołuje \texttt{distributeProportionally}, przedstawiono na rys.~\ref{fig:aktywnosc-podzial}.
+
+\begin{figure}[H]
+  \centering
+  \resizebox{\textwidth}{!}{%
+  \begin{tikzpicture}[ad action/.append style={text width=2.4cm}]
+    \node[ad start] (start) at (0,0) {};
+    \node[ad action, text width=4.8cm] (check) at (0,-1.0) {Sprawdź kwotę i~unikalność uczestników};
+    \node[ad decision] (method) at (0,-2.2) {};
+    \node[ad action] (eq) at (-6.4,-4.4) {wagi: po 1};
+    \node[ad action] (pct) at (-3.2,-4.4) {wagi: punkty bazowe};
+    \node[ad action] (sh) at (0,-4.4) {wagi: udziały};
+    \node[ad action] (adj) at (3.2,-4.4) {odejmij korekty, wagi: po 1};
+    \node[ad action] (ex) at (6.4,-4.4) {kwoty bez zmian};
+    \node[ad decision] (pctok) at (-3.2,-5.7) {};
+    \node[ad decision] (exok) at (6.4,-5.7) {};
+    \node[ad flow end, label={below:\footnotesize błąd}] (pcterr) at (-4.8,-5.7) {};
+    \node[ad flow end, label={below:\footnotesize błąd}] (exerr) at (8.0,-5.7) {};
+    \node[ad decision] (m1) at (0,-6.9) {};
+    \node[ad action, text width=3.8cm] (dist) at (0,-8.1) {Rozdziel kwotę metodą największych reszt};
+    \node[ad decision] (isadj) at (0,-9.3) {};
+    \node[ad action] (add) at (-3.2,-10.5) {dodaj korekty do udziałów};
+    \node[ad decision] (m2) at (0,-11.7) {};
+    \node[ad action, text width=3.8cm] (int) at (0,-12.9) {Zamień kwoty na liczby (\texttt{toSafeInteger})};
+    \node[ad end] (end) at (0,-14.1) {};
+
+    \draw[ad flow] (start) -- (check);
+    \draw[ad flow] (check) -- (method);
+    \draw (method.south) -- (0,-2.9) coordinate (fan);
+    \draw[ad flow] (fan) -| (eq.north);
+    \draw[ad flow] (fan) -| (pct.north);
+    \draw[ad flow] (fan) -- (sh.north);
+    \draw[ad flow] (fan) -| (adj.north);
+    \draw[ad flow] (fan) -| (ex.north);
+    \node[ad guard, anchor=west] at (-6.4,-3.3) {[równy]};
+    \node[ad guard, anchor=west] at (-3.2,-3.3) {[procentowy]};
+    \node[ad guard, anchor=west] at (0,-3.3) {[udziały]};
+    \node[ad guard, anchor=west] at (3.2,-3.3) {[korekty]};
+    \node[ad guard, anchor=west] at (6.4,-3.3) {[kwoty]};
+
+    \draw[ad flow] (pct) -- (pctok);
+    \draw[ad flow] (pctok) -- node[ad guard, above] {[inaczej]} (pcterr);
+    \draw[ad flow] (pctok.south) |- node[ad guard, pos=0.3, right] {[suma = 100\%]} (m1.west);
+    \draw[ad flow] (eq.south) |- (m1.west);
+    \draw[ad flow] (sh) -- (m1);
+    \draw[ad flow] (adj.south) |- (m1.east);
+    \draw[ad flow] (ex) -- (exok);
+    \draw[ad flow] (exok) -- node[ad guard, above] {[inaczej]} (exerr);
+    \draw[ad flow] (exok.south) |- node[ad guard, pos=0.15, right] {[suma = kwota wydatku]} (m2.east);
+
+    \draw[ad flow] (m1) -- (dist);
+    \draw[ad flow] (dist) -- (isadj);
+    \draw[ad flow] (isadj.west) -| node[ad guard, pos=0.25, above] {[korekty]} (add.north);
+    \draw[ad flow] (isadj) -- node[ad guard, right] {[inna metoda]} (m2);
+    \draw[ad flow] (add.south) |- (m2.west);
+    \draw[ad flow] (m2) -- (int);
+    \draw[ad flow] (int) -- (end);
+  \end{tikzpicture}%
+  }
+  \caption{Diagram aktywności funkcji \texttt{allocate}}
+  \label{fig:aktywnosc-podzial}
+\end{figure}
+
 \subsection{Salda i~sugestie rozliczeń}
 
 Salda nie są przechowywane, tylko wyliczane jednym zapytaniem SQL. Zapytanie łączy operatorem \texttt{UNION ALL} cztery zbiory wierszy ze znakiem:
@@ -43,7 +107,41 @@ Saldo osoby w~danej walucie to suma jej wierszy, pogrupowana według waluty i~u�
 
 Sugestie rozliczeń wyznacza algorytm zachłanny opisany w~sekcji~\ref{sec:upraszczanie-rozliczen}, uruchamiany osobno dla każdej waluty. Wierzyciele i~dłużnicy są sortowani malejąco według kwoty, a~przy równych kwotach według identyfikatora użytkownika, więc wynik nie zależy od kolejności wierszy zwróconych przez bazę. Jeśli po przejściu obu list któraś z~nich nie jest pusta, salda w~danej walucie nie sumują się do zera. Taki stan oznacza błąd w~danych, dlatego funkcja zgłasza wyjątek zamiast zwracać niepełne sugestie.
 
+Przebieg algorytmu przedstawiono na rys.~\ref{fig:aktywnosc-sugestie}.
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[ad action/.append style={text width=5cm}]
+    \node[ad start] (start) at (0,0) {};
+    \node[ad action, below=0.4cm of start] (split) {Podziel niezerowe salda na wierzycieli i~dłużników};
+    \node[ad action, below=0.45cm of split] (sort) {Posortuj obie listy malejąco według kwoty, przy remisie według identyfikatora};
+    \node[ad decision, below=0.45cm of sort] (loop) {};
+    \node[ad decision, below=0.45cm of loop] (both) {};
+    \node[ad action, below=0.8cm of both] (transfer) {Dodaj przelew od dłużnika do wierzyciela na mniejszą z~ich kwot};
+    \node[ad action, below=0.45cm of transfer] (reduce) {Zmniejsz obie kwoty; osoba z~kwotą zero ustępuje następnej};
+    \node[ad decision] (empty) at ($(both)+(-5.2,0)$) {};
+    \node[ad action, text width=2.6cm, below=0.8cm of empty] (ret) {Zwróć listę przelewów};
+    \node[ad end, below=0.45cm of ret] (end) {};
+    \node[ad flow end, label={below:\footnotesize błąd}] (err) at ($(empty)+(-2.2,0)$) {};
+
+    \draw[ad flow] (start) -- (split);
+    \draw[ad flow] (split) -- (sort);
+    \draw[ad flow] (sort) -- (loop);
+    \draw[ad flow] (loop) -- (both);
+    \draw[ad flow] (both) -- node[ad guard, right] {[obie listy niepuste]} (transfer);
+    \draw[ad flow] (transfer) -- (reduce);
+    \draw[ad flow] (reduce.east) -- ++(0.5,0) |- (loop.east);
+    \draw[ad flow] (both) -- node[ad guard, above] {[któraś lista pusta]} (empty);
+    \draw[ad flow] (empty) -- node[ad guard, right] {[obie puste]} (ret);
+    \draw[ad flow] (ret) -- (end);
+    \draw[ad flow] (empty) -- node[ad guard, above] {[inaczej]} (err);
+  \end{tikzpicture}
+  \caption{Diagram aktywności wyznaczania sugestii rozliczeń w~jednej walucie}
+  \label{fig:aktywnosc-sugestie}
+\end{figure}
+
 \subsection{Równoległe zapisy finansowe}
+\label{sec:rownolegle-zapisy}
 
 Kilku członków gospodarstwa może jednocześnie dodawać wydatki, edytować ten sam wydatek albo zmieniać ustawienia gospodarstwa. Bez dodatkowej synchronizacji mogłoby dojść np. do sytuacji, w~której administrator wyłącza moduł wydatków po sprawdzeniu, że wszystkie salda wynoszą zero, a~w~tym samym czasie inna osoba dodaje wydatek.
 
@@ -72,7 +170,45 @@ Zapis pliku obejmuje dwa systemy, magazyn obiektów i~bazę danych, których nie
 
 Plik jest przesyłany od razu po wybraniu, jeszcze przed zapisaniem wydatku. Formularz może dzięki temu pokazać postęp przesyłania i~miniaturę, a~zapis wydatku nie czeka na przesłanie plików. Plik musi też istnieć na serwerze, zanim powstanie wydatek, aby model AI mógł zaproponować na jego podstawie kategorię lub odczytać paragon. Jeśli użytkownik prześle plik, ale nie zapisze formularza, plik pozostaje bez powiązania z~wydatkiem. Takie pliki usuwa okresowo uruchamiane zadanie porządkowe, gdy od przesłania minie 24~godziny, a~następnie usuwa z~magazynu obiekty z~kolejki \texttt{storage\_object\_deletions}.
 
-Załączniki pobierane są przez podpisane adresy URL ważne 5~minut. Czas ważności liczony jest przed podpisaniem adresu, więc podany klientowi termin nigdy nie jest późniejszy niż faktyczne wygaśnięcie adresu.
+Załączniki pobierane są przez podpisane adresy URL ważne 5~minut. Czas ważności liczony jest przed podpisaniem adresu, więc podany klientowi termin nigdy nie jest późniejszy niż faktyczne wygaśnięcie adresu. Aplikacja webowa nie pobiera podpisanych adresów razem ze stroną wydatku, tylko przy każdym otwarciu pliku, dlatego krótki czas ważności nie przeszkadza użytkownikowi, który długo przegląda stronę.
+
+Przesłanie pliku, powiązanie go z~wydatkiem i~jego pobranie przedstawiono na rys.~\ref{fig:sekwencja-zalacznik}.
+
+\begin{figure}[H]
+  \centering
+  \resizebox{\textwidth}{!}{%
+  \begin{tikzpicture}
+    \def\xB{0}\def\xA{5.4}\def\xR{9.8}\def\xD{14.2}
+    \sdparticipant{\xB}{Przeglądarka}{-12.6}
+    \sdparticipant{\xA}{Serwer API}{-12.6}
+    \sdparticipant{\xR}{Cloudflare R2}{-12.6}
+    \sdparticipant{\xD}{PostgreSQL}{-12.6}
+
+    \node[sd guard] at (-1.3,-0.7) {przesłanie pliku};
+    \sdcall{\xB}{\xA}{-1.5}{\texttt{POST \dots/attachments}, plik}
+    \sdself{\xA}{-2.1}{typ pliku z~zawartości}
+    \sdcall{\xA}{\xR}{-2.9}{\texttt{PUT} obiektu}
+    \sdreply{\xR}{\xA}{-3.5}{200}
+    \sdcall{\xA}{\xD}{-4.1}{\texttt{INSERT} metadanych}
+    \sdreply{\xA}{\xB}{-4.7}{201, identyfikator załącznika}
+
+    \sdelse{-1.3}{15.5}{-5.1}{powiązanie z~wydatkiem}
+    \sdcall{\xB}{\xA}{-6.1}{\texttt{POST \dots/expenses/:id/attachments}}
+    \sdcall{\xA}{\xD}{-6.7}{\texttt{INSERT} powiązania}
+    \sdreply{\xA}{\xB}{-7.3}{201}
+
+    \sdelse{-1.3}{15.5}{-7.7}{pobranie pliku}
+    \sdcall{\xB}{\xA}{-8.7}{\texttt{GET \dots/attachments/:id/download}}
+    \sdcall{\xA}{\xD}{-9.3}{\texttt{SELECT} klucza obiektu}
+    \sdself{\xA}{-9.9}{podpisanie URL (5~min)}
+    \sdreply{\xA}{\xB}{-10.7}{podpisany URL, termin ważności}
+    \sdcall{\xB}{\xR}{-11.4}{\texttt{GET} podpisanego URL}
+    \sdreply{\xR}{\xB}{-12.0}{plik}
+  \end{tikzpicture}%
+  }
+  \caption{Diagram sekwencji przesłania, powiązania i~pobrania załącznika. Pośrednictwo serwera Next.js pominięto}
+  \label{fig:sekwencja-zalacznik}
+\end{figure}
 
 \subsection{Integracja z~modelami językowymi}
 
@@ -85,6 +221,40 @@ Przy połączeniu z~OpenRouter serwer dołącza do zapytania wymagania dotycząc
 Zdjęcia przed wysłaniem do modelu są obracane zgodnie z~orientacją zapisaną przez aparat, zmniejszane tak, aby dłuższy bok miał najwyżej 2048~pikseli, i~zapisywane jako JPEG. Nowy plik nie zawiera metadanych EXIF, w~tym współrzędnych GPS. Zdjęcia w~formacie HEIC, domyślnym na telefonach iPhone, są dekodowane biblioteką libheif skompilowaną do WebAssembly. Przed dekodowaniem sprawdzana jest liczba pikseli (najwyżej 50~milionów), aby mały, specjalnie spreparowany plik nie zajął gigabajtów pamięci.
 
 Pierwszą zrealizowaną funkcją jest sugerowanie kategorii wydatku. Model otrzymuje listę kategorii gospodarstwa w~postaci ponumerowanej, nazwę i~opis wydatku (przycięte do ustalonej długości) oraz opcjonalnie załącznik. Zwraca numer kategorii albo wartość \texttt{null} i~poziom pewności. Model nie zna identyfikatorów kategorii, a~numer spoza listy jest odrzucany, więc odpowiedź nie może wskazać kategorii innego gospodarstwa. Instrukcja dla modelu zaznacza, że treść wiadomości użytkownika to dane, a~nie polecenia, co ogranicza skutki prób wstrzyknięcia instrukcji w~nazwie lub opisie wydatku. Gospodarstwo bez kategorii otrzymuje pustą odpowiedź bez zapytania do modelu i~bez zużycia limitu.
+
+Przebieg sugestii kategorii przedstawiono na rys.~\ref{fig:sekwencja-kategoria}.
+
+\begin{figure}[H]
+  \centering
+  \resizebox{\textwidth}{!}{%
+  \begin{tikzpicture}
+    \def\xB{0}\def\xA{4.4}\def\xD{8.8}\def\xR{12.6}\def\xO{16.4}
+    \sdparticipant{\xB}{Przeglądarka}{-11.0}
+    \sdparticipant{\xA}{Serwer API}{-11.0}
+    \sdparticipant{\xD}{PostgreSQL}{-11.0}
+    \sdparticipant{\xR}{Cloudflare R2}{-11.0}
+    \sdparticipant{\xO}{OpenRouter}{-11.0}
+
+    \sdcall{\xB}{\xA}{-1.0}{\texttt{POST \dots/suggestion}}
+    \sdcall{\xA}{\xD}{-1.6}{załącznik, moduł AI, kategorie}
+    \sdframe{-1.3}{-2.0}{17.7}{-4.3}{opt}{[z~załącznikiem]}
+    \sdcall{\xA}{\xR}{-2.7}{\texttt{GET} obiektu}
+    \sdreply{\xR}{\xA}{-3.3}{plik}
+    \sdself{\xA}{-3.8}{obrót, zmniejszenie, JPEG}
+    \sdcall{\xA}{\xD}{-5.1}{zużycie limitu (429 po wyczerpaniu)}
+    \sdcall{\xA}{\xO}{-5.7}{instrukcja, dane, schemat odpowiedzi}
+    \sdframe{-1.3}{-6.1}{17.7}{-10.6}{alt}{[poprawna odpowiedź]}
+    \sdreply{\xO}{\xA}{-6.8}{numer kategorii, pewność}
+    \sdself{\xA}{-7.3}{numer na kategorię}
+    \sdreply{\xA}{\xB}{-8.3}{200, sugestia}
+    \sdelse{-1.3}{17.7}{-8.7}{[błąd lub przekroczenie czasu]}
+    \sdreply{\xO}{\xA}{-9.4}{błąd lub brak odpowiedzi}
+    \sdreply{\xA}{\xB}{-10.0}{502 lub 504}
+  \end{tikzpicture}%
+  }
+  \caption{Diagram sekwencji sugestii kategorii wydatku. Pośrednictwo serwera Next.js pominięto}
+  \label{fig:sekwencja-kategoria}
+\end{figure}
 
 Odczyt paragonu korzysta z~tego samego serwisu. Członek przesyła zdjęcie paragonu jako załącznik, a~serwer tworzy szkic paragonu ze statusem \emph{przetwarzany} i~zleca odczyt w~tle; aplikacja webowa okresowo sprawdza status szkicu. Model wizyjny zwraca bezpośrednio, bez osobnego etapu OCR, nazwę sprzedawcy, datę, walutę, sumę i~pozycje z~ilością, ceną jednostkową, rabatem i~kwotą. Serwer zapisuje je jako szkic do edycji i~podaje różnicę między sumą pozycji a~sumą z~paragonu, aby użytkownik mógł poprawić błędnie odczytane wartości.
 

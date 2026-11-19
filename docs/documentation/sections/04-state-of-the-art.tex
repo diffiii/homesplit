@@ -6,13 +6,7 @@ Analiza objęła trzy obszary istotne dla projektu: istniejące aplikacje do wsp
 
 \textbf{Splitwise} to aplikacja mobilna i~webowa do rejestrowania wspólnych wydatków w~grupach i~ustalania wzajemnych należności, z~funkcją upraszczania długów w~grupie. Skanowanie paragonów z~podziałem na pozycje jest dostępne wyłącznie w~płatnym planie Splitwise Pro~\cite{splitwise-appstore}. Według przeglądów porównawczych wersja bezpłatna ogranicza liczbę wydatków dodawanych w~ciągu dnia i~wyświetla reklamy~\cite{finny-alternatives}.
 
-\textbf{Tricount} jest bezpłatną aplikacją do rozliczania wydatków grupowych, od 2022~roku należącą do banku bunq~\cite{techcrunch-tricount}. Umożliwia import grup ze Splitwise~\cite{tricount-splitwise} oraz opcjonalne połączenie z~kartą bunq, dzięki któremu płatności kartą są automatycznie dodawane jako wydatki~\cite{tricount-features}.
-
-\textbf{Splid} nie wymaga rejestracji i~działa również bez połączenia z~internetem; grupę można prowadzić lokalnie lub synchronizować między uczestnikami. Koszty dzieli się równo lub według udziałów i~procentów, z~przeliczaniem walut~\cite{splid-appstore}.
-
-\textbf{Settle Up} oferuje w~płatnej wersji Premium dołączanie zdjęć paragonów do wydatków, kategorie, transakcje cykliczne (np. czynsz) oraz brak reklam~\cite{settleup-appstore}.
-
-\begin{table}[htbp]
+\begin{table}[H]
   \centering
   \caption{Porównanie wybranych aplikacji do dzielenia kosztów}
   \label{tab:porownanie-aplikacji}
@@ -27,6 +21,12 @@ Analiza objęła trzy obszary istotne dla projektu: istniejące aplikacje do wsp
     \bottomrule
   \end{tabularx}
 \end{table}
+
+\textbf{Tricount} jest bezpłatną aplikacją do rozliczania wydatków grupowych, od 2022~roku należącą do banku bunq~\cite{techcrunch-tricount}. Umożliwia import grup ze Splitwise~\cite{tricount-splitwise} oraz opcjonalne połączenie z~kartą bunq, dzięki któremu płatności kartą są automatycznie dodawane jako wydatki~\cite{tricount-features}.
+
+\textbf{Splid} nie wymaga rejestracji i~działa również bez połączenia z~internetem; grupę można prowadzić lokalnie lub synchronizować między uczestnikami. Koszty dzieli się równo lub według udziałów i~procentów, z~przeliczaniem walut~\cite{splid-appstore}.
+
+\textbf{Settle Up} oferuje w~płatnej wersji Premium dołączanie zdjęć paragonów do wydatków, kategorie, transakcje cykliczne (np. czynsz) oraz brak reklam~\cite{settleup-appstore}.
 
 Przeanalizowane aplikacje (tab.~\ref{tab:porownanie-aplikacji}) koncentrują się na rozliczaniu wydatków. W~opisach ich funkcji nie występują wspólne listy zakupów ani obowiązki domowe, a~automatyczny odczyt paragonów, jeśli jest dostępny, wymaga płatnego planu. HomeSplit łączy rozliczenia z~organizacją domu i~udostępnia funkcje sztucznej inteligencji jako część podstawowej funkcjonalności.
 
@@ -46,7 +46,7 @@ Po zarejestrowaniu wydatków każda osoba w~grupie ma saldo netto: różnicę mi
 
 Wyznaczenie najmniejszej możliwej liczby przelewów jest w~ogólnym przypadku problemem NP-trudnym~\cite{verhoeff2004}. W~praktyce stosuje się więc algorytmy przybliżone. Prosty algorytm zachłanny porządkuje wierzycieli i~dłużników malejąco według kwot, a~następnie łączy największego dłużnika z~największym wierzycielem przelewem na mniejszą z~dwóch kwot. Osoba, której saldo spadło do zera, ustępuje miejsca następnej na liście. Algorytm działa w~czasie $O(n \log n)$ i~wyznacza co najwyżej $n-1$ przelewów, choć nie zawsze jest to liczba minimalna.
 
-\begin{table}[htbp]
+\begin{table}[H]
   \centering
   \caption{Przykład działania algorytmu zachłannego dla czterech osób}
   \label{tab:przyklad-rozliczenia}

@@ -17,7 +17,7 @@
 
 Cały system napisano w~języku TypeScript, co pozwala współdzielić typy i~logikę walidacji między klientem a~serwerem. Kod jest zorganizowany jako monorepozytorium zarządzane przez pnpm, złożone z~trzech pakietów: aplikacji webowej, serwera aplikacji oraz wspólnych kontraktów. Wybrane technologie przedstawiono w~tab.~\ref{tab:technologie}.
 
-\begin{table}[htbp]
+\begin{table}[H]
   \centering
   \caption{Technologie wykorzystane w~projekcie}
   \label{tab:technologie}
@@ -45,7 +45,7 @@ Cały system napisano w~języku TypeScript, co pozwala współdzielić typy i~lo
 
 Projekt realizuje czteroosobowy zespół w~ciągu dziesięciu tygodni. Zadania są prowadzone jako zgłoszenia (\emph{issues}) w~serwisie GitHub i~grupowane w~epiki odpowiadające obszarom funkcjonalnym, oddzielnie dla serwera i~interfejsu użytkownika. Każda zmiana trafia do głównej gałęzi przez \emph{pull request}, w~którym proces CI sprawdza styl kodu, typy, budowanie oraz testy jednostkowe, integracyjne i~E2E. Po scaleniu zmian do głównej gałęzi następuje automatyczne wdrożenie: najpierw migracje bazy danych, następnie serwer, a~na końcu aplikacja webowa. Harmonogram prac przedstawiono w~tab.~\ref{tab:harmonogram}.
 
-\begin{table}[htbp]
+\begin{table}[H]
   \centering
   \caption{Harmonogram realizacji projektu}
   \label{tab:harmonogram}
@@ -66,7 +66,7 @@ Projekt realizuje czteroosobowy zespół w~ciągu dziesięciu tygodni. Zadania s
 
 Główne ryzyka projektu i~sposoby ich ograniczenia zestawiono w~tab.~\ref{tab:ryzyka}.
 
-\begin{table}[htbp]
+\begin{table}[H]
   \centering
   \caption{Główne ryzyka projektu}
   \label{tab:ryzyka}
