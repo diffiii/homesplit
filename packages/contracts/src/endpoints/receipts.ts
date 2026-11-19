@@ -5,9 +5,12 @@ import {
   ConfirmReceiptResponse,
   CreateReceiptRequest,
   ListReceiptsQuery,
+  PurchaseReceiptShoppingItemsRequest,
+  PurchaseReceiptShoppingItemsResponse,
   Receipt,
   ReceiptIdParams,
   ReceiptListResponse,
+  ReceiptShoppingMatchesResponse,
   ReceiptSplit,
   UpdateReceiptRequest,
 } from "../features/receipts";
@@ -90,5 +93,22 @@ export const receiptEndpoints = {
     body: ConfirmReceiptRequest,
     status: 200,
     response: ConfirmReceiptResponse,
+  },
+  /** Suggests which unpurchased shopping items a confirmed receipt bought. */
+  suggestReceiptShoppingMatches: {
+    method: "POST",
+    path: `${RECEIPT}/shopping-matches`,
+    params: ReceiptIdParams,
+    status: 200,
+    response: ReceiptShoppingMatchesResponse,
+  },
+  /** Marks shopping items purchased by the receipt's payer; needs no AI. */
+  purchaseReceiptShoppingItems: {
+    method: "POST",
+    path: `${RECEIPT}/purchase-shopping-items`,
+    params: ReceiptIdParams,
+    body: PurchaseReceiptShoppingItemsRequest,
+    status: 200,
+    response: PurchaseReceiptShoppingItemsResponse,
   },
 } as const satisfies Record<string, Endpoint>;

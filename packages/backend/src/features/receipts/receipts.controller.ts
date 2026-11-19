@@ -6,8 +6,11 @@ import {
   endpoints,
   Id,
   ListReceiptsQuery,
+  PurchaseReceiptShoppingItemsRequest,
+  type PurchaseReceiptShoppingItemsResponse,
   type Receipt,
   type ReceiptListResponse,
+  type ReceiptShoppingMatchesResponse,
   type ReceiptSplit,
   UpdateReceiptRequest,
 } from "@homesplit/contracts";
@@ -20,6 +23,7 @@ import type { HouseholdContext } from "@/features/households/access/household.gu
 import { PatchPipe } from "@/http/patch.pipe";
 import { ZodPipe } from "@/http/zod.pipe";
 import { ReceiptConfirmationService } from "./receipt-confirmation.service";
+import { ReceiptShoppingService } from "./receipt-shopping.service";
 import { ReceiptsService } from "./receipts.service";
 
 /** Writes need `expenses`; `AiService` also checks `ai` before reading a receipt. */
@@ -27,13 +31,17 @@ import { ReceiptsService } from "./receipts.service";
 export class ReceiptsController {
   private readonly receipts: ReceiptsService;
   private readonly confirmation: ReceiptConfirmationService;
+  private readonly shopping: ReceiptShoppingService;
 
   constructor(
     @Inject(ReceiptsService) receipts: ReceiptsService,
-    @Inject(ReceiptConfirmationService) confirmation: ReceiptConfirmationService
+    @Inject(ReceiptConfirmationService)
+    confirmation: ReceiptConfirmationService,
+    @Inject(ReceiptShoppingService) shopping: ReceiptShoppingService
   ) {
     this.receipts = receipts;
     this.confirmation = confirmation;
+    this.shopping = shopping;
   }
 
   @HouseholdRoute(endpoints.listReceipts)
@@ -111,5 +119,28 @@ export class ReceiptsController {
     @Body(new ZodPipe(ConfirmReceiptRequest)) body: ConfirmReceiptRequest
   ): Promise<ConfirmReceiptResponse> {
     return this.confirmation.confirm(household, receiptId, body);
+  }
+
+  /** `shopping` for the route; `AiService` also checks `ai`. */
+  @HouseholdRoute(endpoints.suggestReceiptShoppingMatches, {
+    module: "shopping",
+  })
+  suggestReceiptShoppingMatches(
+    @CurrentHousehold() household: HouseholdContext,
+    @Param("receiptId", new ZodPipe(Id)) receiptId: Id
+  ): Promise<ReceiptShoppingMatchesResponse> {
+    return this.shopping.suggest(household.householdId, receiptId);
+  }
+
+  @HouseholdRoute(endpoints.purchaseReceiptShoppingItems, {
+    module: "shopping",
+  })
+  purchaseReceiptShoppingItems(
+    @CurrentHousehold() household: HouseholdContext,
+    @Param("receiptId", new ZodPipe(Id)) receiptId: Id,
+    @Body(new ZodPipe(PurchaseReceiptShoppingItemsRequest))
+    body: PurchaseReceiptShoppingItemsRequest
+  ): Promise<PurchaseReceiptShoppingItemsResponse> {
+    return this.shopping.purchase(household.householdId, receiptId, body);
   }
 }

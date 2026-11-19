@@ -3,13 +3,14 @@ import type {
   CreateShoppingItemRequest,
   ListShoppingItemsQuery,
   PurchasedShoppingItem,
+  PurchaseReceiptShoppingItemsResponse,
   ShoppingItem,
   ShoppingItemListResponse,
   UnpurchasedShoppingItem,
   UpdateShoppingItemRequest,
 } from "@homesplit/contracts";
 import { Injectable } from "@nestjs/common";
-import { and, asc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import type { PgUpdateSetSource } from "drizzle-orm/pg-core";
 import { db, type Executor, readSnapshot } from "@/db";
 import { shoppingItems } from "@/db/schema";
@@ -186,6 +187,58 @@ export class ShoppingItemsService {
       throw new Error("Shopping item still purchased after unpurchase");
     }
     return item;
+  }
+
+  /**
+   * Marks several of the household's items purchased by `purchasedById` at
+   * `purchasedAt`, as `purchase` would, in one update. Only unpurchased items
+   * change, and the rows are locked first, so an update that waited on a
+   * concurrent purchase sees it and skips the item: each item is purchased
+   * once. Items purchased or gone meanwhile, and
+   * other households' items, are reported as skipped.
+   */
+  purchaseMany(
+    householdId: string,
+    itemIds: readonly string[],
+    { purchasedById, purchasedAt }: { purchasedAt: Date; purchasedById: string }
+  ): Promise<PurchaseReceiptShoppingItemsResponse> {
+    const ofHousehold = and(
+      eq(shoppingItems.householdId, householdId),
+      inArray(shoppingItems.id, [...itemIds])
+    );
+    return db.transaction(async (tx) => {
+      // Locked in ID order first, so two requests for overlapping items
+      // queue up instead of deadlocking.
+      await tx
+        .select({ id: shoppingItems.id })
+        .from(shoppingItems)
+        .where(ofHousehold)
+        .orderBy(asc(shoppingItems.id))
+        .for("update");
+      const updated = await tx
+        .update(shoppingItems)
+        .set({ purchasedById, purchasedAt })
+        .where(and(ofHousehold, isNull(shoppingItems.purchasedAt)))
+        .returning({ id: shoppingItems.id });
+      const rows = await selectItems(tx).where(ofHousehold);
+      const found = new Map(rows.map((row) => [row.id, toShoppingItem(row)]));
+      const marked = new Set(updated.map(({ id }) => id));
+
+      const purchased: PurchasedShoppingItem[] = [];
+      const skipped: PurchaseReceiptShoppingItemsResponse["skipped"] = [];
+      for (const itemId of itemIds) {
+        const item = found.get(itemId);
+        if (item?.isPurchased && marked.has(itemId)) {
+          purchased.push(item);
+        } else {
+          skipped.push({
+            itemId,
+            reason: item ? "ALREADY_PURCHASED" : "NOT_FOUND",
+          });
+        }
+      }
+      return { purchased, skipped };
+    });
   }
 
   async clearPurchased(

@@ -199,11 +199,18 @@ describe("receipts", () => {
     return rows.reduce((sum, row) => sum + row.requests, 0);
   }
 
-  const setStatus = (receiptId: string, status: "confirmed") =>
+  /** Confirms without an expense, which the confirm route of #56 adds. */
+  const setConfirmed = ({ id, createdBy }: Receipt) =>
     db
       .update(receipts)
-      .set({ status, failureCode: null, extractionId: null })
-      .where(eq(receipts.id, receiptId));
+      .set({
+        status: "confirmed",
+        failureCode: null,
+        extractionId: null,
+        payerId: createdBy.id,
+        confirmedAt: new Date(),
+      })
+      .where(eq(receipts.id, id));
 
   describe("extraction", () => {
     it("answers at once and fills the draft in the background", async () => {
@@ -633,7 +640,7 @@ describe("receipts", () => {
       const alice = await setup();
       reply(GROCERIES);
       const receipt = await scanned(alice);
-      await setStatus(receipt.id, "confirmed");
+      await setConfirmed(receipt);
 
       expectApiError(
         await update(alice, receipt.id, { merchant: "Lidl" }).expect(409),
