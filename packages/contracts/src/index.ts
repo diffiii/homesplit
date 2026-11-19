@@ -1,5 +1,6 @@
 /** Shared API contracts for HomeSplit. Zod schemas, types, and shared money and allocation logic. */
 
+export * from "./common/ai-errors";
 export * from "./common/api-error";
 export * from "./common/datetime";
 export * from "./common/distribute";

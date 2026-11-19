@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { AI_ERROR_CODES } from "../../common/ai-errors";
 import { IsoDate, IsoDateTime } from "../../common/datetime";
 import { Id } from "../../common/id";
 import {
@@ -27,19 +28,13 @@ export const ReceiptStatus = z.enum(RECEIPT_STATUSES);
 export type ReceiptStatus = z.infer<typeof ReceiptStatus>;
 
 /**
- * Why extraction failed. The AI codes match the errors `AiService` answers
- * with; `NOT_A_RECEIPT` means the model found no receipt in the file,
- * `EXTRACTION_INTERRUPTED` that the server stopped before it finished, and
- * `EXTRACTION_FAILED` anything else.
+ * Why extraction failed: any of the AI layer's own codes, `NOT_A_RECEIPT`
+ * when the model found no receipt in the file, `EXTRACTION_INTERRUPTED` when
+ * the server stopped before it finished, and `EXTRACTION_FAILED` for
+ * anything else.
  */
 export const RECEIPT_FAILURE_CODES = [
-  "MODULE_DISABLED",
-  "AI_UNAVAILABLE",
-  "AI_LIMIT_EXCEEDED",
-  "AI_TIMEOUT",
-  "AI_PROVIDER_ERROR",
-  "AI_INVALID_OUTPUT",
-  "UNSUPPORTED_FILE_TYPE",
+  ...AI_ERROR_CODES,
   "NOT_A_RECEIPT",
   "EXTRACTION_INTERRUPTED",
   "EXTRACTION_FAILED",
@@ -143,20 +138,27 @@ export const ReceiptItemInput = z.object({
 export type ReceiptItemInput = z.infer<typeof ReceiptItemInput>;
 
 /**
+ * Everything a draft holds, with the limits both an edit and extraction must
+ * meet. Extraction parses the model's draft with it, and `UpdateReceiptRequest`
+ * is its partial form.
+ */
+export const ReceiptDraftFields = z.object({
+  merchant: ReceiptText.nullable(),
+  purchasedOn: IsoDate.nullable(),
+  currency: CurrencyCode.nullable(),
+  totalCents: NonNegativeBoundedCents.nullable(),
+  discountCents: NonNegativeBoundedCents,
+  items: z.array(ReceiptItemInput).max(MAX_RECEIPT_ITEMS),
+});
+export type ReceiptDraftFields = z.infer<typeof ReceiptDraftFields>;
+
+/**
  * Partial update of a draft. `items`, when given, replaces the whole list in
  * that order: existing items keep their IDs, items left out are removed, and
  * items without an ID are added. An `id` may appear only once.
  */
-export const UpdateReceiptRequest = z
-  .object({
-    merchant: ReceiptText.nullable().optional(),
-    purchasedOn: IsoDate.nullable().optional(),
-    currency: CurrencyCode.nullable().optional(),
-    totalCents: NonNegativeBoundedCents.nullable().optional(),
-    discountCents: NonNegativeBoundedCents.optional(),
-    items: z.array(ReceiptItemInput).max(MAX_RECEIPT_ITEMS).optional(),
-  })
-  .superRefine(({ items }, ctx) => {
+export const UpdateReceiptRequest = ReceiptDraftFields.partial().superRefine(
+  ({ items }, ctx) => {
     const seen = new Set<string>();
     items?.forEach(({ id }, index) => {
       if (id === undefined) {
@@ -171,7 +173,8 @@ export const UpdateReceiptRequest = z
       }
       seen.add(id);
     });
-  });
+  }
+);
 export type UpdateReceiptRequest = z.infer<typeof UpdateReceiptRequest>;
 
 /** List receipts, newest first. */

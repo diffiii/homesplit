@@ -3,10 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   fractionDigits,
   type ModelReceipt,
-  ReceiptExtractionError,
   toMinorUnits,
   toReceiptDraft,
-} from "./receipt-extraction";
+} from "./receipt-draft";
 
 const reply = (overrides: Partial<ModelReceipt> = {}): ModelReceipt => ({
   isReceipt: true,
@@ -142,7 +141,7 @@ describe("toReceiptDraft", () => {
 
   it("fails a file the model says isn't a receipt", () => {
     expect(() => toReceiptDraft(reply({ isReceipt: false }))).toThrow(
-      ReceiptExtractionError
+      "The attachment isn't a receipt"
     );
   });
 

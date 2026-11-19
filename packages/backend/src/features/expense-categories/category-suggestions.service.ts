@@ -1,18 +1,14 @@
 import {
-  AttachmentMimeType,
   CategorySuggestionConfidence,
   type ExpenseCategorySuggestion,
   type SuggestExpenseCategoryRequest,
 } from "@homesplit/contracts";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { AiService } from "@/ai/ai.service";
 import { attachmentInput } from "@/ai/ai-attachment";
 import type { AiInput } from "@/ai/ai-client";
-import { db } from "@/db";
-import { attachments } from "@/db/schema";
-import { AppError } from "@/http/app-error";
+import { findHouseholdAttachment } from "@/features/attachments/household-attachment";
 import { ObjectStorage } from "@/storage/object-storage";
 import { ExpenseCategoriesService } from "./expense-categories.service";
 
@@ -60,7 +56,7 @@ export class CategorySuggestionsService {
     { name, description, attachmentId }: SuggestExpenseCategoryRequest
   ): Promise<ExpenseCategorySuggestion> {
     const attachment = attachmentId
-      ? await findAttachment(householdId, attachmentId)
+      ? await findHouseholdAttachment(householdId, attachmentId)
       : null;
     await this.ai.assertAvailable(householdId);
 
@@ -105,33 +101,4 @@ export class CategorySuggestionsService {
         : null,
     };
   }
-}
-
-/** A missing attachment and another household's get the same 400. */
-async function findAttachment(
-  householdId: string,
-  attachmentId: string
-): Promise<{ storageKey: string; mimeType: AttachmentMimeType }> {
-  const [row] = await db
-    .select({
-      storageKey: attachments.storageKey,
-      mimeType: attachments.mimeType,
-    })
-    .from(attachments)
-    .where(
-      and(
-        eq(attachments.id, attachmentId),
-        eq(attachments.householdId, householdId)
-      )
-    )
-    .limit(1);
-  if (!row) {
-    throw new AppError(400, "INVALID_REFERENCE", "Invalid reference", {
-      issues: [{ path: ["attachmentId"], message: "Unknown attachment" }],
-    });
-  }
-  return {
-    storageKey: row.storageKey,
-    mimeType: AttachmentMimeType.parse(row.mimeType),
-  };
 }

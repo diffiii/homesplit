@@ -7,7 +7,7 @@ import {
   ReceiptListResponse,
 } from "@homesplit/contracts";
 import type { INestApplication } from "@nestjs/common";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { AiClient, aiTimeout } from "@/ai/ai-client";
 import { FakeAiClient } from "@/ai/fake-ai-client";
@@ -17,8 +17,9 @@ import { AttachmentsCleanupService } from "@/features/attachments/attachments-cl
 import {
   type ModelReceipt,
   SCAN_RECEIPT_TASK,
-} from "@/features/receipts/receipt-extraction";
-import { ReceiptsService } from "@/features/receipts/receipts.service";
+} from "@/features/receipts/receipt-draft";
+import { ReceiptExtraction } from "@/features/receipts/receipt-extraction";
+import { STALE_AFTER_MS } from "@/features/receipts/receipts.repository";
 import { expectApiError } from "./helpers/api";
 import { createTestApp } from "./helpers/app";
 import {
@@ -79,7 +80,7 @@ const GROCERIES: ModelReceipt = {
 describe("receipts", () => {
   let app: INestApplication;
   let fake: FakeAiClient;
-  let service: ReceiptsService;
+  let extraction: ReceiptExtraction;
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -88,7 +89,7 @@ describe("receipts", () => {
       throw new Error("Tests need AI_DRIVER=fake");
     }
     fake = client;
-    service = app.get(ReceiptsService);
+    extraction = app.get(ReceiptExtraction);
   });
 
   afterAll(async () => {
@@ -423,7 +424,7 @@ describe("receipts", () => {
       const { id } = await startScan(alice);
       await db
         .update(receipts)
-        .set({ updatedAt: sql`now() - interval '11 minutes'` })
+        .set({ updatedAt: new Date(Date.now() - STALE_AFTER_MS - 60_000) })
         .where(eq(receipts.id, id));
 
       expect(await get(alice, id)).toMatchObject({
@@ -432,7 +433,7 @@ describe("receipts", () => {
       });
       await retry(alice, id).expect(200);
       gate.open();
-      await service.idle();
+      await extraction.idle();
 
       // The overtaken run wrote nothing; the retry wrote the draft once.
       const receipt = await get(alice, id);
@@ -671,7 +672,7 @@ describe("receipts", () => {
 
       await discard(alice, id).expect(204);
       gate.open();
-      await service.idle();
+      await extraction.idle();
 
       expect(await db.select().from(receipts)).toHaveLength(0);
       expect(await db.select().from(receiptItems)).toHaveLength(0);
