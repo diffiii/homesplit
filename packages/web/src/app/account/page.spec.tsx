@@ -489,6 +489,19 @@ describe("AccountPage", () => {
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
   });
 
+  it("links to the privacy policy and terms", () => {
+    renderPage();
+
+    const legal = screen.getByRole("navigation", { name: "Legal" });
+    expect(
+      within(legal).getByRole("link", { name: "Privacy policy" })
+    ).toHaveAttribute("href", "/privacy");
+    expect(within(legal).getByRole("link", { name: "Terms" })).toHaveAttribute(
+      "href",
+      "/terms"
+    );
+  });
+
   it("lists this device first, then the others by last activity", async () => {
     renderPage();
 
