@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { LegalLinks } from "@/components/legal-links";
 import { Logo } from "@/components/logo";
 import { ThemeMenu } from "@/components/theme-menu";
 import { buttonVariants } from "@/components/ui/button";
@@ -129,11 +130,14 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className={`${SECTION} py-8`}>
+      <footer
+        className={`${SECTION} flex flex-wrap items-center justify-between gap-4 py-8`}
+      >
         <span className="flex items-center gap-2 text-sm font-medium">
           <Logo className="size-4" />
           HomeSplit
         </span>
+        <LegalLinks />
       </footer>
     </div>
   );
