@@ -1,0 +1,35 @@
+% !TEX program = lualatex
+\documentclass[12pt, a4paper]{article}
+\usepackage{zpi}
+\addbibresource{references.bib}
+
+\zpikierunek{IST}
+\zpitytul{HomeSplit - inteligentna aplikacja webowa do~wspólnego zarządzania gospodarstwem domowym}
+\zpiautorzy{Jan Marek, Mikołaj Miedziak, Jakub Świątko, Paweł Trybel}
+\zpiopiekun{dr inż. Michał Kędziora}
+\zpislowakluczowe{aplikacja webowa, wspólne wydatki, rozliczenia, gospodarstwo domowe, odczyt paragonów}
+\zpirok{2026}
+
+% \zpiukryjwskazowki
+
+\begin{document}
+
+\zpistronatytulowa
+
+\tableofcontents
+
+\zpiczesc{DOKUMENTACJA PROJEKTOWA}
+
+\input{sections/01-acronyms}
+\input{sections/02-goals-and-scope}
+\input{sections/03-glossary}
+\input{sections/04-state-of-the-art}
+\input{sections/05-assumptions}
+\input{sections/06-requirements}
+\input{sections/07-design}
+\input{sections/08-implementation}
+\input{sections/09-demonstration}
+
+\printbibliography[heading=bibintoc, title={Bibliografia}]
+
+\end{document}

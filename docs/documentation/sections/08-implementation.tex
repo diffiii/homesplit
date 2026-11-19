@@ -1,0 +1,271 @@
+\section{Implementacja}
+
+\subsection{Podział kwot}
+\label{sec:podzial-kwot}
+
+Każdy podział kosztów sprowadza się do rozdzielenia kwoty $T$, wyrażonej w~jednostkach podrzędnych waluty, między $k$~uczestników o~wagach $w_1, \dots, w_k$. Dokładne udziały $T w_i / W$, gdzie $W = \sum_j w_j$, zwykle nie są liczbami całkowitymi, a~niezależne zaokrąglenie każdego z~nich może dać sumę różną od $T$. Funkcja \texttt{distributeProportionally} rozwiązuje ten problem metodą największych reszt:
+
+\begin{enumerate}
+  \item każdy uczestnik otrzymuje część całkowitą $a_i = \lfloor T w_i / W \rfloor$;
+  \item dla każdego uczestnika wyznaczana jest reszta $r_i = T w_i - a_i W$;
+  \item brakujące jednostki, których jest $T - \sum_i a_i < k$, otrzymują po jednej osoby o~największych resztach; przy równych resztach pierwszeństwo ma uczestnik o~mniejszym identyfikatorze.
+\end{enumerate}
+
+Wynik zależy wyłącznie od par (identyfikator, waga), a~nie od kolejności uczestników w~żądaniu, więc ten sam wydatek zawsze daje te same udziały. Przykładowo kwota 100,00~zł podzielona równo między trzy osoby daje udziały 33,34~zł, 33,33~zł i~33,33~zł, przy czym dodatkowy grosz trafia do osoby o~najmniejszym identyfikatorze.
+
+Obliczenia wykonywane są na typie \texttt{bigint}, ponieważ iloczyn $T w_i$ może przekroczyć zakres liczb całkowitych, które JavaScript reprezentuje dokładnie ($2^{53}-1$). Wynik jest zamieniany z~powrotem na liczbę dopiero na końcu, a~funkcja \texttt{toSafeInteger} zgłasza błąd zamiast po cichu utracić precyzję. Ta sama funkcja zamienia wartości kolumn \texttt{bigint} i~sum zwracanych przez PostgreSQL, które sterownik bazy danych przekazuje jako tekst.
+
+Pięć metod podziału różni się tylko sposobem wyznaczania wag:
+
+\begin{itemize}
+  \item \textbf{równy} - każdy uczestnik ma wagę 1;
+  \item \textbf{procentowy} - wagami są punkty bazowe (1\% to 100 punktów), których suma musi wynosić dokładnie 10\,000;
+  \item \textbf{według udziałów} - wagami są liczby udziałów;
+  \item \textbf{według kwot} - kwoty są przyjmowane bez zmian i~muszą sumować się do kwoty wydatku;
+  \item \textbf{z~korektami} - od kwoty wydatku odejmowana jest suma korekt, resztę dzieli się równo, a~następnie do udziału każdego uczestnika dodaje się jego korektę.
+\end{itemize}
+
+\zpitodo{Opisać sprawdzanie, czy w~metodzie z~korektami żaden udział nie wychodzi poniżej zera, po wprowadzeniu poprawki tego podziału.}
+
+Silnik podziału znajduje się w~pakiecie \texttt{contracts}. Serwer wylicza nim udziały przy każdym zapisie wydatku i~nigdy nie przyjmuje ich od klienta, a~formularz wydatku korzysta z~niego do podglądu podziału przed zapisem. Z~tego samego kodu korzystają atrapy API używane w~testach interfejsu.
+
+Przebieg funkcji \texttt{allocate}, która wybiera wagi według metody podziału i~wywołuje \texttt{distributeProportionally}, przedstawiono na rys.~\ref{fig:aktywnosc-podzial}.
+
+\begin{figure}[H]
+  \centering
+  \resizebox{\textwidth}{!}{%
+  \begin{tikzpicture}[ad action/.append style={text width=2.4cm}]
+    \node[ad start] (start) at (0,0) {};
+    \node[ad action, text width=4.8cm] (check) at (0,-1.0) {Sprawdź kwotę i~unikalność uczestników};
+    \node[ad decision] (method) at (0,-2.2) {};
+    \node[ad action] (eq) at (-6.4,-4.4) {wagi: po 1};
+    \node[ad action] (pct) at (-3.2,-4.4) {wagi: punkty bazowe};
+    \node[ad action] (sh) at (0,-4.4) {wagi: udziały};
+    \node[ad action] (adj) at (3.2,-4.4) {odejmij korekty, wagi: po 1};
+    \node[ad action] (ex) at (6.4,-4.4) {kwoty bez zmian};
+    \node[ad decision] (pctok) at (-3.2,-5.7) {};
+    \node[ad decision] (exok) at (6.4,-5.7) {};
+    \node[ad flow end, label={below:\footnotesize błąd}] (pcterr) at (-4.8,-5.7) {};
+    \node[ad flow end, label={below:\footnotesize błąd}] (exerr) at (8.0,-5.7) {};
+    \node[ad decision] (m1) at (0,-6.9) {};
+    \node[ad action, text width=3.8cm] (dist) at (0,-8.1) {Rozdziel kwotę metodą największych reszt};
+    \node[ad decision] (isadj) at (0,-9.3) {};
+    \node[ad action] (add) at (-3.2,-10.5) {dodaj korekty do udziałów};
+    \node[ad decision] (m2) at (0,-11.7) {};
+    \node[ad action, text width=3.8cm] (int) at (0,-12.9) {Zamień kwoty na liczby (\texttt{toSafeInteger})};
+    \node[ad end] (end) at (0,-14.1) {};
+
+    \draw[ad flow] (start) -- (check);
+    \draw[ad flow] (check) -- (method);
+    \draw (method.south) -- (0,-2.9) coordinate (fan);
+    \draw[ad flow] (fan) -| (eq.north);
+    \draw[ad flow] (fan) -| (pct.north);
+    \draw[ad flow] (fan) -- (sh.north);
+    \draw[ad flow] (fan) -| (adj.north);
+    \draw[ad flow] (fan) -| (ex.north);
+    \node[ad guard, anchor=west] at (-6.4,-3.3) {[równy]};
+    \node[ad guard, anchor=west] at (-3.2,-3.3) {[procentowy]};
+    \node[ad guard, anchor=west] at (0,-3.3) {[udziały]};
+    \node[ad guard, anchor=west] at (3.2,-3.3) {[korekty]};
+    \node[ad guard, anchor=west] at (6.4,-3.3) {[kwoty]};
+
+    \draw[ad flow] (pct) -- (pctok);
+    \draw[ad flow] (pctok) -- node[ad guard, above] {[inaczej]} (pcterr);
+    \draw[ad flow] (pctok.south) |- node[ad guard, pos=0.3, right] {[suma = 100\%]} (m1.west);
+    \draw[ad flow] (eq.south) |- (m1.west);
+    \draw[ad flow] (sh) -- (m1);
+    \draw[ad flow] (adj.south) |- (m1.east);
+    \draw[ad flow] (ex) -- (exok);
+    \draw[ad flow] (exok) -- node[ad guard, above] {[inaczej]} (exerr);
+    \draw[ad flow] (exok.south) |- node[ad guard, pos=0.15, right] {[suma = kwota wydatku]} (m2.east);
+
+    \draw[ad flow] (m1) -- (dist);
+    \draw[ad flow] (dist) -- (isadj);
+    \draw[ad flow] (isadj.west) -| node[ad guard, pos=0.25, above] {[korekty]} (add.north);
+    \draw[ad flow] (isadj) -- node[ad guard, right] {[inna metoda]} (m2);
+    \draw[ad flow] (add.south) |- (m2.west);
+    \draw[ad flow] (m2) -- (int);
+    \draw[ad flow] (int) -- (end);
+  \end{tikzpicture}%
+  }
+  \caption{Diagram aktywności funkcji \texttt{allocate}}
+  \label{fig:aktywnosc-podzial}
+\end{figure}
+
+\subsection{Salda i~sugestie rozliczeń}
+
+Salda nie są przechowywane, tylko wyliczane jednym zapytaniem SQL. Zapytanie łączy operatorem \texttt{UNION ALL} cztery zbiory wierszy ze znakiem:
+
+\begin{itemize}
+  \item kwoty zapłacone przez płatników (\texttt{expense\_payers}) ze znakiem dodatnim;
+  \item udziały w~wydatkach (\texttt{expense\_splits}) ze znakiem ujemnym;
+  \item potwierdzone spłaty wysłane (\texttt{settlements}, strona płacąca) ze znakiem dodatnim;
+  \item potwierdzone spłaty otrzymane (\texttt{settlements}, strona odbierająca) ze znakiem ujemnym.
+\end{itemize}
+
+Saldo osoby w~danej walucie to suma jej wierszy, pogrupowana według waluty i~użytkownika. Każdy zbiór jest łączony tylko z~tabelą wydatków (w~celu odczytania waluty), więc wiersze płatników i~udziałów nie mnożą się nawzajem, a~warunek na gospodarstwo trafia do każdej gałęzi zapytania osobno i~korzysta z~jej indeksu. Na tej samej konstrukcji oparte są saldo użytkownika we wszystkich jego gospodarstwach oraz sprawdzenie, czy gospodarstwo jest rozliczone; to ostatnie kończy się po znalezieniu pierwszego niezerowego salda.
+
+Sugestie rozliczeń wyznacza algorytm zachłanny opisany w~sekcji~\ref{sec:upraszczanie-rozliczen}, uruchamiany osobno dla każdej waluty. Wierzyciele i~dłużnicy są sortowani malejąco według kwoty, a~przy równych kwotach według identyfikatora użytkownika, więc wynik nie zależy od kolejności wierszy zwróconych przez bazę. Jeśli po przejściu obu list któraś z~nich nie jest pusta, salda w~danej walucie nie sumują się do zera. Taki stan oznacza błąd w~danych, dlatego funkcja zgłasza wyjątek zamiast zwracać niepełne sugestie.
+
+Przebieg algorytmu przedstawiono na rys.~\ref{fig:aktywnosc-sugestie}.
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[ad action/.append style={text width=5cm}]
+    \node[ad start] (start) at (0,0) {};
+    \node[ad action, below=0.4cm of start] (split) {Podziel niezerowe salda na wierzycieli i~dłużników};
+    \node[ad action, below=0.45cm of split] (sort) {Posortuj obie listy malejąco według kwoty, przy remisie według identyfikatora};
+    \node[ad decision, below=0.45cm of sort] (loop) {};
+    \node[ad decision, below=0.45cm of loop] (both) {};
+    \node[ad action, below=0.8cm of both] (transfer) {Dodaj przelew od dłużnika do wierzyciela na mniejszą z~ich kwot};
+    \node[ad action, below=0.45cm of transfer] (reduce) {Zmniejsz obie kwoty; osoba z~kwotą zero ustępuje następnej};
+    \node[ad decision] (empty) at ($(both)+(-5.2,0)$) {};
+    \node[ad action, text width=2.6cm, below=0.8cm of empty] (ret) {Zwróć listę przelewów};
+    \node[ad end, below=0.45cm of ret] (end) {};
+    \node[ad flow end, label={below:\footnotesize błąd}] (err) at ($(empty)+(-2.2,0)$) {};
+
+    \draw[ad flow] (start) -- (split);
+    \draw[ad flow] (split) -- (sort);
+    \draw[ad flow] (sort) -- (loop);
+    \draw[ad flow] (loop) -- (both);
+    \draw[ad flow] (both) -- node[ad guard, right] {[obie listy niepuste]} (transfer);
+    \draw[ad flow] (transfer) -- (reduce);
+    \draw[ad flow] (reduce.east) -- ++(0.5,0) |- (loop.east);
+    \draw[ad flow] (both) -- node[ad guard, above] {[któraś lista pusta]} (empty);
+    \draw[ad flow] (empty) -- node[ad guard, right] {[obie puste]} (ret);
+    \draw[ad flow] (ret) -- (end);
+    \draw[ad flow] (empty) -- node[ad guard, above] {[inaczej]} (err);
+  \end{tikzpicture}
+  \caption{Diagram aktywności wyznaczania sugestii rozliczeń w~jednej walucie}
+  \label{fig:aktywnosc-sugestie}
+\end{figure}
+
+\subsection{Równoległe zapisy finansowe}
+\label{sec:rownolegle-zapisy}
+
+Kilku członków gospodarstwa może jednocześnie dodawać wydatki, edytować ten sam wydatek albo zmieniać ustawienia gospodarstwa. Bez dodatkowej synchronizacji mogłoby dojść np. do sytuacji, w~której administrator wyłącza moduł wydatków po sprawdzeniu, że wszystkie salda wynoszą zero, a~w~tym samym czasie inna osoba dodaje wydatek.
+
+Synchronizacja opiera się na blokadach wierszy PostgreSQL zakładanych na wiersz gospodarstwa w~tabeli \texttt{organization}:
+
+\begin{itemize}
+  \item każda transakcja zapisująca wydatek lub spłatę zakłada blokadę współdzieloną (\texttt{SELECT \dots{} FOR SHARE}), więc zwykłe zapisy finansowe nie czekają na siebie nawzajem;
+  \item usunięcie gospodarstwa i~wyłączenie modułu wydatków zakładają blokadę wyłączną (\texttt{SELECT \dots{} FOR UPDATE}), sprawdzają salda i~wykonują zmianę w~tej samej transakcji; blokadę wyłączną zakłada też rozliczenie długu byłego członka, które wylicza spłaty z~bieżących sald.
+\end{itemize}
+
+Blokada wyłączna czeka na zakończenie trwających zapisów i~wstrzymuje nowe do końca transakcji, więc salda odczytane po jej założeniu pozostają prawdziwe do chwili zatwierdzenia zmiany. Zapis, który czekał na blokadę usuwanego gospodarstwa, po jej zwolnieniu nie znajduje już wiersza i~kończy się odpowiedzią 404.
+
+Edycja i~usunięcie wydatku dodatkowo blokują wiersz samego wydatku (\texttt{FOR UPDATE}). Dwie równoległe edycje tego samego wydatku wykonują się więc kolejno, a~druga z~nich odczytuje dane zapisane przez pierwszą, zanim sprawdzi, którzy uczestnicy są nowi i~muszą być bieżącymi członkami. Zmiana kwoty, płatników lub podziału usuwa i~ponownie zapisuje wszystkie wiersze podrzędne wydatku w~jednej transakcji.
+
+\subsection{Wyzwalacze bazy danych}
+
+Członkostwo w~gospodarstwie obsługuje biblioteka Better Auth, która dodaje wiersze do tabeli \texttt{member} na kilka sposobów: przy tworzeniu gospodarstwa, przyjęciu zaproszenia lub bezpośrednim dodaniu członka. Zamiast uzupełniać historię członkostwa w~każdym z~tych miejsc, zastosowano wyzwalacz \texttt{AFTER INSERT} na tabeli \texttt{member}, który dopisuje parę gospodarstwo-użytkownik do tabeli \texttt{household\_membership\_history} (instrukcja \texttt{ON CONFLICT DO NOTHING} pomija pary już zapisane). Historia jest dzięki temu kompletna także dla ścieżek dodanych w~przyszłych wersjach biblioteki. W~ten sam sposób tworzony jest wiersz z~ustawieniami modułów dla każdego nowego gospodarstwa.
+
+Drugi wyzwalacz, \texttt{AFTER DELETE} na tabeli \texttt{attachments}, dopisuje klucz usuniętego pliku do kolejki \texttt{storage\_object\_deletions}. Działa on również wtedy, gdy załączniki są usuwane kaskadowo razem z~gospodarstwem, więc żaden plik w~magazynie nie zostaje bez wiersza, który by go opisywał.
+
+\subsection{Załączniki}
+
+Typ przesłanego pliku jest rozpoznawany na podstawie jego zawartości (sygnatury pliku), a~typ zadeklarowany przez przeglądarkę jest ignorowany. Akceptowane są obrazy JPEG, PNG, WebP i~HEIC oraz dokumenty PDF o~rozmiarze do 10~MiB.
+
+Zapis pliku obejmuje dwa systemy, magazyn obiektów i~bazę danych, których nie da się objąć jedną transakcją. Dlatego plik trafia najpierw do magazynu, a~wiersz z~metadanymi jest wstawiany do bazy dopiero po udanym zapisie. Jeśli wstawienie wiersza się nie powiedzie, serwer usuwa plik z~magazynu, a~gdy i~to się nie uda, dopisuje jego klucz do kolejki usuwania.
+
+Plik jest przesyłany od razu po wybraniu, jeszcze przed zapisaniem wydatku. Formularz może dzięki temu pokazać postęp przesyłania i~miniaturę, a~zapis wydatku nie czeka na przesłanie plików. Plik musi też istnieć na serwerze, zanim powstanie wydatek, aby model AI mógł zaproponować na jego podstawie kategorię lub odczytać paragon. Jeśli użytkownik prześle plik, ale nie zapisze formularza, plik pozostaje bez powiązania z~wydatkiem. Takie pliki usuwa okresowo uruchamiane zadanie porządkowe, gdy od przesłania minie 24~godziny, a~następnie usuwa z~magazynu obiekty z~kolejki \texttt{storage\_object\_deletions}.
+
+Załączniki pobierane są przez podpisane adresy URL ważne 5~minut. Czas ważności liczony jest przed podpisaniem adresu, więc podany klientowi termin nigdy nie jest późniejszy niż faktyczne wygaśnięcie adresu. Aplikacja webowa nie pobiera podpisanych adresów razem ze stroną wydatku, tylko przy każdym otwarciu pliku, dlatego krótki czas ważności nie przeszkadza użytkownikowi, który długo przegląda stronę.
+
+Przesłanie pliku, powiązanie go z~wydatkiem i~jego pobranie przedstawiono na rys.~\ref{fig:sekwencja-zalacznik}.
+
+\begin{figure}[H]
+  \centering
+  \resizebox{\textwidth}{!}{%
+  \begin{tikzpicture}
+    \def\xB{0}\def\xA{5.4}\def\xR{9.8}\def\xD{14.2}
+    \sdparticipant{\xB}{Przeglądarka}{-12.6}
+    \sdparticipant{\xA}{Serwer API}{-12.6}
+    \sdparticipant{\xR}{Cloudflare R2}{-12.6}
+    \sdparticipant{\xD}{PostgreSQL}{-12.6}
+
+    \node[sd guard] at (-1.3,-0.7) {przesłanie pliku};
+    \sdcall{\xB}{\xA}{-1.5}{\texttt{POST \dots/attachments}, plik}
+    \sdself{\xA}{-2.1}{typ pliku z~zawartości}
+    \sdcall{\xA}{\xR}{-2.9}{\texttt{PUT} obiektu}
+    \sdreply{\xR}{\xA}{-3.5}{200}
+    \sdcall{\xA}{\xD}{-4.1}{\texttt{INSERT} metadanych}
+    \sdreply{\xA}{\xB}{-4.7}{201, identyfikator załącznika}
+
+    \sdelse{-1.3}{15.5}{-5.1}{powiązanie z~wydatkiem}
+    \sdcall{\xB}{\xA}{-6.1}{\texttt{POST \dots/expenses/:id/attachments}}
+    \sdcall{\xA}{\xD}{-6.7}{\texttt{INSERT} powiązania}
+    \sdreply{\xA}{\xB}{-7.3}{201}
+
+    \sdelse{-1.3}{15.5}{-7.7}{pobranie pliku}
+    \sdcall{\xB}{\xA}{-8.7}{\texttt{GET \dots/attachments/:id/download}}
+    \sdcall{\xA}{\xD}{-9.3}{\texttt{SELECT} klucza obiektu}
+    \sdself{\xA}{-9.9}{podpisanie URL (5~min)}
+    \sdreply{\xA}{\xB}{-10.7}{podpisany URL, termin ważności}
+    \sdcall{\xB}{\xR}{-11.4}{\texttt{GET} podpisanego URL}
+    \sdreply{\xR}{\xB}{-12.0}{plik}
+  \end{tikzpicture}%
+  }
+  \caption{Diagram sekwencji przesłania, powiązania i~pobrania załącznika. Pośrednictwo serwera Next.js pominięto}
+  \label{fig:sekwencja-zalacznik}
+\end{figure}
+
+\subsection{Integracja z~modelami językowymi}
+
+Funkcje sztucznej inteligencji korzystają z~jednego serwisu, który przed każdym zapytaniem do modelu sprawdza, czy moduł AI jest włączony w~gospodarstwie i~czy dostawca jest skonfigurowany, a~następnie zużywa jedno zapytanie z~dziennego limitu. Limit (domyślnie 50~zapytań na gospodarstwo) jest realizowany jedną instrukcją \texttt{INSERT \dots{} ON CONFLICT DO UPDATE} na tabeli \texttt{ai\_usage}, która zwiększa licznik tylko wtedy, gdy jest on mniejszy od limitu. Równoległe zapytania nie mogą więc go przekroczyć, a~gdy instrukcja nie zwróci wiersza, serwer odpowiada kodem 429 wraz z~godziną odnowienia limitu.
+
+Odpowiedź modelu musi mieć ustaloną strukturę. Każde zadanie definiuje schemat odpowiedzi w~Zod, który jest przekazywany dostawcy jako ścisły schemat JSON (\emph{structured outputs}), a~odpowiedź jest ponownie sprawdzana na serwerze. Odpowiedź niezgodna ze schematem lub odmowa modelu daje błąd 502, przekroczenie czasu (domyślnie 30~s) - błąd 504. W~dzienniku zapisywany jest tylko rodzaj błędu, bez jego treści, ponieważ komunikat może cytować odpowiedź zawierającą dane gospodarstwa.
+
+Przy połączeniu z~OpenRouter serwer dołącza do zapytania wymagania dotyczące wyboru dostawcy: zakaz wykorzystywania danych do trenowania, brak przechowywania danych (\emph{zero data retention}) oraz obsługa wszystkich przekazanych parametrów, w~tym schematu odpowiedzi. Zapytanie z~obrazem lub plikiem PDF trafia do modelu wizyjnego, a~zapytanie tekstowe do modelu tekstowego.
+
+Zdjęcia przed wysłaniem do modelu są obracane zgodnie z~orientacją zapisaną przez aparat, zmniejszane tak, aby dłuższy bok miał najwyżej 2048~pikseli, i~zapisywane jako JPEG. Nowy plik nie zawiera metadanych EXIF, w~tym współrzędnych GPS. Zdjęcia w~formacie HEIC, domyślnym na telefonach iPhone, są dekodowane biblioteką libheif skompilowaną do WebAssembly. Przed dekodowaniem sprawdzana jest liczba pikseli (najwyżej 50~milionów), aby mały, specjalnie spreparowany plik nie zajął gigabajtów pamięci.
+
+Pierwszą zrealizowaną funkcją jest sugerowanie kategorii wydatku. Model otrzymuje listę kategorii gospodarstwa w~postaci ponumerowanej, nazwę i~opis wydatku (przycięte do ustalonej długości) oraz opcjonalnie załącznik. Zwraca numer kategorii albo wartość \texttt{null} i~poziom pewności. Model nie zna identyfikatorów kategorii, a~numer spoza listy jest odrzucany, więc odpowiedź nie może wskazać kategorii innego gospodarstwa. Instrukcja dla modelu zaznacza, że treść wiadomości użytkownika to dane, a~nie polecenia, co ogranicza skutki prób wstrzyknięcia instrukcji w~nazwie lub opisie wydatku. Gospodarstwo bez kategorii otrzymuje pustą odpowiedź bez zapytania do modelu i~bez zużycia limitu.
+
+Przebieg sugestii kategorii przedstawiono na rys.~\ref{fig:sekwencja-kategoria}.
+
+\begin{figure}[H]
+  \centering
+  \resizebox{\textwidth}{!}{%
+  \begin{tikzpicture}
+    \def\xB{0}\def\xA{4.4}\def\xD{8.8}\def\xR{12.6}\def\xO{16.4}
+    \sdparticipant{\xB}{Przeglądarka}{-11.0}
+    \sdparticipant{\xA}{Serwer API}{-11.0}
+    \sdparticipant{\xD}{PostgreSQL}{-11.0}
+    \sdparticipant{\xR}{Cloudflare R2}{-11.0}
+    \sdparticipant{\xO}{OpenRouter}{-11.0}
+
+    \sdcall{\xB}{\xA}{-1.0}{\texttt{POST \dots/suggestion}}
+    \sdcall{\xA}{\xD}{-1.6}{załącznik, moduł AI, kategorie}
+    \sdframe{-1.3}{-2.0}{17.7}{-4.3}{opt}{[z~załącznikiem]}
+    \sdcall{\xA}{\xR}{-2.7}{\texttt{GET} obiektu}
+    \sdreply{\xR}{\xA}{-3.3}{plik}
+    \sdself{\xA}{-3.8}{obrót, zmniejszenie, JPEG}
+    \sdcall{\xA}{\xD}{-5.1}{zużycie limitu (429 po wyczerpaniu)}
+    \sdcall{\xA}{\xO}{-5.7}{instrukcja, dane, schemat odpowiedzi}
+    \sdframe{-1.3}{-6.1}{17.7}{-10.6}{alt}{[poprawna odpowiedź]}
+    \sdreply{\xO}{\xA}{-6.8}{numer kategorii, pewność}
+    \sdself{\xA}{-7.3}{numer na kategorię}
+    \sdreply{\xA}{\xB}{-8.3}{200, sugestia}
+    \sdelse{-1.3}{17.7}{-8.7}{[błąd lub przekroczenie czasu]}
+    \sdreply{\xO}{\xA}{-9.4}{błąd lub brak odpowiedzi}
+    \sdreply{\xA}{\xB}{-10.0}{502 lub 504}
+  \end{tikzpicture}%
+  }
+  \caption{Diagram sekwencji sugestii kategorii wydatku. Pośrednictwo serwera Next.js pominięto}
+  \label{fig:sekwencja-kategoria}
+\end{figure}
+
+Odczyt paragonu korzysta z~tego samego serwisu. Członek przesyła zdjęcie paragonu jako załącznik, a~serwer tworzy szkic paragonu ze statusem \emph{przetwarzany} i~zleca odczyt w~tle; aplikacja webowa okresowo sprawdza status szkicu. Model wizyjny zwraca bezpośrednio, bez osobnego etapu OCR, nazwę sprzedawcy, datę, walutę, sumę i~pozycje z~ilością, ceną jednostkową, rabatem i~kwotą. Serwer zapisuje je jako szkic do edycji i~podaje różnicę między sumą pozycji a~sumą z~paragonu, aby użytkownik mógł poprawić błędnie odczytane wartości.
+
+Pozycje paragonu przypisuje się do osób jako udziały: jedna osoba z~jednym udziałem płaci za całą pozycję, kilka osób po jednym udziale dzieli ją równo, a~przy pozycji z~kilkoma sztukami udziałem jest liczba sztuk. Kwota każdej pozycji po rabacie jest dzielona między przypisane osoby proporcjonalnie do udziałów, a~rabaty dla całego paragonu rozkładane proporcjonalnie do kwot pozycji. Kwoty przypadające na osoby są sumowane bez zaokrąglania i~zaokrąglane raz, metodą największych reszt, więc ich suma zawsze równa się sumie paragonu. Zatwierdzenie paragonu tworzy w~jednej transakcji wydatek z~podziałem według kwot, dołącza do niego zdjęcie paragonu i~oznacza paragon jako zatwierdzony.
+
+Po zatwierdzeniu model porównuje pozycje paragonu z~niekupionymi pozycjami listy zakupów gospodarstwa i~proponuje dopasowania, np. pozycję \enquote{Mleko 2\% 1L} do pozycji \enquote{mleko}. Podobnie jak przy kategoriach, dopasowania wskazujące nieznane pozycje są odrzucane. Członek zatwierdza wybrane dopasowania, a~serwer oznacza pozycje jako kupione przez płatnika paragonu, pomijając te, które ktoś kupił lub usunął w~międzyczasie.
+
+\zpitodo{Zweryfikować opis odczytu paragonów, przypisywania pozycji i~dopasowania do listy zakupów po ich implementacji.}
+
+\subsection{Natychmiastowa reakcja interfejsu}
+
+Najczęstsze czynności na liście obowiązków i~liście zakupów, takie jak oznaczenie obowiązku jako wykonanego, są wykonywane optymistycznie: interfejs zmienia dane w~pamięci podręcznej TanStack Query od razu po dotknięciu, nie czekając na odpowiedź serwera. Jeśli serwer zwróci błąd, zmiana jest wycofywana, a~użytkownik dostaje komunikat; gdy obowiązek został w~międzyczasie usunięty przez inną osobę, komunikat o~tym informuje.
+
+Szybkie, kolejne dotknięcia wymagały dwóch zabezpieczeń. Żądania z~jednej listy są wysyłane kolejno, więc cofnięcie wykonania zawsze dociera do serwera po samym wykonaniu. Dane listy są ponownie pobierane z~serwera dopiero po zakończeniu ostatniego z~oczekujących żądań, ponieważ wcześniejsze pobranie przywróciłoby na ekranie stan sprzed zmian, których żądania są jeszcze w~drodze.

@@ -1,0 +1,222 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{zpi}[2026/11/09 ZPI project documentation]
+
+% Language and fonts
+\RequirePackage[polish]{babel}
+\RequirePackage{fontspec}
+\RequirePackage{unicode-math}
+
+\setmainfont{texgyretermes}[
+  Extension      = .otf,
+  UprightFont    = *-regular,
+  BoldFont       = *-bold,
+  ItalicFont     = *-italic,
+  BoldItalicFont = *-bolditalic,
+]
+\setmathfont{texgyretermes-math.otf}
+
+\newfontfamily\zpi@garamond{EBGaramond}[
+  Ligatures      = TeX,
+  Extension      = .otf,
+  UprightFont    = *-Regular,
+  BoldFont       = *-Bold,
+  ItalicFont     = *-Italic,
+  BoldItalicFont = *-BoldItalic,
+]
+
+% Page layout
+\RequirePackage[a4paper, top=2.5cm, bottom=1.75cm, left=3.5cm, right=2.5cm,
+  footskip=0.75cm]{geometry}
+\RequirePackage{indentfirst}
+\RequirePackage{microtype}
+\setlength\emergencystretch{1.5em}
+
+% Headings
+\RequirePackage{etoolbox}
+\RequirePackage{titlesec}
+\titleformat{\section}{\fontsize{14}{17}\selectfont\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\itshape}{\thesubsubsection.}{0.5em}{}
+\titlespacing*{\section}{0pt}{18pt plus 4pt minus 2pt}{8pt plus 2pt}
+\titlespacing*{\subsection}{0pt}{12pt plus 3pt minus 2pt}{6pt plus 2pt}
+\titlespacing*{\subsubsection}{0pt}{10pt plus 2pt minus 2pt}{4pt plus 2pt}
+\RequirePackage{needspace}
+\preto\section{\needspace{12\baselineskip}}
+\preto\subsection{\needspace{6\baselineskip}}
+\preto\subsubsection{\needspace{8\baselineskip}}
+
+\newcommand\zpiczesc[1]{%
+  \clearpage
+  \phantomsection
+  \addcontentsline{toc}{part}{#1}%
+  {\noindent\fontsize{16}{20}\selectfont\bfseries #1\par}%
+  \vspace{12pt}%
+}
+
+% Table of contents
+\RequirePackage[titles]{tocloft}
+\renewcommand\cftsecaftersnum{.}
+\renewcommand\cftsubsecaftersnum{.}
+\renewcommand\cftsubsubsecaftersnum{.}
+\renewcommand\cftpartfont{\bfseries}
+\renewcommand\cftpartpagefont{\bfseries}
+\setlength\cftbeforepartskip{6pt}
+
+% Packages
+\RequirePackage{graphicx}
+\RequirePackage{tikz}
+\RequirePackage{rotating}
+\usetikzlibrary{positioning, arrows.meta, shapes.multipart, shapes.geometric, calc, fit, backgrounds}
+\graphicspath{{figures/}}
+
+% Sequence diagrams
+\tikzset{
+  sd participant/.style={draw, fill=white, align=center, font=\small, minimum height=0.9cm, text width=2.3cm, inner sep=2pt},
+  sd lifeline/.style={densely dashed, gray},
+  sd call/.style={-{Triangle[length=2mm, width=1.6mm]}},
+  sd reply/.style={densely dashed, -{Straight Barb[length=2mm]}},
+  sd text/.style={font=\footnotesize, inner sep=1.5pt, fill=white},
+  sd guard/.style={font=\footnotesize\itshape, inner sep=2pt, anchor=north west},
+}
+% \sdparticipant{x}{name}{lifeline end y}
+\newcommand\sdparticipant[3]{%
+  \node[sd participant] at (#1,0) {#2};
+  \draw[sd lifeline] (#1,-0.45) -- (#1,#3);}
+% \sdcall{from x}{to x}{y}{label}, \sdreply{from x}{to x}{y}{label}
+\newcommand\sdcall[4]{\draw[sd call] (#1,#3) -- node[sd text, above] {#4} (#2,#3);}
+\newcommand\sdreply[4]{\draw[sd reply] (#1,#3) -- node[sd text, above] {#4} (#2,#3);}
+% \sdself{x}{y}{label}
+\newcommand\sdself[3]{%
+  \draw[sd call] (#1,#2) -- ++(0.45,0) -- ++(0,-0.3) -- ++(-0.45,0);
+  \node[sd text, anchor=south west] at (#1,#2) {#3};}
+% \sdframe{left x}{top y}{right x}{bottom y}{operator}{guard}
+\newcommand\sdframe[6]{%
+  \draw (#1,#2) rectangle (#3,#4);
+  \node[draw, fill=white, font=\footnotesize\bfseries, inner sep=2pt, anchor=north west] (sdtag) at (#1,#2) {#5};
+  \node[sd guard] at (sdtag.north east) {#6};}
+% \sdelse{left x}{right x}{y}{guard}
+\newcommand\sdelse[4]{%
+  \draw[densely dashed] (#1,#3) -- (#2,#3);
+  \node[sd guard] at (#1,#3) {#4};}
+
+% Activity diagrams
+\tikzset{
+  ad action/.style={draw, rounded corners=7pt, align=center, font=\small, execute at begin node={\hyphenpenalty=10000}, text width=2.6cm, minimum height=0.9cm, inner sep=3pt, fill=white},
+  ad decision/.style={draw, diamond, aspect=1.6, minimum width=0.9cm, minimum height=0.6cm, inner sep=0pt, fill=white},
+  ad start/.style={circle, fill=black, minimum size=3mm, inner sep=0pt},
+  ad end/.style={circle, draw, double, double distance=1.2pt, fill=black, minimum size=2.6mm, inner sep=0pt},
+  ad flow end/.style={circle, draw, minimum size=3mm, inner sep=0pt, path picture={\draw (path picture bounding box.north west) -- (path picture bounding box.south east) (path picture bounding box.north east) -- (path picture bounding box.south west);}},
+  ad flow/.style={-{Stealth[length=2.2mm]}},
+  ad guard/.style={font=\footnotesize, inner sep=2pt},
+}
+\RequirePackage{booktabs}
+\RequirePackage{tabularx}
+\RequirePackage{longtable}
+\RequirePackage{array}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\renewcommand\arraystretch{1.25}
+\RequirePackage[shortlabels]{enumitem}
+\setlist{itemsep=2pt, parsep=0pt, topsep=4pt, leftmargin=1.5em}
+\setlist[description]{leftmargin=1.5em, labelindent=0pt, itemsep=3pt}
+\RequirePackage[font=small, labelfont=bf, labelsep=period]{caption}
+\captionsetup[table]{position=top}
+\RequirePackage[section]{placeins}
+\RequirePackage{float}
+\renewcommand\topfraction{0.85}
+\renewcommand\bottomfraction{0.7}
+\renewcommand\textfraction{0.1}
+\renewcommand\floatpagefraction{0.8}
+\RequirePackage{xcolor}
+\RequirePackage{csquotes}
+\RequirePackage[backend=biber, style=numeric-comp, sorting=none]{biblatex}
+\renewcommand*\bibfont{\raggedright}
+\RequirePackage[hidelinks]{hyperref}
+\RequirePackage{etoolbox}
+\AtBeginEnvironment{table}{\small}
+
+% User story tables
+\newenvironment{historyjki}[1]{%
+  \small
+  \begin{longtable}{@{}p{1.2cm}p{13.3cm}@{}}
+    \caption{Historyjki użytkownika: #1}\\
+    \toprule
+    ID & Historyjka \\
+    \midrule
+    \endfirsthead
+    \toprule
+    ID & Historyjka \\
+    \midrule
+    \endhead
+    \midrule
+    \endfoot
+    \bottomrule
+    \endlastfoot
+}{%
+  \end{longtable}%
+}
+
+% Template hints
+\newif\ifzpi@wskazowki
+\zpi@wskazowkitrue
+\newcommand\zpiukryjwskazowki{\zpi@wskazowkifalse}
+\newcommand\wskazowka[1]{%
+  \ifzpi@wskazowki{\par\noindent\color{gray}\itshape #1\par}\fi
+}
+
+% Placeholders to fill in later
+\newcommand\zpitodo[1]{{\par\medskip\noindent\color{red}\textbf{TODO:} #1\par\medskip}}
+
+% Project metadata
+\newcommand\zpi@uczelnia{Politechnika Wrocławska}
+\newcommand\zpi@wydzial{Wydział Informatyki i Telekomunikacji}
+\newcommand\zpi@przedmiot{ZESPOŁOWE PRZEDSIĘWZIĘCIE INFORMATYCZNE}
+\newcommand\zpi@kierunek{}
+\newcommand\zpi@tytul{}
+\newcommand\zpi@autorzy{}
+\newcommand\zpi@opiekun{}
+\newcommand\zpi@slowakluczowe{}
+\newcommand\zpi@miasto{WROCŁAW}
+\newcommand\zpi@rok{\the\year}
+
+\newcommand\zpiprzedmiot[1]{\renewcommand\zpi@przedmiot{#1}}
+\newcommand\zpikierunek[1]{\renewcommand\zpi@kierunek{#1}}
+\newcommand\zpitytul[1]{\renewcommand\zpi@tytul{#1}}
+\newcommand\zpiautorzy[1]{\renewcommand\zpi@autorzy{#1}}
+\newcommand\zpiopiekun[1]{\renewcommand\zpi@opiekun{#1}}
+\newcommand\zpislowakluczowe[1]{\renewcommand\zpi@slowakluczowe{#1}}
+\newcommand\zpirok[1]{\renewcommand\zpi@rok{#1}}
+
+\AtBeginDocument{%
+  \hypersetup{
+    pdftitle    = {\zpi@tytul},
+    pdfauthor   = {\zpi@autorzy},
+    pdfkeywords = {\zpi@slowakluczowe},
+  }%
+}
+
+% Title page
+\newcommand\zpi@autor[1]{#1\par}
+\newcommand\zpistronatytulowa{%
+  \begin{titlepage}
+    \zpi@garamond
+    \centering
+    {\fontsize{20}{24}\selectfont\bfseries \zpi@uczelnia\par}
+    {\fontsize{16}{20}\selectfont\bfseries \zpi@wydzial\par}
+    \vspace{3pt}\hrule\vspace{20pt}
+    {\raggedright\fontsize{16}{20}\selectfont Kierunek: \zpi@kierunek\par}
+    \vspace{48pt}
+    {\fontsize{22}{27}\selectfont\bfseries \zpi@przedmiot\par}
+    \vspace{48pt}
+    {\fontsize{18}{23}\selectfont\bfseries \zpi@tytul\par}
+    \vspace{36pt}
+    {\fontsize{16}{20}\selectfont
+      \expandafter\forcsvlist\expandafter\zpi@autor\expandafter{\zpi@autorzy}}
+    \vspace{36pt}
+    {\fontsize{14}{18}\selectfont Opiekun pracy\par\bfseries \zpi@opiekun\par}
+    \vfill
+    {\raggedright\fontsize{12}{15}\selectfont Słowa kluczowe: \zpi@slowakluczowe\par}
+    \vspace{16pt}\hrule\vspace{6pt}
+    {\rmfamily\fontsize{12}{15}\selectfont \zpi@miasto\ \zpi@rok\par}
+  \end{titlepage}%
+  \setcounter{page}{2}%
+}

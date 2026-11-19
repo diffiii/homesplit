@@ -1,0 +1,84 @@
+\section{Założenia wstępne}
+
+\subsection{Założenia projektowe}
+
+\begin{itemize}
+  \item \textbf{Aplikacja webowa projektowana od telefonu.} Interfejs powstaje najpierw dla małych ekranów (\emph{mobile-first}) i~jest rozszerzany na tablety i~komputery zgodnie z~zasadami RWD. Najczęstsze czynności, takie jak dodanie wydatku czy odhaczenie zakupu, są dostępne bez zbędnej nawigacji.
+  \item \textbf{Gospodarstwo domowe jako podstawowa jednostka danych.} Wydatki, spłaty, listy zakupów i~obowiązki należą do gospodarstwa. Dostęp do nich mają wyłącznie bieżący członkowie, a~zakres uprawnień zależy od roli: dane finansowe i~ustawienia gospodarstwa są chronione, a~codzienne listy pozostają otwarte dla wszystkich członków.
+  \item \textbf{Moduły włączane niezależnie.} Każde gospodarstwo samodzielnie decyduje, z~których modułów korzysta (wydatki, obowiązki, zakupy, sztuczna inteligencja). Wyłączenie modułu blokuje zmiany, ale nie usuwa danych.
+  \item \textbf{Dokładne obliczenia finansowe.} Kwoty przechowywane są jako liczby całkowite w~jednostkach podrzędnych waluty, co eliminuje błędy zaokrągleń arytmetyki zmiennoprzecinkowej. Reszty z~podziału kwot rozdzielane są metodą największych reszt w~sposób deterministyczny, więc suma części zawsze równa się kwocie wydatku. Waluty nie są przeliczane, a~salda prowadzone są oddzielnie dla każdej z~nich.
+  \item \textbf{Ewidencja zamiast realizacji płatności.} Aplikacja rejestruje przelewy wykonane poza nią. Spłata zgłoszona przez płacącego wymaga potwierdzenia przez odbiorcę, zanim zostanie uwzględniona w~saldach.
+  \item \textbf{Sztuczna inteligencja jedynie proponuje.} Każdy wynik modelu (odczyt paragonu, kategoria, dopasowanie do listy zakupów) jest weryfikowany przez użytkownika przed zapisem, a~odpowiedź modelu jest dodatkowo sprawdzana pod kątem zgodności ze schematem danych.
+  \item \textbf{Ochrona danych przy korzystaniu z~AI.} Moduł sztucznej inteligencji jest domyślnie wyłączony i~włącza go administrator gospodarstwa. Do dostawcy modelu trafiają wyłącznie dane niezbędne do realizacji zadania (obraz paragonu, opisy wydatków, nazwy kategorii i~pozycji listy zakupów), bez imion, adresów e-mail i~identyfikatorów użytkowników. Wymagane jest, aby dostawca nie przechowywał przesłanych danych ani nie wykorzystywał ich do trenowania modeli. Liczba zapytań do modelu jest ograniczona dziennym limitem na gospodarstwo.
+  \item \textbf{Wspólne kontrakty API.} Schematy żądań i~odpowiedzi są zdefiniowane raz, we wspólnym pakiecie, i~wykorzystywane zarówno przez interfejs użytkownika, jak i~przez serwer.
+\end{itemize}
+
+\subsection{Dobór technologii}
+
+Cały system napisano w~języku TypeScript, co pozwala współdzielić typy i~logikę walidacji między klientem a~serwerem. Kod jest zorganizowany jako monorepozytorium zarządzane przez pnpm, złożone z~trzech pakietów: aplikacji webowej, serwera aplikacji oraz wspólnych kontraktów. Wybrane technologie przedstawiono w~tab.~\ref{tab:technologie}.
+
+\begin{table}[H]
+  \centering
+  \caption{Technologie wykorzystane w~projekcie}
+  \label{tab:technologie}
+  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.27\textwidth}L@{}}
+    \toprule
+    Obszar & Technologie & Uzasadnienie \\
+    \midrule
+    Interfejs użytkownika & Next.js, React, Tailwind CSS, shadcn/ui & komponentowy, responsywny interfejs; gotowe, dostępne komponenty \\
+    Komunikacja z~serwerem & TanStack Query, TanStack Form & pamięć podręczna danych z~serwera, obsługa formularzy z~walidacją \\
+    Serwer aplikacji & Node.js, NestJS & modułowa architektura, wstrzykiwanie zależności, mechanizmy autoryzacji i~walidacji żądań \\
+    Uwierzytelnianie & Better Auth & sesje, weryfikacja adresu e-mail, reset hasła, organizacje z~rolami i~zaproszeniami odwzorowujące gospodarstwa \\
+    Baza danych & PostgreSQL, Drizzle ORM & transakcje i~więzy integralności dla danych finansowych; typowany dostęp do danych i~migracje \\
+    Kontrakty API & Zod & wspólne schematy walidacji i~typy dla klienta i~serwera \\
+    Pliki & Cloudflare R2 (API zgodne z~S3) & przechowywanie załączników i~awatarów \\
+    Poczta e-mail & Resend & wysyłka zaproszeń, linków weryfikacyjnych i~resetujących hasło \\
+    Sztuczna inteligencja & biblioteka \texttt{openai}, API zgodne z~OpenAI (domyślnie OpenRouter) & dostęp do multimodalnych modeli językowych; możliwość zmiany dostawcy i~modelu bez zmian w~kodzie \\
+    Testy & Vitest, Testing Library, MSW, Playwright, axe-core & testy jednostkowe, komponentów, integracyjne i~E2E, w~tym kontrola dostępności \\
+    Infrastruktura & Docker Compose, GitHub Actions, Render, Neon & lokalne uruchamianie bazy danych i~magazynu plików; ciągła integracja, automatyczne wdrażanie, hosting aplikacji i~bazy danych \\
+    Organizacja pracy & Git, GitHub, Biome, Husky, commitlint, Figma & wersjonowanie, przeglądy kodu, jednolity styl kodu i~komunikatów zmian, projekt interfejsu \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Organizacja pracy i~harmonogram}
+
+Projekt realizuje czteroosobowy zespół w~ciągu dziesięciu tygodni. Zadania są prowadzone jako zgłoszenia (\emph{issues}) w~serwisie GitHub i~grupowane w~epiki odpowiadające obszarom funkcjonalnym, oddzielnie dla serwera i~interfejsu użytkownika. Każda zmiana trafia do głównej gałęzi przez \emph{pull request}, w~którym proces CI sprawdza styl kodu, typy, budowanie oraz testy jednostkowe, integracyjne i~E2E. Po scaleniu zmian do głównej gałęzi następuje automatyczne wdrożenie: najpierw migracje bazy danych, następnie serwer, a~na końcu aplikacja webowa. Harmonogram prac przedstawiono w~tab.~\ref{tab:harmonogram}.
+
+\begin{table}[H]
+  \centering
+  \caption{Harmonogram realizacji projektu}
+  \label{tab:harmonogram}
+  \begin{tabularx}{\textwidth}{@{}llL@{}}
+    \toprule
+    Etap & Tydzień & Zakres prac \\
+    \midrule
+    1. Analiza i~projekt koncepcyjny & 1 & analiza wymagań i~konkurencji, projekt architektury i~schematu bazy danych \\
+    2. Szkielet projektu & 2 & konfiguracja środowiska, uwierzytelnianie i~autoryzacja, model gospodarstwa domowego \\
+    3. Finanse i~moduły towarzyszące & 3-5 & wydatki i~kategorie, rozliczenia między domownikami, listy zakupów, obowiązki i~załączniki \\
+    4. Sztuczna inteligencja & 6-7 & integracja z~dostawcą modeli, sugestie kategorii, odczyt paragonów, dopasowanie do listy zakupów \\
+    5. Testy i~wdrożenie & 8-10 & testy modułów i~responsywności, naprawa błędów, finalizacja dokumentacji \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Ryzyka}
+
+Główne ryzyka projektu i~sposoby ich ograniczenia zestawiono w~tab.~\ref{tab:ryzyka}.
+
+\begin{table}[H]
+  \centering
+  \caption{Główne ryzyka projektu}
+  \label{tab:ryzyka}
+  \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.22\textwidth}L@{}}
+    \toprule
+    Ryzyko & Możliwy skutek & Sposób ograniczenia \\
+    \midrule
+    Błędny odczyt paragonu przez model AI & błędne kwoty w~wydatkach & zatwierdzanie danych przez użytkownika przed zapisem, walidacja odpowiedzi, ocena względem wartości referencyjnych \\
+    Błędy w~obliczeniach rozliczeń & utrata zaufania do sald & kwoty w~liczbach całkowitych, deterministyczne zaokrąglanie, testy jednostkowe obliczeń \\
+    Krótki czas realizacji & niedokończone moduły & praca etapami, w~pierwszej kolejności funkcje podstawowe \\
+    Nieuprawniony dostęp do danych finansowych & wyciek danych & uwierzytelnianie i~autoryzacja, dostęp wyłącznie dla bieżących członków gospodarstwa \\
+    Przekazanie danych do zewnętrznego dostawcy AI & naruszenie prywatności & moduł AI domyślnie wyłączony, przesyłanie tylko niezbędnych danych, dostawca bez przechowywania danych \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
