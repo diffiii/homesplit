@@ -60,7 +60,7 @@ A trigger runs in the same statement as every insert, whatever the path, includi
 | Balances and suggestions | all | – | – | – | – |
 | Chores | all | all | all | all | complete, reopen: all |
 | Shopping items | all | all | all | all | purchase, unpurchase, clear purchased: all |
-| Receipts | all | all | all, until confirmed | all, until confirmed | retry, assign items, confirm: all |
+| Receipts | all | all | all, until confirmed | all, until confirmed | retry, assign items, confirm, match and purchase shopping items: all |
 | Profile | self (Better Auth `get-session`) | – | self | – | – |
 | Friends | self | self | – | friendship: either friend · request: sender | accept, decline: recipient |
 
@@ -129,7 +129,7 @@ Better Auth's generated tables keep their own `CASCADE` keys. A task that stores
 
 ### Disabled modules
 
-- `expenses` covers categories, expenses, payments, balances, suggestions, attachment links, and receipts. `chores` and `shopping` cover their own routes.
+- `expenses` covers categories, expenses, payments, balances, suggestions, attachment links, and receipts. `chores` and `shopping` cover their own routes, and `shopping` also the receipt routes that match and purchase shopping items.
 - `ai` covers every call to an AI provider, on any method; see [AI provider](#ai-provider).
 - While a module is off, its `GET` routes keep working, and every other method answers 403 `MODULE_DISABLED`. Nothing is deleted or hidden, and turning the module back on restores everything.
 - Better Auth's membership actions are never blocked. Changing flags isn't either, except that `expenses` stays on while any balance in the household isn't zero, so members can always settle up: turning it off then answers 409 `HOUSEHOLD_HAS_UNSETTLED_BALANCES`. #40 adds this check together with the one for deleting households, serialized against ledger writes the same way (see [Deleting households](#deleting-households)).
@@ -198,7 +198,7 @@ Household paths in this table are relative to `/api/households/:householdId`. Ta
 | Balances | `/balances`: `GET` · `/settlement-suggestions`: `GET` |
 | Chores | `/chores`: `GET`, `POST` · `/chores/:choreId`: `GET`, `PATCH`, `DELETE` · `/chores/:choreId/complete` and `/reopen`: `POST` |
 | Shopping | `/shopping-items`: `GET`, `POST` · `/shopping-items/:itemId`: `GET`, `PATCH`, `DELETE` · `/shopping-items/:itemId/purchase` and `/unpurchase`: `POST` · `/shopping-items/clear-purchased`: `POST` |
-| Receipts | `/receipts`: `GET`, `POST` · `/receipts/:receiptId`: `GET`, `PATCH`, `DELETE` · `/receipts/:receiptId/retry` and `/confirm`: `POST` · `/receipts/:receiptId/assignments`: `PUT` · `/receipts/:receiptId/split`: `GET` |
+| Receipts | `/receipts`: `GET`, `POST` · `/receipts/:receiptId`: `GET`, `PATCH`, `DELETE` · `/receipts/:receiptId/retry`, `/confirm`, `/shopping-matches`, and `/purchase-shopping-items`: `POST` · `/receipts/:receiptId/assignments`: `PUT` · `/receipts/:receiptId/split`: `GET` |
 | Profile | `/api/me`: `PATCH` |
 | Friends | `/api/me/friends`: `GET` · `/api/me/friends/:friendshipId`: `DELETE` · `/api/me/friend-requests`: `POST` · `/api/me/friend-requests/incoming` and `/sent`: `GET` · `/api/me/friend-requests/:requestId`: `DELETE` · `/api/me/friend-requests/:requestId/accept` and `/decline`: `POST` |
 

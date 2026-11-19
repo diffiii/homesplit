@@ -324,6 +324,8 @@ export class MockFactory {
       })),
       suggestedCategory: failed ? null : (input.suggestedCategory ?? null),
       expenseId: null,
+      payerId: null,
+      confirmedAt: null,
       createdById: input.scannedBy.id,
       createdAt,
       updatedAt: createdAt,

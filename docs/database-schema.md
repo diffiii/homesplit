@@ -414,6 +414,8 @@ erDiagram
         uuid suggested_category_id FK "nullable; the scan's pick, SET NULL on category delete"
         text suggested_category_confidence "nullable; low, medium, high"
         uuid expense_id FK "nullable; set on confirm, cleared when the expense's amounts change"
+        uuid payer_id FK "nullable; set on confirm"
+        timestamptz confirmed_at "nullable; set on confirm"
         uuid created_by_id FK
         timestamptz created_at
         timestamptz updated_at
@@ -450,7 +452,7 @@ erDiagram
 - Confirming a receipt creates an ordinary expense with the `exact` allocation method. Item assignments are kept on the receipt as the history of who had what, and the expense's splits remain the only source for balances.
 - Returned deposits aren't items but part of the receipt-level discount, so no item amount is negative.
 - Item costs are split by shares, receipt-level discounts are spread over items in proportion to their cost, and per-person totals are rounded once with the allocation engine's remainder rule.
-- Shopping matches from task 7.5 are request-time suggestions, not stored relations. Confirming them reuses the shopping purchase columns.
+- Shopping matches (#57) are request-time suggestions, not stored relations. Purchasing them reuses the shopping purchase columns, with the receipt's payer and confirmation time.
 
 ## Mapping notes
 

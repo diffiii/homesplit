@@ -53,6 +53,7 @@ const STALE_INTERVAL = sql.raw(`interval '${STALE_AFTER_MS} milliseconds'`);
 const isStale = sql<boolean>`(${receipts.status} = 'processing' AND ${receipts.updatedAt} < now() - ${STALE_INTERVAL})`;
 
 const createdBy = userRole("created_by");
+const payer = userRole("payer");
 const assignee = userRole("assignee");
 
 const selectReceipts = (executor: Executor) =>
@@ -72,12 +73,15 @@ const selectReceipts = (executor: Executor) =>
       expenseId: receipts.expenseId,
       suggestedCategoryId: receipts.suggestedCategoryId,
       suggestedCategoryConfidence: receipts.suggestedCategoryConfidence,
+      payer: payer.summary,
+      confirmedAt: receipts.confirmedAt,
       createdBy: createdBy.summary,
       createdAt: receipts.createdAt,
       updatedAt: receipts.updatedAt,
     })
     .from(receipts)
-    .innerJoin(createdBy.table, eq(createdBy.table.id, receipts.createdById));
+    .innerJoin(createdBy.table, eq(createdBy.table.id, receipts.createdById))
+    .leftJoin(payer.table, eq(payer.table.id, receipts.payerId));
 
 type ReceiptRow = Awaited<ReturnType<typeof selectReceipts>>[number];
 
@@ -132,6 +136,8 @@ function toSummary(row: ReceiptRow): ReceiptSummary {
     discountCents: toSafeInteger(row.discountCents),
     expenseId: row.expenseId,
     suggestedCategory: suggestionOf(row),
+    payer: row.payer,
+    confirmedAt: row.confirmedAt?.toISOString() ?? null,
     createdBy: row.createdBy,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

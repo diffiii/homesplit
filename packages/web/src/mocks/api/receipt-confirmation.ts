@@ -207,6 +207,8 @@ export const receiptConfirmationRoutes: MockRoutes = {
       Object.assign(receipt, {
         status: "confirmed",
         expenseId: expense.id,
+        payerId,
+        confirmedAt: time,
         updatedAt: time,
       });
       return {

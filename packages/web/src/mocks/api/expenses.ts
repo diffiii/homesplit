@@ -415,6 +415,8 @@ export const expenseRoutes: MockRoutes = {
           Object.assign(receipt, {
             status: "ready",
             expenseId: null,
+            payerId: null,
+            confirmedAt: null,
             updatedAt: now(),
           });
         }

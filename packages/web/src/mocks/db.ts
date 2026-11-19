@@ -111,6 +111,8 @@ export interface MockReceiptItem {
 /** A scanned receipt; the mocks "read" it on its first fetch instead of calling a model. */
 export interface MockReceipt {
   attachmentId: string;
+  /** When the receipt was confirmed; `null` before, and again once its expense is deleted. */
+  confirmedAt: string | null;
   createdAt: string;
   createdById: string;
   currency: string | null;
@@ -122,6 +124,8 @@ export interface MockReceipt {
   id: string;
   items: MockReceiptItem[];
   merchant: string | null;
+  /** Who paid, set when the receipt is confirmed, like `confirmedAt`. */
+  payerId: string | null;
   purchasedOn: string | null;
   status: ReceiptStatus;
   suggestedCategory: Receipt["suggestedCategory"];

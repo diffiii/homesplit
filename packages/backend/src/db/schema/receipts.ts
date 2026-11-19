@@ -59,6 +59,12 @@ export const receipts = pgTable(
       { onDelete: "set null" }
     ),
     suggestedCategoryConfidence: text("suggested_category_confidence"),
+    // Who paid, and when the receipt was confirmed: what marking shopping
+    // items purchased uses, even after the expense is edited or unlinked.
+    payerId: uuid("payer_id").references(() => user.id, {
+      onDelete: "restrict",
+    }),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
     createdById: uuid("created_by_id")
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
@@ -101,6 +107,18 @@ export const receipts = pgTable(
     check("receipts_currency_code", sql`${table.currency} ~ '^[A-Z]{3}$'`),
     check("receipts_total_nonnegative", sql`${table.totalCents} >= 0`),
     check("receipts_discount_nonnegative", sql`${table.discountCents} >= 0`),
+    foreignKey({
+      name: "receipts_payer_party_fk",
+      columns: [table.householdId, table.payerId],
+      foreignColumns: [
+        householdMembershipHistory.organizationId,
+        householdMembershipHistory.userId,
+      ],
+    }),
+    check(
+      "receipts_confirmation",
+      sql`(${table.status} = 'confirmed') = (${table.confirmedAt} IS NOT NULL) AND (${table.confirmedAt} IS NULL) = (${table.payerId} IS NULL)`
+    ),
     check(
       "receipts_expense",
       sql`${table.expenseId} IS NULL OR ${table.status} = 'confirmed'`
