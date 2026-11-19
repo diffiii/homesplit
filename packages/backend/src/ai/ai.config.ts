@@ -65,3 +65,13 @@ export function loadAiConfig(env: NodeJS.ProcessEnv = process.env): AiConfig {
 }
 
 export const aiConfig = loadAiConfig();
+
+/**
+ * The longest one `AiService.generate` call can wait on the provider:
+ * `OpenAiCompatibleAiClient` gives each call one `AbortSignal.timeout`, which
+ * also ends the SDK's retries, so it's `timeoutMs` however many retries run.
+ * Zero without a provider. Callers that treat a long call as lost, such as
+ * receipts, add their own margin on top.
+ */
+export const longestRequestMs = (config: AiConfig = aiConfig): number =>
+  config.provider?.timeoutMs ?? 0;

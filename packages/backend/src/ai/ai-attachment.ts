@@ -1,7 +1,6 @@
 import type { AttachmentMimeType } from "@homesplit/contracts";
-import { AppError } from "@/http/app-error";
 import { openImage } from "@/images";
-import type { AiInput } from "./ai-client";
+import { type AiInput, aiError } from "./ai-client";
 
 /** Long edge of images sent to the vision model, enough for a receipt's small print. */
 const MAX_IMAGE_EDGE = 2048;
@@ -22,7 +21,7 @@ export async function attachmentInput(
   // Content that can't be decoded as its type is a bad file.
   const data = await toJpeg(content, mimeType).catch(() => undefined);
   if (!data) {
-    throw new AppError(
+    throw aiError(
       415,
       "UNSUPPORTED_FILE_TYPE",
       "The attachment can't be read as an image"

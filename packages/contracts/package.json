@@ -36,6 +36,10 @@
       "types": "./dist/features/chores/index.d.ts",
       "default": "./dist/features/chores/index.js"
     },
+    "./features/receipts": {
+      "types": "./dist/features/receipts/index.d.ts",
+      "default": "./dist/features/receipts/index.js"
+    },
     "./features/shopping": {
       "types": "./dist/features/shopping/index.d.ts",
       "default": "./dist/features/shopping/index.js"
