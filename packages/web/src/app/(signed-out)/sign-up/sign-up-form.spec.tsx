@@ -9,6 +9,18 @@ import { SignUpForm } from "./sign-up-form";
 describe("SignUpForm", () => {
   beforeEach(() => loadScenario("signed-out"));
 
+  it("links to the terms and the privacy policy", () => {
+    renderWithProviders(<SignUpForm />, { url: "/sign-up" });
+
+    expect(screen.getByRole("link", { name: "terms" })).toHaveAttribute(
+      "href",
+      "/terms"
+    );
+    expect(
+      screen.getByRole("link", { name: "privacy policy" })
+    ).toHaveAttribute("href", "/privacy");
+  });
+
   it("asks the user to open the emailed link when sign-up gives no session", async () => {
     let body: unknown;
     server.use(

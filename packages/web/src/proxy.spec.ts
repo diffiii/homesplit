@@ -44,6 +44,16 @@ describe("proxy", () => {
     );
   });
 
+  it.each(["/privacy", "/terms"])(
+    "lets everyone open %s, with a session cookie or without",
+    (path) => {
+      expect(proxy(request(path)).headers.get("x-middleware-next")).toBe("1");
+      expect(
+        proxy(request(path, SESSION_COOKIE)).headers.get("x-middleware-next")
+      ).toBe("1");
+    }
+  );
+
   it("lets visitors without a session cookie open signed-out pages", () => {
     const response = proxy(request("/sign-up"));
 

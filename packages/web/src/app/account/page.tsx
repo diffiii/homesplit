@@ -3,6 +3,7 @@
 import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
 import { ErrorState } from "@/components/error-state";
+import { LegalLinks } from "@/components/legal-links";
 import { ListSkeleton } from "@/components/list-skeleton";
 import { PageHeader } from "@/components/page-header";
 import { UserMenu } from "@/components/shell/user-menu";
@@ -64,6 +65,7 @@ export default function AccountPage() {
         <PageHeader title="Account" />
         {content}
         <AppearanceSection />
+        <LegalLinks />
       </main>
     </div>
   );
