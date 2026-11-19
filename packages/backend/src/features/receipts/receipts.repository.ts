@@ -11,10 +11,24 @@ import {
   toSafeInteger,
   type UpdateReceiptRequest,
 } from "@homesplit/contracts";
-import { and, asc, desc, eq, inArray, type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  notInArray,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { longestRequestMs } from "@/ai/ai.config";
 import { db, type Executor, readSnapshot, type Transaction } from "@/db";
-import { attachments, receiptItems, receipts } from "@/db/schema";
+import {
+  attachments,
+  receiptItemAssignments,
+  receiptItems,
+  receipts,
+} from "@/db/schema";
 import { userRole } from "@/features/users/user-projections";
 import { invalidReference, notFound } from "@/http/app-error";
 
@@ -36,6 +50,7 @@ const STALE_INTERVAL = sql.raw(`interval '${STALE_AFTER_MS} milliseconds'`);
 const isStale = sql<boolean>`(${receipts.status} = 'processing' AND ${receipts.updatedAt} < now() - ${STALE_INTERVAL})`;
 
 const createdBy = userRole("created_by");
+const assignee = userRole("assignee");
 
 const selectReceipts = (executor: Executor) =>
   executor
@@ -51,6 +66,7 @@ const selectReceipts = (executor: Executor) =>
       currency: receipts.currency,
       totalCents: receipts.totalCents,
       discountCents: receipts.discountCents,
+      expenseId: receipts.expenseId,
       createdBy: createdBy.summary,
       createdAt: receipts.createdAt,
       updatedAt: receipts.updatedAt,
@@ -94,6 +110,7 @@ function toSummary(row: ReceiptRow): ReceiptSummary {
     currency: row.currency,
     totalCents: row.totalCents === null ? null : toSafeInteger(row.totalCents),
     discountCents: toSafeInteger(row.discountCents),
+    expenseId: row.expenseId,
     createdBy: row.createdBy,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -142,6 +159,23 @@ async function findItems(
     .from(receiptItems)
     .where(eq(receiptItems.receiptId, receiptId))
     .orderBy(asc(receiptItems.position), asc(receiptItems.id));
+  const assignments = await executor
+    .select({
+      itemId: receiptItemAssignments.receiptItemId,
+      user: assignee.summary,
+      shares: receiptItemAssignments.shares,
+    })
+    .from(receiptItemAssignments)
+    .innerJoin(
+      receiptItems,
+      eq(receiptItems.id, receiptItemAssignments.receiptItemId)
+    )
+    .innerJoin(
+      assignee.table,
+      eq(assignee.table.id, receiptItemAssignments.userId)
+    )
+    .where(eq(receiptItems.receiptId, receiptId))
+    .orderBy(asc(receiptItemAssignments.userId));
   return rows.map((row) => ({
     id: row.id,
     position: row.position,
@@ -151,6 +185,9 @@ async function findItems(
     unitPriceCents: toSafeInteger(row.unitPriceCents),
     discountCents: toSafeInteger(row.discountCents),
     totalCents: toSafeInteger(row.totalCents),
+    assignments: assignments
+      .filter(({ itemId }) => itemId === row.id)
+      .map(({ user, shares }) => ({ user, shares })),
   }));
 }
 
@@ -295,30 +332,54 @@ function headerColumns({
 }
 
 /**
- * Replaces the items in the given order. Items with an ID keep it, new items
- * get new IDs, and positions are renumbered from 0.
+ * Replaces the items in the given order. Items with an ID keep it and their
+ * assignments, items left out are deleted with theirs, new items get new IDs,
+ * and positions are renumbered from 0. Callers checked the IDs with
+ * `assertOwnItems`, or have none, so the upsert only updates this receipt's
+ * items.
  */
 async function replaceItems(
   tx: Transaction,
   receiptId: string,
   items: ReceiptItemInput[]
 ): Promise<void> {
-  await tx.delete(receiptItems).where(eq(receiptItems.receiptId, receiptId));
+  const keptIds = items.flatMap(({ id }) => (id === undefined ? [] : [id]));
+  await tx
+    .delete(receiptItems)
+    .where(
+      and(
+        eq(receiptItems.receiptId, receiptId),
+        keptIds.length === 0 ? undefined : notInArray(receiptItems.id, keptIds)
+      )
+    );
   if (items.length === 0) {
     return;
   }
-  await tx.insert(receiptItems).values(
-    items.map(({ id, ...item }, position) => ({
-      ...(id === undefined ? {} : { id }),
-      receiptId,
-      position,
-      name: item.name,
-      quantity: String(item.quantity),
-      unitPriceCents: BigInt(item.unitPriceCents),
-      discountCents: BigInt(item.discountCents),
-      totalCents: BigInt(item.totalCents),
-    }))
-  );
+  await tx
+    .insert(receiptItems)
+    .values(
+      items.map(({ id, ...item }, position) => ({
+        ...(id === undefined ? {} : { id }),
+        receiptId,
+        position,
+        name: item.name,
+        quantity: String(item.quantity),
+        unitPriceCents: BigInt(item.unitPriceCents),
+        discountCents: BigInt(item.discountCents),
+        totalCents: BigInt(item.totalCents),
+      }))
+    )
+    .onConflictDoUpdate({
+      target: receiptItems.id,
+      set: {
+        position: sql`excluded.position`,
+        name: sql`excluded.name`,
+        quantity: sql`excluded.quantity`,
+        unitPriceCents: sql`excluded.unit_price_cents`,
+        discountCents: sql`excluded.discount_cents`,
+        totalCents: sql`excluded.total_cents`,
+      },
+    });
 }
 
 /**

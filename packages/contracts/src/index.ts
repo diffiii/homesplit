@@ -18,5 +18,6 @@ export * from "./features/expenses";
 export * from "./features/friends";
 export * from "./features/households";
 export * from "./features/receipts";
+export * from "./features/receipts/split";
 export * from "./features/shopping";
 export * from "./features/users";

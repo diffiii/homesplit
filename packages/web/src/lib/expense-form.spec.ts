@@ -671,6 +671,7 @@ const stored = (overrides: Partial<Expense> = {}): Expense => ({
   },
   splits: [A, B, C].map((id) => ({ user: user(id), amountCents: 3000 })),
   attachments: [],
+  receiptId: null,
   createdAt: "2026-03-01T12:00:00.000Z",
   updatedAt: "2026-03-01T12:00:00.000Z",
   ...overrides,

@@ -385,7 +385,7 @@ erDiagram
 
 ## Attachments and receipts
 
-These tables support backlog tasks [4.3](backlog/tasks/4-expenses/4.3-attachments/4.3.0-epic.md) and [7](backlog/tasks/7-ai-receipts/7.0-epic.md). `HOUSEHOLDS`, `USERS`, `EXPENSES`, and `SHOPPING_ITEMS` are the entities from the household diagram. `ATTACHMENTS` and `EXPENSE_ATTACHMENTS` are the implemented `attachments` (#44) and `expense_attachments` (#45) tables, and `RECEIPTS` and `RECEIPT_ITEMS` the implemented `receipts` and `receipt_items` (#55; see [Receipts API](api/receipts.md#storage)), except `expense_id`. `expense_id` and `RECEIPT_ITEM_ASSIGNMENTS` are still proposed, for the tasks that confirm and split receipts.
+These tables support backlog tasks [4.3](backlog/tasks/4-expenses/4.3-attachments/4.3.0-epic.md) and [7](backlog/tasks/7-ai-receipts/7.0-epic.md). `HOUSEHOLDS`, `USERS`, `EXPENSES`, and `SHOPPING_ITEMS` are the entities from the household diagram. `ATTACHMENTS` and `EXPENSE_ATTACHMENTS` are the implemented `attachments` (#44) and `expense_attachments` (#45) tables, and `RECEIPTS`, `RECEIPT_ITEMS`, and `RECEIPT_ITEM_ASSIGNMENTS` the implemented `receipts`, `receipt_items`, and `receipt_item_assignments` (#55, #56; see [Receipts API](api/receipts.md#storage)).
 
 ```mermaid
 erDiagram
@@ -410,7 +410,7 @@ erDiagram
         text currency "nullable until extracted; ISO 4217"
         bigint total_cents "nullable until extracted"
         bigint discount_cents "Receipt-level; default 0"
-        uuid expense_id FK "Proposed; nullable; set on confirm"
+        uuid expense_id FK "nullable; set on confirm, cleared when the expense's amounts change"
         uuid created_by_id FK
         timestamptz created_at
         timestamptz updated_at
@@ -430,7 +430,7 @@ erDiagram
     RECEIPT_ITEM_ASSIGNMENTS {
         uuid receipt_item_id PK,FK
         uuid user_id PK,FK
-        numeric shares "Strictly positive; units or equal shares"
+        integer shares "Strictly positive; units or equal shares"
     }
 
     HOUSEHOLDS ||..o{ RECEIPTS : contains

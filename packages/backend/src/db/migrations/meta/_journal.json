@@ -155,6 +155,13 @@
       "when": 1794633679952,
       "tag": "0021_receipts",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794635824269,
+      "tag": "0022_receipt_assignments",
+      "breakpoints": true
     }
   ]
 }
