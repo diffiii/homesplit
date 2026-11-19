@@ -4,7 +4,7 @@ import type { Chore } from "@homesplit/contracts";
 import { useInfiniteQuery, useIsMutating } from "@tanstack/react-query";
 import { cn } from "cn";
 import { ListChecksIcon } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { ListSkeleton } from "@/components/list-skeleton";
@@ -17,6 +17,7 @@ import {
   useUserName,
 } from "@/components/shell/household-context";
 import { Badge } from "@/components/ui/badge";
+import { useNow } from "@/hooks/use-now";
 import { choreActionKey, choreListQuery } from "@/lib/api/chore-queries";
 import { type ChoreFilters, isOverdue } from "@/lib/chores";
 import {
@@ -57,12 +58,7 @@ export function ChoreList({ emptyAction, filters, onEdit }: ChoreListProps) {
   const { hidden, deleteChore } = useDeleteChore();
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
-  // Deadlines turn overdue, and "Today" turns "Yesterday", without new data.
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 60_000);
-    return () => clearInterval(timer);
-  }, []);
+  const now = useNow();
 
   if (list.status === "pending") {
     return <ListSkeleton label="Loading chores" rows={4} />;
