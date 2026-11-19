@@ -26,6 +26,8 @@ export const attachments = pgTable(
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
     storageKey: text("storage_key").notNull().unique(),
+    // Null for PDFs and images without a thumbnail yet.
+    thumbnailStorageKey: text("thumbnail_storage_key").unique(),
     mimeType: text("mime_type").notNull(),
     sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
     uploadedById: uuid("uploaded_by_id")
@@ -56,8 +58,9 @@ export const attachments = pgTable(
 
 /**
  * Objects whose `attachments` row is gone and that still have to be deleted
- * from object storage. An `AFTER DELETE ON attachments` trigger fills it, so
- * cascades from a deleted household are queued too.
+ * from object storage: the file and its thumbnail. An `AFTER DELETE ON
+ * attachments` trigger fills it, so cascades from a deleted household are
+ * queued too.
  */
 export const storageObjectDeletions = pgTable("storage_object_deletions", {
   storageKey: text("storage_key").primaryKey(),

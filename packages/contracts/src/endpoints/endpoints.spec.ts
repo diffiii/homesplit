@@ -99,12 +99,15 @@ describe("encodeQuery", () => {
 });
 
 describe("ResponseBody", () => {
-  it("is the parsed response, or undefined for 204 routes", () => {
+  it("is the parsed response, or undefined for 204 and 302 routes", () => {
     expectTypeOf<
       ResponseBody<typeof endpoints.getExpense>
     >().toEqualTypeOf<Expense>();
     expectTypeOf<
       ResponseBody<typeof endpoints.deleteExpense>
+    >().toEqualTypeOf<undefined>();
+    expectTypeOf<
+      ResponseBody<typeof endpoints.getAttachmentThumbnail>
     >().toEqualTypeOf<undefined>();
   });
 

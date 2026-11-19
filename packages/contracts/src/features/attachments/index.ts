@@ -25,12 +25,16 @@ export const DEFAULT_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 /** Multipart form field that carries the file in an upload. */
 export const ATTACHMENT_UPLOAD_FIELD = "file";
 
-/** A file stored for a household. Where it's stored is never exposed. */
+/**
+ * A file stored for a household. Where it's stored is never exposed.
+ * `hasThumbnail` says whether `getAttachmentThumbnail` serves a preview.
+ */
 export const Attachment = z.object({
   id: Id,
   householdId: Id,
   mimeType: AttachmentMimeType,
   sizeBytes: z.int().positive(),
+  hasThumbnail: z.boolean(),
   uploadedBy: UserSummary,
   createdAt: IsoDateTime,
 });
@@ -44,6 +48,7 @@ export const AttachmentSummary = Attachment.pick({
   id: true,
   mimeType: true,
   sizeBytes: true,
+  hasThumbnail: true,
 });
 export type AttachmentSummary = z.infer<typeof AttachmentSummary>;
 

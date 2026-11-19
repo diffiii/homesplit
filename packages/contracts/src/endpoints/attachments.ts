@@ -28,4 +28,15 @@ export const attachmentEndpoints = {
     status: 200,
     response: AttachmentDownload,
   },
+  /**
+   * Redirects to a short-lived signed URL of the thumbnail, so the path works
+   * as an `<img src>`: `/api` is same-origin and sends the session cookie.
+   */
+  getAttachmentThumbnail: {
+    method: "GET",
+    path: `${ATTACHMENT}/thumbnail`,
+    params: AttachmentIdParams,
+    status: 302,
+    response: null,
+  },
 } as const satisfies Record<string, Endpoint>;

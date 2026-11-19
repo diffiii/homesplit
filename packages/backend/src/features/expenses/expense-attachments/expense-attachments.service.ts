@@ -35,6 +35,7 @@ async function lockAttachmentForLink(
       id: attachments.id,
       mimeType: attachments.mimeType,
       sizeBytes: attachments.sizeBytes,
+      thumbnailStorageKey: attachments.thumbnailStorageKey,
     })
     .from(attachments)
     .where(
