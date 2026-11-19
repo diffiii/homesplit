@@ -351,7 +351,13 @@ export class ReceiptConfirmationService {
       });
       await tx
         .update(receipts)
-        .set({ status: "confirmed", expenseId, updatedAt: sql`now()` })
+        .set({
+          status: "confirmed",
+          expenseId,
+          payerId,
+          confirmedAt: sql`now()`,
+          updatedAt: sql`now()`,
+        })
         .where(inHousehold(householdId, receiptId));
 
       return {
