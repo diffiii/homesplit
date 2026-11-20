@@ -84,6 +84,7 @@ function households(): MockState {
     },
     daysAgo: 5,
   });
+  // A photo with a thumbnail and a PDF without one, so the file list shows both.
   f.attachment(electricity, {
     uploadedBy: bartek,
     mimeType: "image/jpeg",

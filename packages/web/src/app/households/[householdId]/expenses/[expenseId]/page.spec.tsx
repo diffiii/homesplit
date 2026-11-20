@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { HouseholdShell } from "@/components/shell/household-shell";
@@ -229,6 +229,22 @@ describe("ExpensePage", () => {
       return count;
     }
 
+    /** The rows of the files list, once it shows. */
+    async function fileRows() {
+      const files = await screen.findByRole("region", { name: "Files" });
+      return within(files).getAllByRole("listitem");
+    }
+
+    /** The Electricity bill's linked files, in the order they show. */
+    const electricityFiles = () => {
+      const id = expenseId("Electricity");
+      return db.state.expenseAttachments
+        .filter(({ expenseId: linked }) => linked === id)
+        .map(({ attachmentId }) =>
+          db.state.attachments.find(({ id: file }) => file === attachmentId)
+        );
+    };
+
     /** Stands in for the tab `window.open` opens, or for a blocked one with `null`. */
     function stubNewTab(blocked = false) {
       const tab = {
@@ -255,6 +271,66 @@ describe("ExpensePage", () => {
         "File 1JPEG image · 1.8 MBOpen",
         "File 2PDF document · 210 kBOpen",
       ]);
+    });
+
+    it("shows an image's thumbnail and other files' icons, without fetching the files", async () => {
+      const downloads = countDownloads();
+      renderExpense(expenseId("Electricity"));
+
+      const [photo, pdf] = await fileRows();
+      const thumbnail = within(photo).getByTestId("file-preview");
+      const [photoFile] = electricityFiles();
+      expect(thumbnail).toHaveAttribute(
+        "src",
+        `/api/households/${flat().id}/attachments/${photoFile?.id}/thumbnail`
+      );
+      expect(thumbnail).toHaveAttribute("loading", "lazy");
+      expect(thumbnail).toHaveAttribute("alt", "");
+      expect(within(photo).queryByTestId("file-icon")).not.toBeInTheDocument();
+      expect(within(pdf).getByTestId("file-icon")).toBeInTheDocument();
+      expect(within(pdf).queryByTestId("file-preview")).not.toBeInTheDocument();
+      // The previews add no names: each row still has one Open button.
+      expect(
+        within(screen.getByRole("region", { name: "Files" }))
+          .getAllByRole("button")
+          .map((button) => button.getAttribute("aria-label"))
+          .filter((name) => name?.startsWith("Open"))
+      ).toEqual(["Open File 1", "Open File 2"]);
+      expect(downloads.value).toBe(0);
+      await expectNoAxeViolations(document.body, {
+        rules: { "landmark-unique": { enabled: false } },
+      });
+    });
+
+    it("keeps the icon of an image without a thumbnail", async () => {
+      // As for an image the backend couldn't decode.
+      const [photoFile] = electricityFiles();
+      if (photoFile) {
+        photoFile.hasThumbnail = false;
+      }
+      renderExpense(expenseId("Electricity"));
+
+      const [photo] = await fileRows();
+      expect(within(photo).getByTestId("file-icon")).toBeInTheDocument();
+      expect(
+        within(photo).queryByTestId("file-preview")
+      ).not.toBeInTheDocument();
+    });
+
+    it("falls back to the icon when a thumbnail fails to load", async () => {
+      renderExpense(expenseId("Electricity"));
+
+      const [photo] = await fileRows();
+      fireEvent.error(within(photo).getByTestId("file-preview"));
+
+      expect(within(photo).getByTestId("file-icon")).toBeInTheDocument();
+      expect(
+        within(photo).queryByTestId("file-preview")
+      ).not.toBeInTheDocument();
+      expect(plain(photo.textContent)).toBe("File 1JPEG image · 1.8 MBOpen");
+      expect(
+        within(photo).getByRole("button", { name: "Open File 1" })
+      ).toBeEnabled();
     });
 
     it("shows no files section when nothing is attached", async () => {
@@ -417,6 +493,7 @@ describe("ExpensePage", () => {
       db.state.attachments.push({
         id: crypto.randomUUID(),
         householdId: cabin,
+        hasThumbnail: true,
         mimeType: "image/png",
         sizeBytes: 1000,
         uploadedById: db.userByEmail("ewa@example.com")?.id ?? "",

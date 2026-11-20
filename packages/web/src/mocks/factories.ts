@@ -1,9 +1,10 @@
-import type {
-  AttachmentMimeType,
-  CurrencyCode,
-  ExpenseAllocationInput,
-  ExpenseCategory,
-  HouseholdFeatures,
+import {
+  type AttachmentMimeType,
+  type CurrencyCode,
+  type ExpenseAllocationInput,
+  type ExpenseCategory,
+  type HouseholdFeatures,
+  isImageType,
 } from "@homesplit/contracts";
 import type { HouseholdRole } from "@/lib/api/auth-client";
 import { toIsoDate } from "@/lib/dates";
@@ -243,7 +244,7 @@ export class MockFactory {
     return expense;
   }
 
-  /** A file uploaded by `uploadedBy` and linked to `expense`. */
+  /** A file uploaded by `uploadedBy` and linked to `expense`. Images have a thumbnail. */
   attachment(
     expense: MockExpense,
     input: Ago & {
@@ -256,6 +257,7 @@ export class MockFactory {
     const attachment = {
       id: this.id(),
       householdId: expense.householdId,
+      hasThumbnail: isImageType(input.mimeType),
       mimeType: input.mimeType,
       sizeBytes: input.sizeBytes,
       uploadedById: input.uploadedBy.id,

@@ -651,6 +651,7 @@ describe("application routes", () => {
         householdId: flat().params.householdId,
         mimeType: "application/pdf",
         sizeBytes: 8,
+        hasThumbnail: false,
         uploadedBy: { id: alice.id },
       },
     });
@@ -694,6 +695,7 @@ describe("application routes", () => {
       const row = {
         id: crypto.randomUUID(),
         householdId: household,
+        hasThumbnail: true,
         mimeType: "image/png" as const,
         sizeBytes: 10,
         uploadedById: db.state.users[0]?.id ?? "",
@@ -726,7 +728,7 @@ describe("application routes", () => {
       id: added.id,
       mimeType: "image/png",
       sizeBytes: 10,
-      hasThumbnail: false,
+      hasThumbnail: true,
     });
     await expect(
       api("listExpenseAttachments", expense("Pizza night"))
@@ -736,7 +738,7 @@ describe("application routes", () => {
           id: added.id,
           mimeType: "image/png",
           sizeBytes: 10,
-          hasThumbnail: false,
+          hasThumbnail: true,
         },
       ],
     });
@@ -779,6 +781,52 @@ describe("application routes", () => {
       )
     ).toBe(false);
     expect(db.state.attachments.some(({ id }) => id === photo?.id)).toBe(true);
+  });
+
+  it("serve image thumbnails like the backend, as the content its redirect leads to", async () => {
+    signInAs("Alice");
+    const thumbnail = (attachmentId: string, household = flat()) =>
+      fetch(
+        new URL(
+          buildPath(endpoints.getAttachmentThumbnail, {
+            ...household.params,
+            attachmentId,
+          }),
+          BASE_URL
+        )
+      );
+    const electricity = db.state.expenses.find(
+      ({ name }) => name === "Electricity"
+    );
+    const [photo, pdf] = db.state.expenseAttachments
+      .filter(({ expenseId }) => expenseId === electricity?.id)
+      .map(({ attachmentId }) => attachmentId);
+
+    const seeded = await thumbnail(photo ?? "");
+    expect(seeded.status).toBe(200);
+    expect(seeded.headers.get("Content-Type")).toBe("image/svg+xml");
+    expect(await seeded.text()).toContain("Sample receipt");
+
+    const form = new FormData();
+    const png = new File(["\x89PNG fake"], "photo.png", { type: "image/png" });
+    form.append(ATTACHMENT_UPLOAD_FIELD, png);
+    const uploaded = await fetch(
+      new URL(buildPath(endpoints.uploadAttachment, flat().params), BASE_URL),
+      { method: "POST", body: form }
+    ).then((response) => response.json());
+    expect(uploaded).toMatchObject({
+      mimeType: "image/png",
+      hasThumbnail: true,
+    });
+    const own = await thumbnail(uploaded.id);
+    expect(own.status).toBe(200);
+    expect(own.headers.get("Content-Type")).toBe("image/png");
+    expect(await own.text()).toBe(await png.text());
+
+    expect(await (await thumbnail(pdf ?? "")).json()).toMatchObject({
+      code: "NOT_FOUND",
+    });
+    expect((await thumbnail(photo ?? "", cabin())).status).toBe(404);
   });
 
   it("only lets the author or an admin+ change files, and only while expenses are on", async () => {

@@ -297,7 +297,7 @@ function UploadRow({ item, actions }: UploadRowProps) {
   const percent = Math.round(item.progress * 100);
   return (
     <li className="flex items-center gap-3 rounded-lg border p-2">
-      <Preview item={item} />
+      <FilePreview size={48} src={item.previewUrl} type={item.type} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <p className="truncate text-sm font-medium">{file.name}</p>
         {status === "rejected" || status === "failed" ? (
@@ -344,26 +344,41 @@ const STATUS_LABELS: Record<
   canceled: () => "Canceled",
 };
 
-/** The image itself, or an icon for files the browser can't show, such as PDFs and HEIC outside Safari. */
-function Preview({ item }: { item: UploadItem }) {
+/** Pixel sizes of a preview, as Tailwind classes. */
+const PREVIEW_SIZES = { 40: "size-10", 48: "size-12" } as const;
+
+/**
+ * An image from `src`, or the icon for `type` when there's no `src` or it
+ * fails to load, such as a HEIC outside Safari.
+ */
+export function FilePreview({
+  size,
+  src,
+  type,
+}: {
+  size: keyof typeof PREVIEW_SIZES;
+  src: string | null;
+  type: AttachmentMimeType | null;
+}) {
   const [broken, setBroken] = useState(false);
-  const box = "size-12 shrink-0 rounded-md";
-  if (item.previewUrl && !broken) {
+  const box = cn("shrink-0 rounded-md", PREVIEW_SIZES[size]);
+  if (src && !broken) {
     return (
-      // biome-ignore lint/performance/noImgElement: next/image can't optimize a local object URL.
+      // biome-ignore lint/performance/noImgElement: next/image can't optimize object URLs or redirects to signed URLs.
       // biome-ignore lint/a11y/noNoninteractiveElementInteractions: `onError` is a load failure, not user input.
       <img
         alt=""
         className={cn(box, "object-cover")}
         data-testid="file-preview"
-        height={48}
+        height={size}
+        loading="lazy"
         onError={() => setBroken(true)}
-        src={item.previewUrl}
-        width={48}
+        src={src}
+        width={size}
       />
     );
   }
-  const Icon = fileIcon(item.type);
+  const Icon = fileIcon(type);
   return (
     <div
       className={cn(box, "bg-muted flex items-center justify-center")}
@@ -375,7 +390,7 @@ function Preview({ item }: { item: UploadItem }) {
 }
 
 /** The icon for a file of `type`: a document for PDFs, a picture for images. */
-export function fileIcon(type: AttachmentMimeType | null): LucideIcon {
+function fileIcon(type: AttachmentMimeType | null): LucideIcon {
   if (type === "application/pdf") {
     return FileTextIcon;
   }
