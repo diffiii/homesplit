@@ -130,7 +130,7 @@ function NoMatches() {
   );
 }
 
-function ExpenseRow({ expense }: { expense: Expense }) {
+export function ExpenseRow({ expense }: { expense: Expense }) {
   const { household, userId } = useHousehold();
   // The detail page links back to the list with the same filters.
   const search = useSearchParams().toString();
