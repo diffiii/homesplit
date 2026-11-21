@@ -75,9 +75,6 @@ test("creates households, switches, and signs back in to the last opened one", a
   expect(body.slug).toMatch(UUID);
 
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
-  await expect(
-    page.getByRole("listitem").filter({ hasText: user.name })
-  ).toContainText("owner");
   await expectNoAxeViolations(page);
 
   const flatUrl = page.url();

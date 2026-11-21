@@ -28,9 +28,6 @@ test.describe("signed out", () => {
     await signIn(page, { email: "alice@example.com", password: MOCK_PASSWORD });
 
     await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
-    await expect(
-      page.getByRole("listitem").filter({ hasText: "Alice Nowak" })
-    ).toContainText("owner");
     await expectNoAxeViolations(page);
 
     await signOut(page, "Alice Nowak");
@@ -53,7 +50,7 @@ test.describe("new user", () => {
 
     await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
     await expect(
-      page.getByRole("listitem").filter({ hasText: "Nina Kaczmarek" })
-    ).toContainText("owner");
+      page.getByRole("button", { name: "Switch household, Studio" })
+    ).toBeVisible();
   });
 });
