@@ -348,7 +348,16 @@ describe("advanced previewShares", () => {
   it.each([
     ["percentages short of 100%", "percentage", { percentage: { [A]: "50" } }],
     ["exact amounts short of the total", "exact", { exact: { [A]: "10" } }],
-    ["a negative share", "adjustment", { adjustment: { [A]: "200" } }],
+    [
+      "a negative share",
+      "adjustment",
+      { adjustment: { [A]: "120", [B]: "-10", [C]: "-10" } },
+    ],
+    [
+      "adjustments over the amount",
+      "adjustment",
+      { adjustment: { [A]: "130" } },
+    ],
     ["shares that don't parse", "shares", { shares: { [A]: "1.5" } }],
   ] as const)("shows nothing for %s", (_, method, typed) => {
     expect(
@@ -444,7 +453,9 @@ describe("running checks", () => {
       splitCheck(
         advanced({
           method: "adjustment",
-          splits: splits({ adjustment: { [A]: "130" } }),
+          splits: splits({
+            adjustment: { [A]: "120", [B]: "-10", [C]: "-10" },
+          }),
         }),
         nameOf
       )
@@ -461,6 +472,31 @@ describe("running checks", () => {
         nameOf
       )?.text.replace(/\s/gu, " ")
     ).toBe("PLN 90.00 is split equally before adjustments.");
+  });
+
+  it("keep adjustments within the amount", () => {
+    const check = (adjustment: Record<string, string>) =>
+      splitCheck(
+        advanced({
+          amount: "2",
+          participantIds: [A, B],
+          method: "adjustment",
+          splits: splits({ adjustment }),
+        }),
+        nameOf
+      )?.text.replace(/\s/gu, " ");
+    expect(check({ [A]: "3", [B]: "1" })).toBe(
+      "The adjustments add up to more than the amount."
+    );
+    expect(check({ [A]: "-3", [B]: "-1" })).toBe(
+      "Alice's adjustment takes away more than the amount."
+    );
+    expect(check({ [A]: "-3", [B]: "-3" })).toBe(
+      "Alice's and Bartek's adjustments take away more than the amount."
+    );
+    expect(check({ [A]: "-2", [B]: "0" })).toBe(
+      "PLN 4.00 is split equally before adjustments."
+    );
   });
 
   it("have nothing to check for an equal split", () => {
@@ -552,7 +588,9 @@ describe("advanced validateExpense", () => {
       validateExpense(
         advanced({
           method: "adjustment",
-          splits: splits({ adjustment: { [A]: "130" } }),
+          splits: splits({
+            adjustment: { [A]: "120", [B]: "-10", [C]: "-10" },
+          }),
         }),
         A
       )?.fields
@@ -562,6 +600,28 @@ describe("advanced validateExpense", () => {
     });
   });
 
+  it("keeps adjustments within the amount", () => {
+    const form = (adjustment: Record<string, string>) =>
+      advanced({
+        amount: "2",
+        participantIds: [A, B],
+        method: "adjustment",
+        splits: splits({ adjustment }),
+      });
+    expect(validateExpense(form({ [A]: "3", [B]: "1" }), A)?.fields).toEqual({
+      participantIds: "The adjustments add up to more than the amount.",
+    });
+    expect(validateExpense(form({ [A]: "-3", [B]: "-1" }), A)?.fields).toEqual({
+      [`splits.adjustment.${A}`]:
+        "An adjustment can't take away more than the amount.",
+    });
+    const same = form({ [A]: "-2", [B]: "0" });
+    expect(validateExpense(same, A)).toBeUndefined();
+    expect(previewShares(same)?.map(({ amountCents }) => amountCents)).toEqual([
+      0, 200,
+    ]);
+  });
+
   it("checks each list even while a row in the other doesn't parse", () => {
     expect(
       validateExpense(
@@ -569,7 +629,9 @@ describe("advanced validateExpense", () => {
           payerIds: [A, B],
           payerAmounts: { [A]: "90", [B]: "abc" },
           method: "adjustment",
-          splits: splits({ adjustment: { [A]: "130" } }),
+          splits: splits({
+            adjustment: { [A]: "120", [B]: "-10", [C]: "-10" },
+          }),
         }),
         A
       )?.fields

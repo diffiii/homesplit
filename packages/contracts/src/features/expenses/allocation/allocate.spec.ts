@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { MAX_AMOUNT_CENTS, MAX_SHARES } from "../../../common/money";
+import { CreateExpenseRequest } from "..";
 import { type AllocatedSplit, allocate } from "./allocate";
 import { AllocationError, type AllocationErrorCode } from "./allocation-error";
 import type { ExpenseAllocationInput } from "./input";
@@ -168,16 +169,16 @@ describe("allocate", () => {
       expect(byUser(splits)).toEqual({ [A]: 417, [B]: 267, [C]: 316 });
     });
 
-    it("supports adjustments that exceed the total", () => {
-      // Base 100 - 120 = -20 splits into -10 each.
-      const splits = allocate(100, {
+    it("allows adjustments down to minus the total", () => {
+      // The same split as -300 and -100, which go below minus the total.
+      const splits = allocate(200, {
         method: "adjustment",
         participants: [
-          { userId: A, adjustmentCents: 60 },
-          { userId: B, adjustmentCents: 60 },
+          { userId: A, adjustmentCents: -200 },
+          { userId: B, adjustmentCents: 0 },
         ],
       });
-      expect(byUser(splits)).toEqual({ [A]: 50, [B]: 50 });
+      expect(byUser(splits)).toEqual({ [A]: 0, [B]: 200 });
     });
 
     it("allows an adjustment that brings a share to exactly zero", () => {
@@ -336,15 +337,43 @@ describe("allocate", () => {
       );
     });
 
+    it("rejects an adjustment below minus the total", () => {
+      expectCode(
+        () =>
+          allocate(200, {
+            method: "adjustment",
+            participants: [
+              { userId: A, adjustmentCents: -300 },
+              { userId: B, adjustmentCents: -100 },
+            ],
+          }),
+        "INVALID_AMOUNT"
+      );
+    });
+
+    it("rejects adjustments that add up to more than the total", () => {
+      expectCode(
+        () =>
+          allocate(200, {
+            method: "adjustment",
+            participants: [
+              { userId: A, adjustmentCents: 300 },
+              { userId: B, adjustmentCents: 100 },
+            ],
+          }),
+        "ADJUSTMENT_SUM_EXCEEDS_TOTAL"
+      );
+    });
+
     it("rejects adjustments that leave a share negative", () => {
-      // Before rounding, B's share is 201 / 2 - 101 = -0.5.
+      // Before rounding, B's share is 101 / 2 - 51 = -0.5.
       expectCode(
         () =>
           allocate(100, {
             method: "adjustment",
             participants: [
-              { userId: A, adjustmentCents: 0 },
-              { userId: B, adjustmentCents: -101 },
+              { userId: A, adjustmentCents: 50 },
+              { userId: B, adjustmentCents: -51 },
             ],
           }),
         "NEGATIVE_SHARE"
@@ -352,8 +381,8 @@ describe("allocate", () => {
     });
 
     it("rejects a share negative before rounding, whoever gets the leftover unit", () => {
-      // Base 1 - 2 = -1 splits into -0.5 each before rounding.
-      for (const [zero, two] of [
+      // Base 1 splits into 0.5 each before rounding, so -1 leaves -0.5.
+      for (const [minus, plus] of [
         [A, B],
         [B, A],
       ]) {
@@ -362,13 +391,42 @@ describe("allocate", () => {
             allocate(1, {
               method: "adjustment",
               participants: [
-                { userId: zero, adjustmentCents: 0 },
-                { userId: two, adjustmentCents: 2 },
+                { userId: minus, adjustmentCents: -1 },
+                { userId: plus, adjustmentCents: 1 },
               ],
             }),
           "NEGATIVE_SHARE"
         );
       }
     });
+  });
+});
+
+describe("CreateExpenseRequest and allocate", () => {
+  it.each([
+    [300, 100, false],
+    [-300, -100, false],
+    [-200, 0, true],
+  ])("agree on adjustments %i and %i on 200", (a, b, valid) => {
+    const allocation: ExpenseAllocationInput = {
+      method: "adjustment",
+      participants: [
+        { userId: A, adjustmentCents: a },
+        { userId: B, adjustmentCents: b },
+      ],
+    };
+    const request = {
+      name: "Snack",
+      expenseDate: "2026-11-22",
+      total: { amountCents: 200, currency: "PLN" },
+      payers: [{ userId: A, amountCents: 200 }],
+      allocation,
+    };
+    expect(CreateExpenseRequest.safeParse(request).success).toBe(valid);
+    if (valid) {
+      expect(byUser(allocate(200, allocation))).toEqual({ [A]: 0, [B]: 200 });
+    } else {
+      expect(() => allocate(200, allocation)).toThrow(AllocationError);
+    }
   });
 });

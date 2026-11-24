@@ -104,7 +104,23 @@ function validateFinancialSpec(
       break;
     case "adjustment": {
       const { participants } = allocation;
+      participants.forEach((p, index) => {
+        if (p.adjustmentCents < -total) {
+          ctx.addIssue({
+            code: "custom",
+            message: "An adjustment can't take away more than the total",
+            path: [...participantsPath, index, "adjustmentCents"],
+          });
+        }
+      });
       const adjustmentsSum = sum(participants.map((p) => p.adjustmentCents));
+      if (adjustmentsSum > total) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Adjustments must add up to at most the total",
+          path: participantsPath,
+        });
+      }
       const baseShare = (total - adjustmentsSum) / participants.length;
       participants.forEach((p, index) => {
         if (baseShare + p.adjustmentCents < 0) {

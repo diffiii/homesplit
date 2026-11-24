@@ -99,12 +99,18 @@ function splitWithAdjustments(
     readInteger(
       p.userId,
       p.adjustmentCents,
-      -MAX_AMOUNT_CENTS,
+      -toSafeInteger(total),
       MAX_AMOUNT_CENTS,
       "INVALID_AMOUNT"
     )
   );
   const residual = total - sum(adjustments);
+  if (residual < 0n) {
+    throw new AllocationError(
+      "ADJUSTMENT_SUM_EXCEEDS_TOTAL",
+      "Adjustments must add up to at most the total"
+    );
+  }
   const floorBase = floorDiv(residual, BigInt(participants.length));
 
   adjustments.forEach((adjustment, i) => {

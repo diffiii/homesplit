@@ -23,7 +23,7 @@ Each expense and settlement has one currency, and its payers, allocation amounts
 
 | Constant | Value | Applies to |
 | --- | --- | --- |
-| `MAX_AMOUNT_CENTS` | 10^12 | Expense totals, payer amounts, exact allocation amounts, and payments recorded with `POST /settlements` (at most `MAX_AMOUNT_CENTS`); adjustments (between minus and plus `MAX_AMOUNT_CENTS`) |
+| `MAX_AMOUNT_CENTS` | 10^12 | Expense totals, payer amounts, exact allocation amounts, and payments recorded with `POST /settlements` (at most `MAX_AMOUNT_CENTS`); adjustments (between minus and plus the expense total) |
 | `MAX_SHARES` | 1,000,000 | Shares held by one participant in a `shares` split |
 | `FULL_PERCENTAGE_BASIS_POINTS` | 10,000 | Percentage splits, which add up to exactly this |
 
@@ -50,7 +50,7 @@ The tie-breaker depends only on the keys, so reordering the inputs never changes
 - **`percentage`:** the weights are basis points, adding up to 10,000.
 - **`shares`:** the weights are shares.
 - **`exact`:** the amounts are used as given and must add up to the total.
-- **`adjustment`:** the total minus the sum of adjustments is split equally, and then each adjustment is added. Nobody's share may be negative before rounding: `(total − sum of adjustments) / participants + adjustment ≥ 0` for every participant. Checking before rounding means the leftover units never decide whether an input is valid, so validity doesn't depend on user IDs.
+- **`adjustment`:** the total minus the sum of adjustments is split equally, and then each adjustment is added. Nobody's share may be negative before rounding: `(total − sum of adjustments) / participants + adjustment ≥ 0` for every participant. Checking before rounding means the leftover units never decide whether an input is valid, so validity doesn't depend on user IDs. No adjustment may be below minus the total, and the adjustments may add up to at most the total, so the equally split part is never negative. Together they keep every adjustment within plus or minus the total, and every split can still be entered: each person's share minus the largest share is a valid set of adjustments. Expenses saved before these two rules keep their adjustments until someone edits them; the edit form then asks for adjustments that follow them.
 
 Amounts that are fractions before rounding, such as receipt items split by shares (#56), express each person's amount as a weight over a common denominator and round once with `distributeProportionally`.
 

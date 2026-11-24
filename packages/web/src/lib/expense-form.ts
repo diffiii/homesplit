@@ -449,9 +449,8 @@ const nameList = new Intl.ListFormat("en", { type: "conjunction" });
 
 /**
  * How the inputs for the chosen method add up: percentages left to 100%,
- * exact amounts left to the total, shares in all, or who an adjustment
- * leaves with a negative share. `null` for an equal split or while there's
- * nothing to check.
+ * exact amounts left to the total, shares in all, or what's wrong with the
+ * adjustments. `null` for an equal split or while there's nothing to check.
  */
 export function splitCheck(
   values: ExpenseFormValues,
@@ -490,9 +489,23 @@ export function splitCheck(
   if (method === "exact") {
     return remainderCheck(total, sumOf(numbers), money, "the amount");
   }
+  const below = ids.filter((_, i) => numbers[i] < -total);
+  if (below.length > 0) {
+    const owners = nameList.format(below.map((id) => `${nameOf(id)}'s`));
+    return {
+      ok: false,
+      text: `${owners} ${below.length === 1 ? "adjustment takes" : "adjustments take"} away more than the amount.`,
+    };
+  }
+  const rest = total - sumOf(numbers);
+  if (rest < 0) {
+    return {
+      ok: false,
+      text: "The adjustments add up to more than the amount.",
+    };
+  }
   // As `CreateExpenseRequest` checks it, before rounding:
   // (total − adjustments) / people + adjustment ≥ 0.
-  const rest = total - sumOf(numbers);
   const negative = ids.filter((_, i) => rest + numbers[i] * ids.length < 0);
   if (negative.length > 0) {
     return {
@@ -586,6 +599,8 @@ function clientMessage(
         return "Percentages must add up to 100%.";
       case "exact":
         return "Amounts must add up to the amount.";
+      case "adjustment":
+        return "The adjustments add up to more than the amount.";
       default:
         return "Pick at least one person to split it with.";
     }
@@ -597,11 +612,17 @@ function clientMessage(
       return "Enter a whole number from 1 to 1,000,000.";
     case "amountCents":
       return "That amount is too large.";
-    default:
-      // The negative-share check is the one custom issue on an adjustment.
-      return code === "custom"
-        ? "This would leave them a negative share."
-        : "That adjustment is too large.";
+    default: {
+      if (code !== "custom") {
+        return "That adjustment is too large.";
+      }
+      const participant = request.allocation.participants[third];
+      return participant &&
+        "adjustmentCents" in participant &&
+        participant.adjustmentCents < -request.total.amountCents
+        ? "An adjustment can't take away more than the amount."
+        : "This would leave them a negative share.";
+    }
   }
 }
 
