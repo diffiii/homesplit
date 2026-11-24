@@ -8,6 +8,7 @@ import { and, eq } from "drizzle-orm";
 import { db, type Transaction } from "@/db";
 import { attachments, expenseAttachments } from "@/db/schema";
 import { attachmentsConfig } from "@/features/attachments/attachments.config";
+import { unknownAttachment } from "@/features/attachments/household-attachment";
 import type { HouseholdContext } from "@/features/households/access/household.guard";
 import { AppError, notFound } from "@/http/app-error";
 import {
@@ -44,9 +45,7 @@ async function lockAttachmentForLink(
     )
     .for("key share");
   if (!row) {
-    throw new AppError(400, "INVALID_REFERENCE", "Invalid reference", {
-      issues: [{ path: ["attachmentId"], message: "Unknown attachment" }],
-    });
+    throw unknownAttachment();
   }
   return toAttachmentSummary(row);
 }

@@ -5,6 +5,7 @@ import { expenseEndpoints } from "./expenses";
 import { householdEndpoints } from "./households";
 import { invitationEndpoints } from "./invitations";
 import { meEndpoints } from "./me";
+import { receiptEndpoints } from "./receipts";
 import { shoppingEndpoints } from "./shopping";
 
 export * from "./endpoint";
@@ -19,6 +20,7 @@ export const endpoints = {
   ...invitationEndpoints,
   ...expenseEndpoints,
   ...attachmentEndpoints,
+  ...receiptEndpoints,
   ...choreEndpoints,
   ...shoppingEndpoints,
   ...meEndpoints,

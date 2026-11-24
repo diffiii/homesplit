@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import type { Executor } from "@/db";
 import { expenseCategories } from "@/db/schema";
-import { AppError } from "@/http/app-error";
+import { invalidReference } from "@/http/app-error";
 
 /**
  * Rejects a category that isn't this household's. A missing category and one
@@ -25,8 +25,6 @@ export async function assertCategoryInHousehold(
     )
     .limit(1);
   if (!row) {
-    throw new AppError(400, "INVALID_REFERENCE", "Invalid reference", {
-      issues: [{ path, message: "Unknown category" }],
-    });
+    throw invalidReference([{ path, message: "Unknown category" }]);
   }
 }

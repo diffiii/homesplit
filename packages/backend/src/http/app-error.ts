@@ -25,5 +25,15 @@ export const forbidden = (): AppError =>
 export const moduleDisabled = (module: string): AppError =>
   new AppError(403, "MODULE_DISABLED", "Module disabled", { module });
 
+/** One `{ path, message }` per request field that names a missing or foreign row. */
+export interface ReferenceIssue {
+  message: string;
+  path: (string | number)[];
+}
+
+/** 400 for IDs that don't name one of the household's rows. */
+export const invalidReference = (issues: ReferenceIssue[]): AppError =>
+  new AppError(400, "INVALID_REFERENCE", "Invalid reference", { issues });
+
 export const emptyPatch = (): AppError =>
   new AppError(400, "EMPTY_PATCH", "Patch body has no fields");

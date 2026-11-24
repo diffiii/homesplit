@@ -3,9 +3,9 @@ import { eq, sql } from "drizzle-orm";
 import type { z } from "zod";
 import { db } from "@/db";
 import { aiUsage, householdFeatures } from "@/db/schema";
-import { AppError, moduleDisabled } from "@/http/app-error";
+import { moduleDisabled } from "@/http/app-error";
 import { aiConfig } from "./ai.config";
-import { AiClient, type AiRequest } from "./ai-client";
+import { AiClient, type AiRequest, aiError } from "./ai-client";
 
 @Injectable()
 export class AiService {
@@ -36,7 +36,7 @@ export class AiService {
   private async availableClient(householdId: string): Promise<AiClient> {
     await assertAiEnabled(householdId);
     if (!this.client) {
-      throw new AppError(503, "AI_UNAVAILABLE", "AI is not configured");
+      throw aiError(503, "AI_UNAVAILABLE", "AI is not configured");
     }
     return this.client;
   }
@@ -82,11 +82,9 @@ async function consumeRequest(
     const resetsAt = new Date(
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)
     );
-    throw new AppError(
-      429,
-      "AI_LIMIT_EXCEEDED",
-      "Daily AI request limit reached",
-      { limit, resetsAt: resetsAt.toISOString() }
-    );
+    throw aiError(429, "AI_LIMIT_EXCEEDED", "Daily AI request limit reached", {
+      limit,
+      resetsAt: resetsAt.toISOString(),
+    });
   }
 }
