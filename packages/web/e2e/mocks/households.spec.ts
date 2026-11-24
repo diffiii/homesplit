@@ -45,9 +45,10 @@ test("switches from every household screen and remembers the last household", as
     await expect(
       page.getByRole("button", { name: "Switch household, Lake cabin" })
     ).toBeVisible();
-    await expect(
-      page.getByRole("listitem").filter({ hasText: "Ewa Zielińska" })
-    ).toBeVisible();
+    // Alice's share of the cabin rental.
+    await expect(page.getByRole("region", { name: "Money" })).toContainText(
+      "EUR 320.00"
+    );
   }
 
   const cabinUrl = page.url();
@@ -85,9 +86,6 @@ test("creates from the switcher and can reopen a cleared dialog", async ({
   await expect(
     page.getByRole("button", { name: "Switch household, Studio" })
   ).toBeVisible();
-  await expect(
-    page.getByRole("listitem").filter({ hasText: "Alice Nowak" })
-  ).toContainText("owner");
   const studioUrl = page.url();
   await page.goto("/");
   await expect(page).toHaveURL(studioUrl);

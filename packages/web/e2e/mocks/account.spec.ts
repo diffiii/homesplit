@@ -26,9 +26,13 @@ test("renames the user everywhere and remembers the theme", async ({
 
   await page.getByRole("link", { name: "Back" }).click();
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
   await expect(
-    page.getByRole("listitem").filter({ hasText: "Alicja Nowak" })
-  ).toContainText("owner");
+    page
+      .getByRole("region", { name: "Members" })
+      .getByRole("listitem")
+      .filter({ hasText: "Alicja Nowak" })
+  ).toContainText("Owner");
   await page.reload();
   await expect(page.locator("html")).toHaveClass(DARK);
 });

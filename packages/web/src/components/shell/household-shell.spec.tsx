@@ -87,14 +87,6 @@ describe("HouseholdShell", () => {
       await screen.findByText("owner, 3 members, Dawid left")
     ).toBeVisible();
     expect(
-      screen.getAllByRole("listitem").map((item) => item.textContent)
-    ).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining("Alice Nowak"),
-        expect.stringContaining("Celina Wiśniewska"),
-      ])
-    );
-    expect(
       requests.filter(
         (request) =>
           request.endsWith("/get-full-organization") ||
