@@ -1,3 +1,4 @@
+import type { AiErrorCode } from "@homesplit/contracts";
 import type { z } from "zod";
 import { AppError } from "@/http/app-error";
 
@@ -25,11 +26,22 @@ export abstract class AiClient {
   ): Promise<z.output<T>>;
 }
 
+/**
+ * Every error the AI layer throws goes through here, so its code is one of
+ * `AI_ERROR_CODES`, which features such as receipts store as they are.
+ */
+export const aiError = (
+  status: number,
+  code: AiErrorCode,
+  message: string,
+  details?: unknown
+): AppError => new AppError(status, code, message, details);
+
 export const aiProviderError = (): AppError =>
-  new AppError(502, "AI_PROVIDER_ERROR", "AI provider request failed");
+  aiError(502, "AI_PROVIDER_ERROR", "AI provider request failed");
 
 export const aiInvalidOutput = (): AppError =>
-  new AppError(502, "AI_INVALID_OUTPUT", "AI provider returned invalid output");
+  aiError(502, "AI_INVALID_OUTPUT", "AI provider returned invalid output");
 
 export const aiTimeout = (): AppError =>
-  new AppError(504, "AI_TIMEOUT", "AI provider timed out");
+  aiError(504, "AI_TIMEOUT", "AI provider timed out");

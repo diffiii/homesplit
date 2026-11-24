@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadAiConfig } from "./ai.config";
+import { loadAiConfig, longestRequestMs } from "./ai.config";
 
 const COMPLETE = {
   AI_BASE_URL: "https://openrouter.ai/api/v1",
@@ -29,6 +29,19 @@ describe("loadAiConfig", () => {
       expect(loadAiConfig({ ...COMPLETE, [name]: "" }).provider).toBeNull();
     }
   );
+
+  it("bounds a request by the timeout, retries included", () => {
+    expect(
+      longestRequestMs(
+        loadAiConfig({
+          ...COMPLETE,
+          AI_TIMEOUT_MS: "600000",
+          AI_MAX_RETRIES: "5",
+        })
+      )
+    ).toBe(600_000);
+    expect(longestRequestMs(loadAiConfig({}))).toBe(0);
+  });
 
   it("uses the fake only when asked to", () => {
     expect(loadAiConfig({ AI_DRIVER: "fake" }).fake).toBe(true);

@@ -14,6 +14,7 @@ import { db } from "@/db";
 import {
   attachments,
   expenseAttachments,
+  receipts,
   storageObjectDeletions,
 } from "@/db/schema";
 import { ObjectStorage } from "@/storage/object-storage";
@@ -21,8 +22,7 @@ import { attachmentsConfig } from "./attachments.config";
 
 /**
  * Conditions that keep an attachment alive, each a `NOT EXISTS` over a table
- * that references it: expense links, and receipts once #55 adds its condition
- * here.
+ * that references it: expense links and receipts.
  */
 const UNREFERENCED: SQL[] = [
   notExists(
@@ -30,6 +30,12 @@ const UNREFERENCED: SQL[] = [
       .select({ one: sql`1` })
       .from(expenseAttachments)
       .where(eq(expenseAttachments.attachmentId, attachments.id))
+  ),
+  notExists(
+    db
+      .select({ one: sql`1` })
+      .from(receipts)
+      .where(eq(receipts.attachmentId, attachments.id))
   ),
 ];
 

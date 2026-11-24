@@ -1,7 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import type { Executor } from "@/db";
 import { householdMembershipHistory, member } from "@/db/schema";
-import { AppError } from "@/http/app-error";
+import { invalidReference } from "@/http/app-error";
 
 /** A user ID from the request and where it appeared, for `details.issues`. */
 export interface UserReference {
@@ -43,8 +43,6 @@ export async function assertUsersEligible(
     .filter((ref) => !eligible.has(ref.userId))
     .map(({ path }) => ({ path, message: "Unknown or ineligible user" }));
   if (issues.length > 0) {
-    throw new AppError(400, "INVALID_REFERENCE", "Invalid reference", {
-      issues,
-    });
+    throw invalidReference(issues);
   }
 }
