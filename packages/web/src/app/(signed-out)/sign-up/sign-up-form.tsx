@@ -6,16 +6,12 @@ import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { z } from "zod";
 import { useAppForm } from "@/components/form";
+import { LegalLinks } from "@/components/legal-links";
 import { ResendVerification } from "@/components/resend-verification";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useRedirectIfSignedIn } from "@/hooks/use-redirect-if-signed-in";
 import { account } from "@/lib/api/auth-client";
-import {
-  PRIVACY_PATH,
-  safeRedirectPath,
-  signInUrl,
-  TERMS_PATH,
-} from "@/lib/api/session";
+import { safeRedirectPath, signInUrl } from "@/lib/api/session";
 import {
   applyAuthErrors,
   MAX_PASSWORD_LENGTH,
@@ -130,23 +126,6 @@ export function SignUpForm() {
           </form.AppField>
           <form.FormError />
           <form.SubmitButton size="lg">Create account</form.SubmitButton>
-          <p className="text-muted-foreground text-sm">
-            Read the{" "}
-            <Link
-              className="text-foreground underline underline-offset-4"
-              href={TERMS_PATH}
-            >
-              terms
-            </Link>{" "}
-            and the{" "}
-            <Link
-              className="text-foreground underline underline-offset-4"
-              href={PRIVACY_PATH}
-            >
-              privacy policy
-            </Link>
-            .
-          </p>
         </form.Form>
       </form.AppForm>
       <p className="text-muted-foreground text-center text-sm">
@@ -158,6 +137,10 @@ export function SignUpForm() {
           Sign in
         </Link>
       </p>
+      {/* Until the consent wording is written with the legal text. */}
+      <div className="flex justify-center">
+        <LegalLinks />
+      </div>
     </>
   );
 }

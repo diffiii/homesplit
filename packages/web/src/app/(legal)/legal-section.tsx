@@ -1,10 +1,10 @@
 import { InfoIcon } from "lucide-react";
-import type { ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 /**
- * Says the page is a draft. Remove it once the text is written; writing it
- * is outside #134, which only adds the pages and their sections.
+ * Says the page is a draft; the legal layout shows it above every page.
+ * Remove it once the text is written; writing it is outside #134, which only
+ * adds the pages and their sections.
  */
 export function DraftNotice() {
   return (
@@ -20,16 +20,15 @@ export function DraftNotice() {
 }
 
 /**
- * One section of a legal page. `covers` says what its text must cover, and
- * shows in place of the text until it's written.
+ * A placeholder for one section of a legal page: its title, and what its
+ * text must cover. The PR that writes the text decides how a real section
+ * looks.
  */
 export function LegalSection({
   id,
   title,
   covers,
-  children,
 }: {
-  children?: ReactNode;
   covers: string;
   id: string;
   title: string;
@@ -39,11 +38,9 @@ export function LegalSection({
       <h2 className="text-lg font-medium" id={id}>
         {title}
       </h2>
-      {children ?? (
-        <p className="text-muted-foreground leading-relaxed">
-          To be written: {covers}
-        </p>
-      )}
+      <p className="text-muted-foreground leading-relaxed">
+        To be written: {covers}
+      </p>
     </section>
   );
 }

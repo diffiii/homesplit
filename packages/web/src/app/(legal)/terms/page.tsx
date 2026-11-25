@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/page-header";
 import { TERMS_PATH } from "@/lib/api/session";
-import { DraftNotice, LegalSection } from "../legal-section";
+import { LegalSection } from "../legal-section";
 
 export const metadata: Metadata = {
   title: "Terms · HomeSplit",
@@ -13,7 +13,6 @@ export default function TermsPage() {
   return (
     <>
       <PageHeader description="The rules for using HomeSplit." title="Terms" />
-      <DraftNotice />
       <LegalSection
         covers="what HomeSplit is for, who may use it, and that it records what members agree they owe each other but doesn't move money."
         id="use-heading"
