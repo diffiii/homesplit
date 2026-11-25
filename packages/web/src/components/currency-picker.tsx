@@ -26,6 +26,7 @@ interface CurrencyPickerProps {
   id?: string;
   onBlur?: () => void;
   onValueChange: (code: string) => void;
+  /** A currency code, or `""` for none picked yet. */
   value: string;
 }
 
@@ -60,7 +61,8 @@ export function CurrencyPicker({
           onValueChange(code);
         }
       }}
-      value={value}
+      // An empty value, such as a receipt's unread currency, picks none.
+      value={value || null}
     >
       <ComboboxInput
         aria-invalid={invalid}

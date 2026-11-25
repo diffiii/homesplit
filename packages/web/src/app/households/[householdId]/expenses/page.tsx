@@ -1,7 +1,7 @@
 "use client";
 
 import type { Expense, UserSummary } from "@homesplit/contracts";
-import { PlusIcon, ScaleIcon } from "lucide-react";
+import { PlusIcon, ScaleIcon, ScanLineIcon } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
@@ -12,7 +12,11 @@ import {
   useHouseholdId,
   useWaitingPayments,
 } from "@/components/shell/household-context";
-import { balancesPath, householdPath } from "@/components/shell/household-nav";
+import {
+  balancesPath,
+  householdPath,
+  receiptsPath,
+} from "@/components/shell/household-nav";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { parseExpenseFilters } from "@/lib/expenses";
@@ -64,6 +68,13 @@ export default function ExpensesPage() {
                   </Badge>
                 </>
               ) : null}
+            </Link>
+            <Link
+              className={buttonVariants({ variant: "outline" })}
+              href={receiptsPath(householdId)}
+            >
+              <ScanLineIcon aria-hidden data-icon="inline-start" />
+              Receipts
             </Link>
             {enabled ? <NewExpenseLink householdId={householdId} /> : null}
           </>

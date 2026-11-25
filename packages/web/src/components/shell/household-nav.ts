@@ -52,6 +52,15 @@ export function balancesPath(householdId: string): string {
   return `${householdPath(householdId, "expenses")}/balances`;
 }
 
+/** Scanned receipts that aren't expenses yet, which belong to the expenses section. */
+export function receiptsPath(householdId: string): string {
+  return `${householdPath(householdId, "expenses")}/receipts`;
+}
+
+export function receiptPath(householdId: string, receiptId: string): string {
+  return `${receiptsPath(householdId)}/${receiptId}`;
+}
+
 /** The overview matches only itself; other sections also match their sub-pages. */
 export function isActive(
   pathname: string,

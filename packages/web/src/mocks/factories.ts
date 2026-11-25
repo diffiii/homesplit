@@ -15,6 +15,8 @@ import type {
   MockHousehold,
   MockInvitation,
   MockMember,
+  MockReceipt,
+  MockReceiptItem,
   MockSettlement,
   MockShoppingItem,
   MockState,
@@ -74,6 +76,7 @@ export function emptyState(): MockState {
     expenses: [],
     attachments: [],
     expenseAttachments: [],
+    receipts: [],
     settlements: [],
     chores: [],
     shoppingItems: [],
@@ -271,6 +274,57 @@ export class MockFactory {
       createdAt,
     });
     return attachment;
+  }
+
+  /**
+   * A receipt scanned by `scannedBy` from a photo, `ready` with `items`
+   * unless `failureCode` makes it `failed` with nothing read.
+   */
+  receipt(
+    household: MockHousehold,
+    input: Ago & {
+      currency?: CurrencyCode;
+      discountCents?: number;
+      failureCode?: MockReceipt["failureCode"];
+      items?: Omit<MockReceiptItem, "id" | "position">[];
+      merchant?: string;
+      scannedBy: MockUser;
+      totalCents?: number;
+    }
+  ): MockReceipt {
+    const createdAt = this.time(input);
+    const attachment = {
+      id: this.id(),
+      householdId: household.id,
+      mimeType: "image/jpeg" as const,
+      sizeBytes: 1_258_291,
+      uploadedById: input.scannedBy.id,
+      createdAt,
+    };
+    this.state.attachments.push(attachment);
+    const failed = input.failureCode !== undefined;
+    const receipt: MockReceipt = {
+      id: this.id(),
+      householdId: household.id,
+      attachmentId: attachment.id,
+      status: failed ? "failed" : "ready",
+      failureCode: input.failureCode ?? null,
+      merchant: failed ? null : (input.merchant ?? null),
+      purchasedOn: failed ? null : this.date(input),
+      currency: failed ? null : (input.currency ?? "PLN"),
+      totalCents: failed ? null : (input.totalCents ?? null),
+      discountCents: input.discountCents ?? 0,
+      items: (input.items ?? []).map((item, position) => ({
+        ...item,
+        id: this.id(),
+        position,
+      })),
+      createdById: input.scannedBy.id,
+      createdAt,
+      updatedAt: createdAt,
+    };
+    this.state.receipts.push(receipt);
+    return receipt;
   }
 
   settlement(
