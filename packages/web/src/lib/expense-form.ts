@@ -1,6 +1,8 @@
 import {
+  type AdjustmentProblemReason,
   type AllocatedSplit,
   AllocationError,
+  adjustmentProblems,
   allocate,
   CreateExpenseRequest,
   type Expense,
@@ -489,7 +491,12 @@ export function splitCheck(
   if (method === "exact") {
     return remainderCheck(total, sumOf(numbers), money, "the amount");
   }
-  const below = ids.filter((_, i) => numbers[i] < -total);
+  const problems = adjustmentProblems(total, numbers);
+  const whose = (reason: "below_total" | "negative_share") =>
+    problems.flatMap((p) =>
+      "index" in p && p.reason === reason ? [ids[p.index]] : []
+    );
+  const below = whose("below_total");
   if (below.length > 0) {
     const owners = nameList.format(below.map((id) => `${nameOf(id)}'s`));
     return {
@@ -497,16 +504,13 @@ export function splitCheck(
       text: `${owners} ${below.length === 1 ? "adjustment takes" : "adjustments take"} away more than the amount.`,
     };
   }
-  const rest = total - sumOf(numbers);
-  if (rest < 0) {
+  if (problems.some((p) => p.reason === "sum_over_total")) {
     return {
       ok: false,
       text: "The adjustments add up to more than the amount.",
     };
   }
-  // As `CreateExpenseRequest` checks it, before rounding:
-  // (total − adjustments) / people + adjustment ≥ 0.
-  const negative = ids.filter((_, i) => rest + numbers[i] * ids.length < 0);
+  const negative = whose("negative_share");
   if (negative.length > 0) {
     return {
       ok: false,
@@ -515,7 +519,7 @@ export function splitCheck(
   }
   return {
     ok: true,
-    text: `${money(rest)} is split equally before adjustments.`,
+    text: `${money(total - sumOf(numbers))} is split equally before adjustments.`,
   };
 }
 
@@ -563,7 +567,13 @@ export function fieldForPath(
 
 /** What to tell the user about an input `CreateExpenseRequest` rejected. */
 function clientMessage(
-  { path, code }: { code: string; path: readonly PropertyKey[] },
+  {
+    path,
+    params,
+  }: {
+    path: readonly PropertyKey[];
+    params?: { reason?: AdjustmentProblemReason };
+  },
   values: ExpenseFormValues,
   request: CreateExpenseRequest
 ): string {
@@ -612,17 +622,16 @@ function clientMessage(
       return "Enter a whole number from 1 to 1,000,000.";
     case "amountCents":
       return "That amount is too large.";
-    default: {
-      if (code !== "custom") {
-        return "That adjustment is too large.";
-      }
-      const participant = request.allocation.participants[third];
-      return participant &&
-        "adjustmentCents" in participant &&
-        participant.adjustmentCents < -request.total.amountCents
-        ? "An adjustment can't take away more than the amount."
-        : "This would leave them a negative share.";
-    }
+    default:
+      break;
+  }
+  switch (params?.reason) {
+    case "below_total":
+      return "An adjustment can't take away more than the amount.";
+    case "negative_share":
+      return "This would leave them a negative share.";
+    default:
+      return "That adjustment is too large.";
   }
 }
 

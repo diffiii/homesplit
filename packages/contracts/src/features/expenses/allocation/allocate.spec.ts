@@ -430,3 +430,28 @@ describe("CreateExpenseRequest and allocate", () => {
     }
   });
 });
+
+describe("CreateExpenseRequest", () => {
+  it("tags each adjustment issue with its reason", () => {
+    const issues = CreateExpenseRequest.safeParse({
+      name: "Snack",
+      expenseDate: "2026-11-22",
+      total: { amountCents: 100, currency: "PLN" },
+      payers: [{ userId: A, amountCents: 100 }],
+      allocation: {
+        method: "adjustment",
+        participants: [
+          { userId: A, adjustmentCents: 130 },
+          { userId: B, adjustmentCents: 0 },
+          { userId: C, adjustmentCents: 0 },
+        ],
+      },
+    }).error?.issues;
+    expect(issues).toEqual([
+      expect.objectContaining({
+        path: ["allocation", "participants"],
+        params: { reason: "sum_over_total" },
+      }),
+    ]);
+  });
+});

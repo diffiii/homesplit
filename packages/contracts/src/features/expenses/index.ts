@@ -13,6 +13,10 @@ import { Pagination, paginatedResponse } from "../../common/pagination";
 import { AttachmentSummary } from "../attachments";
 import { UserSummary } from "../users";
 import {
+  type AdjustmentProblemReason,
+  adjustmentProblems,
+} from "./allocation/adjustment-problems";
+import {
   ExpenseAllocationInput,
   FULL_PERCENTAGE_BASIS_POINTS,
 } from "./allocation/input";
@@ -56,6 +60,13 @@ function addDuplicateUserIssues(
     seen.add(entry.userId);
   });
 }
+
+/** Each adjustment issue carries its reason as `params.reason`. */
+const adjustmentMessages: Record<AdjustmentProblemReason, string> = {
+  below_total: "An adjustment can't take away more than the total",
+  sum_over_total: "Adjustments must add up to at most the total",
+  negative_share: "Adjustment results in a negative share",
+};
 
 function validateFinancialSpec(
   spec: ExpenseFinancialFields,
@@ -103,34 +114,21 @@ function validateFinancialSpec(
       }
       break;
     case "adjustment": {
-      const { participants } = allocation;
-      participants.forEach((p, index) => {
-        if (p.adjustmentCents < -total) {
-          ctx.addIssue({
-            code: "custom",
-            message: "An adjustment can't take away more than the total",
-            path: [...participantsPath, index, "adjustmentCents"],
-          });
-        }
-      });
-      const adjustmentsSum = sum(participants.map((p) => p.adjustmentCents));
-      if (adjustmentsSum > total) {
+      const problems = adjustmentProblems(
+        total,
+        allocation.participants.map((p) => p.adjustmentCents)
+      );
+      for (const problem of problems) {
         ctx.addIssue({
           code: "custom",
-          message: "Adjustments must add up to at most the total",
-          path: participantsPath,
+          message: adjustmentMessages[problem.reason],
+          path:
+            "index" in problem
+              ? [...participantsPath, problem.index, "adjustmentCents"]
+              : participantsPath,
+          params: { reason: problem.reason },
         });
       }
-      const baseShare = (total - adjustmentsSum) / participants.length;
-      participants.forEach((p, index) => {
-        if (baseShare + p.adjustmentCents < 0) {
-          ctx.addIssue({
-            code: "custom",
-            message: "Adjustment results in a negative share",
-            path: [...participantsPath, index, "adjustmentCents"],
-          });
-        }
-      });
       break;
     }
     default:

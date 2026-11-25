@@ -1,7 +1,11 @@
-import { distributeProportionally, floorDiv } from "../../../common/distribute";
+import { distributeProportionally } from "../../../common/distribute";
 import type { Id } from "../../../common/id";
 import { MAX_AMOUNT_CENTS, MAX_SHARES } from "../../../common/money";
 import { toSafeInteger } from "../../../common/safe-integer";
+import {
+  type AdjustmentProblem,
+  adjustmentProblems,
+} from "./adjustment-problems";
 import { AllocationError } from "./allocation-error";
 import {
   type ExpenseAllocationInput,
@@ -91,6 +95,33 @@ function useExactAmounts(
   return amounts;
 }
 
+function adjustmentError(
+  problem: AdjustmentProblem,
+  participants: ParticipantsOf<"adjustment">
+): AllocationError {
+  switch (problem.reason) {
+    case "below_total":
+      return new AllocationError(
+        "INVALID_AMOUNT",
+        `Participant ${participants[problem.index].userId}'s adjustment is below minus the total`
+      );
+    case "sum_over_total":
+      return new AllocationError(
+        "ADJUSTMENT_SUM_EXCEEDS_TOTAL",
+        "Adjustments must add up to at most the total"
+      );
+    case "negative_share":
+      return new AllocationError(
+        "NEGATIVE_SHARE",
+        `Participant ${participants[problem.index].userId} would get a negative share`
+      );
+    default: {
+      const unknown: never = problem;
+      throw new Error(`Unknown problem: ${JSON.stringify(unknown)}`);
+    }
+  }
+}
+
 function splitWithAdjustments(
   total: bigint,
   participants: ParticipantsOf<"adjustment">
@@ -99,30 +130,19 @@ function splitWithAdjustments(
     readInteger(
       p.userId,
       p.adjustmentCents,
-      -toSafeInteger(total),
+      -MAX_AMOUNT_CENTS,
       MAX_AMOUNT_CENTS,
       "INVALID_AMOUNT"
     )
   );
-  const residual = total - sum(adjustments);
-  if (residual < 0n) {
-    throw new AllocationError(
-      "ADJUSTMENT_SUM_EXCEEDS_TOTAL",
-      "Adjustments must add up to at most the total"
-    );
+  const [problem] = adjustmentProblems(
+    toSafeInteger(total),
+    participants.map((p) => p.adjustmentCents)
+  );
+  if (problem) {
+    throw adjustmentError(problem, participants);
   }
-  const floorBase = floorDiv(residual, BigInt(participants.length));
-
-  adjustments.forEach((adjustment, i) => {
-    if (floorBase + adjustment < 0n) {
-      throw new AllocationError(
-        "NEGATIVE_SHARE",
-        `Participant ${participants[i].userId} would get a negative share`
-      );
-    }
-  });
-
-  return splitEqually(residual, participants).map(
+  return splitEqually(total - sum(adjustments), participants).map(
     (amount, i) => amount + adjustments[i]
   );
 }

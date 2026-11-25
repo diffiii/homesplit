@@ -497,6 +497,19 @@ describe("running checks", () => {
     expect(check({ [A]: "-2", [B]: "0" })).toBe(
       "PLN 4.00 is split equally before adjustments."
     );
+    // Only the sum, though it leaves Bartek and Celina -10 each.
+    expect(
+      splitCheck(
+        advanced({
+          method: "adjustment",
+          splits: splits({ adjustment: { [A]: "130" } }),
+        }),
+        nameOf
+      )
+    ).toEqual({
+      ok: false,
+      text: "The adjustments add up to more than the amount.",
+    });
   });
 
   it("have nothing to check for an equal split", () => {
@@ -614,6 +627,17 @@ describe("advanced validateExpense", () => {
     expect(validateExpense(form({ [A]: "-3", [B]: "-1" }), A)?.fields).toEqual({
       [`splits.adjustment.${A}`]:
         "An adjustment can't take away more than the amount.",
+    });
+    expect(
+      validateExpense(
+        advanced({
+          method: "adjustment",
+          splits: splits({ adjustment: { [A]: "130" } }),
+        }),
+        A
+      )?.fields
+    ).toEqual({
+      participantIds: "The adjustments add up to more than the amount.",
     });
     const same = form({ [A]: "-2", [B]: "0" });
     expect(validateExpense(same, A)).toBeUndefined();
