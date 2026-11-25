@@ -1,6 +1,10 @@
 "use client";
 
-import type { AttachmentSummary, Expense } from "@homesplit/contracts";
+import {
+  type AttachmentSummary,
+  type Expense,
+  isImageType,
+} from "@homesplit/contracts";
 import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLinkIcon, Trash2Icon } from "lucide-react";
 import { useRef, useState } from "react";
@@ -22,7 +26,6 @@ import { api } from "@/lib/api/client";
 import { errorMessage } from "@/lib/api/error-message";
 import { invalidate } from "@/lib/api/queries";
 import { queryKeys } from "@/lib/api/query-keys";
-import { isImageType } from "@/lib/attachments";
 import { describeFile, FileViewer, type ListedFile } from "./file-viewer";
 
 /**

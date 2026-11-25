@@ -1,6 +1,6 @@
 import {
+  type ApiEndpointName,
   type Endpoint,
-  type EndpointName,
   type Endpoints,
   endpoints,
   type FeatureId,
@@ -75,9 +75,12 @@ export interface MockRoute<E extends Endpoint> {
   resolve: (request: MockRequest<E>) => ResponseBody<E>;
 }
 
-/** Mock implementations by endpoint name. A route left out answers 501 and logs an error. */
+/**
+ * Mock implementations by endpoint name. A route left out, or a 302 route
+ * (`ApiEndpointName` leaves those out), answers 501 and logs an error.
+ */
 export type MockRoutes = {
-  [N in EndpointName]?: MockRoute<Endpoints[N]>;
+  [N in ApiEndpointName]?: MockRoute<Endpoints[N]>;
 };
 
 /** Simulated network conditions for the application routes, switchable on `/dev/mocks`. */
@@ -116,7 +119,7 @@ export function createApiHandlers(
   network: () => MockNetwork = () => ({ ...DEFAULT_NETWORK, latency: "none" })
 ): HttpHandler[] {
   const handlers = Object.entries(endpoints).map(([name, endpoint]) => {
-    const route = routes[name as EndpointName] as AnyRoute | undefined;
+    const route = routes[name as ApiEndpointName] as AnyRoute | undefined;
     const method = endpoint.method.toLowerCase() as Lowercase<
       Endpoint["method"]
     >;

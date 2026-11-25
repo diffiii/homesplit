@@ -4,17 +4,30 @@ import { IsoDateTime } from "../../common/datetime";
 import { Id } from "../../common/id";
 import { UserSummary } from "../users";
 
-/** File types an attachment may have, detected from the file's content. */
-export const ATTACHMENT_MIME_TYPES = [
+/** Image types an attachment may have. The backend makes a thumbnail of each. */
+export const ATTACHMENT_IMAGE_TYPES = [
   "image/jpeg",
   "image/png",
   "image/webp",
   "image/heic",
+] as const;
+export type AttachmentImageType = (typeof ATTACHMENT_IMAGE_TYPES)[number];
+
+/** File types an attachment may have, detected from the file's content. */
+export const ATTACHMENT_MIME_TYPES = [
+  ...ATTACHMENT_IMAGE_TYPES,
   "application/pdf",
 ] as const;
 
 export const AttachmentMimeType = z.enum(ATTACHMENT_MIME_TYPES);
 export type AttachmentMimeType = z.infer<typeof AttachmentMimeType>;
+
+/** Whether `type` is an image. A browser may not show HEIC in an `<img>`. */
+export function isImageType(
+  type: AttachmentMimeType | null
+): type is AttachmentImageType {
+  return ATTACHMENT_IMAGE_TYPES.some((image) => image === type);
+}
 
 /**
  * Largest upload when the backend's `ATTACHMENT_MAX_BYTES` isn't set: 10 MiB.

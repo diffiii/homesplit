@@ -1,18 +1,15 @@
 import {
-  ATTACHMENT_MIME_TYPES,
+  ATTACHMENT_IMAGE_TYPES,
   AttachmentMimeType,
+  isImageType,
 } from "@homesplit/contracts";
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { and, asc, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments } from "@/db/schema";
 import { ObjectStorage } from "@/storage/object-storage";
 import { discardObject } from "./discard-object";
 import { encodeThumbnail, THUMBNAIL_MIME_TYPE } from "./thumbnail-image";
-
-const IMAGE_TYPES: readonly AttachmentMimeType[] = ATTACHMENT_MIME_TYPES.filter(
-  (type) => type !== "application/pdf"
-);
 
 /** Small, since a decoded 48 MP HEIC alone takes about 190 MB. */
 const BACKFILL_BATCH_SIZE = 10;
@@ -56,7 +53,7 @@ export class AttachmentThumbnailsService {
     content: Buffer,
     mimeType: AttachmentMimeType
   ): Promise<string | null> {
-    if (!IMAGE_TYPES.includes(mimeType)) {
+    if (!isImageType(mimeType)) {
       return null;
     }
     const key = thumbnailStorageKey(householdId, attachmentId);
@@ -76,63 +73,51 @@ export class AttachmentThumbnailsService {
   /**
    * Makes thumbnails for images stored without one, such as those uploaded
    * before thumbnails existed. Safe to repeat and to run alongside uploads
-   * and cleanup.
+   * and cleanup. Pages by ID, so an image that keeps failing doesn't stop the
+   * rest, and makes one at a time to bound memory.
    */
-  backfill(): Promise<ThumbnailBackfillResult> {
-    return this.backfillAfter(undefined, {
+  async backfill(): Promise<ThumbnailBackfillResult> {
+    const result: ThumbnailBackfillResult = {
       generated: 0,
       undecodable: 0,
       failed: 0,
-    });
-  }
-
-  /** Keyset pages by ID, so an image that keeps failing doesn't stop the rest. */
-  private async backfillAfter(
-    after: string | undefined,
-    result: ThumbnailBackfillResult
-  ): Promise<ThumbnailBackfillResult> {
-    const batch = await db
-      .select({
-        id: attachments.id,
-        householdId: attachments.householdId,
-        storageKey: attachments.storageKey,
-        mimeType: attachments.mimeType,
-      })
-      .from(attachments)
-      .where(
-        and(
-          isNull(attachments.thumbnailStorageKey),
-          inArray(attachments.mimeType, IMAGE_TYPES),
-          after === undefined ? undefined : gt(attachments.id, after)
+    };
+    let after: string | undefined;
+    let batch: ImageRow[];
+    do {
+      // biome-ignore lint/performance/noAwaitInLoops: each page starts after the previous one
+      batch = await db
+        .select({
+          id: attachments.id,
+          householdId: attachments.householdId,
+          storageKey: attachments.storageKey,
+          mimeType: attachments.mimeType,
+        })
+        .from(attachments)
+        .where(
+          and(
+            isNull(attachments.thumbnailStorageKey),
+            inArray(attachments.mimeType, ATTACHMENT_IMAGE_TYPES),
+            after === undefined ? undefined : gt(attachments.id, after)
+          )
         )
-      )
-      .orderBy(asc(attachments.id))
-      .limit(BACKFILL_BATCH_SIZE);
-    await this.backfillEach(batch, result);
-    const last = batch.at(-1);
-    return batch.length === BACKFILL_BATCH_SIZE && last
-      ? this.backfillAfter(last.id, result)
-      : result;
-  }
-
-  /** One image at a time, to bound memory. */
-  private async backfillEach(
-    [row, ...rest]: ImageRow[],
-    result: ThumbnailBackfillResult
-  ): Promise<void> {
-    if (!row) {
-      return;
-    }
-    const outcome = await this.backfillOne(row).catch((error: unknown) => {
-      this.logger.warn(
-        `Couldn't make a thumbnail for attachment ${row.id}: ${String(error)}`
-      );
-      return "failed" as const;
-    });
-    if (outcome !== "deleted") {
-      result[outcome] += 1;
-    }
-    await this.backfillEach(rest, result);
+        .orderBy(asc(attachments.id))
+        .limit(BACKFILL_BATCH_SIZE);
+      for (const row of batch) {
+        // biome-ignore lint/performance/noAwaitInLoops: one image at a time, to bound memory
+        const outcome = await this.backfillOne(row).catch((error: unknown) => {
+          this.logger.warn(
+            `Couldn't make a thumbnail for attachment ${row.id}: ${String(error)}`
+          );
+          return "failed" as const;
+        });
+        if (outcome !== "deleted") {
+          result[outcome] += 1;
+        }
+      }
+      after = batch.at(-1)?.id;
+    } while (batch.length === BACKFILL_BATCH_SIZE);
+    return result;
   }
 
   private async backfillOne(
@@ -167,22 +152,14 @@ export class AttachmentThumbnailsService {
   }
 
   /**
-   * Sets the key unless the row is gone. A concurrent run may have set the
-   * same key already.
+   * Sets the key unless the row is gone. The key only depends on the row, so
+   * a concurrent run can only have set the same one.
    */
   private async link(attachmentId: string, key: string): Promise<boolean> {
     const updated = await db
       .update(attachments)
       .set({ thumbnailStorageKey: key })
-      .where(
-        and(
-          eq(attachments.id, attachmentId),
-          or(
-            isNull(attachments.thumbnailStorageKey),
-            eq(attachments.thumbnailStorageKey, key)
-          )
-        )
-      )
+      .where(eq(attachments.id, attachmentId))
       .returning({ id: attachments.id });
     return updated.length > 0;
   }

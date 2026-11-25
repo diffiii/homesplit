@@ -2,7 +2,10 @@ import type { z } from "zod";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
-/** A 302 is for paths a browser loads directly, such as an `<img src>`, not for `api()`. */
+/**
+ * A 302 is for paths a browser loads directly, such as an `<img src>`, so
+ * `ApiEndpointName` leaves it out.
+ */
 type EndpointResult =
   | { readonly status: 200 | 201; readonly response: z.ZodType }
   | { readonly status: 204 | 302; readonly response: null };
