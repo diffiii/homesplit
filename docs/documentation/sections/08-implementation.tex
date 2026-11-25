@@ -25,7 +25,17 @@ Pięć metod podziału różni się tylko sposobem wyznaczania wag:
   \item \textbf{z~korektami} - od kwoty wydatku odejmowana jest suma korekt, resztę dzieli się równo, a~następnie do udziału każdego uczestnika dodaje się jego korektę.
 \end{itemize}
 
-\zpitodo{Opisać sprawdzanie, czy w~metodzie z~korektami żaden udział nie wychodzi poniżej zera, po wprowadzeniu poprawki tego podziału.}
+W~metodzie z~korektami uczestnik $i$ ma korektę $c_i$, a~jego udział przed zaokrągleniem wynosi $(T - C)/k + c_i$, gdzie $C = \sum_j c_j$. Korekty muszą spełniać trzy warunki:
+
+\begin{enumerate}
+  \item żadna korekta nie jest mniejsza niż $-T$;
+  \item suma korekt nie przekracza kwoty wydatku ($C \le T$), więc dzielona równo reszta $T - C$ nie jest ujemna;
+  \item żaden udział nie jest ujemny przed zaokrągleniem: $(T - C)/k + c_i \ge 0$ dla każdego uczestnika.
+\end{enumerate}
+
+Trzeci warunek sprawdzany jest przed zaokrągleniem, więc o~poprawności korekt nigdy nie decyduje to, kto otrzyma dodatkowy grosz, a~tym samym nie zależy ona od identyfikatorów uczestników. Aby uniknąć dzielenia, porównywana jest równoważna postać $T - C + k c_i \ge 0$, obliczana na typie \texttt{bigint}. Dwa pierwsze warunki ograniczają każdą korektę do przedziału od $-T$ do $T$, a~mimo to pozwalają wprowadzić każdy podział: wystarczy przyjąć jako korekty różnice między udziałem każdej osoby a~największym udziałem. Przykładowo przy kwocie 2,00~zł korekty $-3{,}00$~zł i~$-1{,}00$~zł są odrzucane, a~ten sam podział (0,00~zł i~2,00~zł) dają korekty $-2{,}00$~zł i~0,00~zł.
+
+Wszystkie trzy warunki sprawdza jedna funkcja \texttt{adjustmentProblems} z~pakietu \texttt{contracts}, która zwraca listę naruszeń wraz z~ich przyczyną. Korzystają z~niej schemat walidacji żądania (serwer odpowiada wtedy kodem 400), silnik podziału oraz formularz wydatku, który na bieżąco wyświetla komunikat pod listą uczestników. Gdy nie jest spełniony któryś z~dwóch pierwszych warunków, ujemne udziały nie są zgłaszane, ponieważ ujemna reszta $T - C$ obniżyłaby poniżej zera także udziały osób o~poprawnych korektach. Wydatki zapisane przed wprowadzeniem tych ograniczeń zachowują swoje korekty i~udziały do czasu edycji, a~formularz edycji wymaga wtedy poprawnych wartości.
 
 Silnik podziału znajduje się w~pakiecie \texttt{contracts}. Serwer wylicza nim udziały przy każdym zapisie wydatku i~nigdy nie przyjmuje ich od klienta, a~formularz wydatku korzysta z~niego do podglądu podziału przed zapisem. Z~tego samego kodu korzystają atrapy API używane w~testach interfejsu.
 
