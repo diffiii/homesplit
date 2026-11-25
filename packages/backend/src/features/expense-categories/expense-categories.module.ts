@@ -9,6 +9,6 @@ import { ExpenseCategoriesService } from "./expense-categories.service";
   imports: [AiModule, StorageModule],
   controllers: [ExpenseCategoriesController],
   providers: [ExpenseCategoriesService, CategorySuggestionsService],
-  exports: [ExpenseCategoriesService, CategorySuggestionsService],
+  exports: [ExpenseCategoriesService],
 })
 export class ExpenseCategoriesModule {}

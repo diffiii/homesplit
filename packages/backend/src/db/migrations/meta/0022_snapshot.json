@@ -1,5 +1,5 @@
 {
-  "id": "bc51f176-e3a6-496e-8053-8bfc8edab1fe",
+  "id": "9a332d9c-d7f3-423b-8049-7c3e948c6002",
   "prevId": "5cf1edde-7e22-46ed-a74c-eed01119d798",
   "version": "7",
   "dialect": "postgresql",
@@ -2777,9 +2777,17 @@
           "name": "receipt_items_quantity_positive",
           "value": "\"receipt_items\".\"quantity\" > 0"
         },
+        "receipt_items_unit_price_nonnegative": {
+          "name": "receipt_items_unit_price_nonnegative",
+          "value": "\"receipt_items\".\"unit_price_cents\" >= 0"
+        },
         "receipt_items_discount_nonnegative": {
           "name": "receipt_items_discount_nonnegative",
           "value": "\"receipt_items\".\"discount_cents\" >= 0"
+        },
+        "receipt_items_total_nonnegative": {
+          "name": "receipt_items_total_nonnegative",
+          "value": "\"receipt_items\".\"total_cents\" >= 0"
         }
       },
       "isRLSEnabled": false
@@ -2862,6 +2870,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "suggested_category_id": {
+          "name": "suggested_category_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "suggested_category_confidence": {
+          "name": "suggested_category_confidence",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_by_id": {
           "name": "created_by_id",
           "type": "uuid",
@@ -2925,6 +2945,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "receipts_suggested_category_idx": {
+          "name": "receipts_suggested_category_idx",
+          "columns": [
+            {
+              "expression": "suggested_category_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -2947,6 +2982,19 @@
           "tableTo": "expenses",
           "columnsFrom": [
             "expense_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "receipts_suggested_category_id_expense_categories_id_fk": {
+          "name": "receipts_suggested_category_id_expense_categories_id_fk",
+          "tableFrom": "receipts",
+          "tableTo": "expense_categories",
+          "columnsFrom": [
+            "suggested_category_id"
           ],
           "columnsTo": [
             "id"
@@ -3041,6 +3089,14 @@
         "receipts_expense": {
           "name": "receipts_expense",
           "value": "\"receipts\".\"expense_id\" IS NULL OR \"receipts\".\"status\" = 'confirmed'"
+        },
+        "receipts_suggested_category_confidence": {
+          "name": "receipts_suggested_category_confidence",
+          "value": "\"receipts\".\"suggested_category_confidence\" IN ('low', 'medium', 'high')"
+        },
+        "receipts_suggested_category": {
+          "name": "receipts_suggested_category",
+          "value": "\"receipts\".\"suggested_category_id\" IS NULL OR \"receipts\".\"suggested_category_confidence\" IS NOT NULL"
         }
       },
       "isRLSEnabled": false

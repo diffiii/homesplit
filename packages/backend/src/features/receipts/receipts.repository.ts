@@ -1,5 +1,6 @@
 import {
   AttachmentMimeType,
+  CategorySuggestionConfidence,
   type ListReceiptsQuery,
   type Receipt,
   ReceiptFailureCode,
@@ -25,12 +26,14 @@ import { longestRequestMs } from "@/ai/ai.config";
 import { db, type Executor, readSnapshot, type Transaction } from "@/db";
 import {
   attachments,
+  expenseCategories,
   receiptItemAssignments,
   receiptItems,
   receipts,
 } from "@/db/schema";
 import { userRole } from "@/features/users/user-projections";
 import { invalidReference, notFound } from "@/http/app-error";
+import type { ReceiptCategorySuggestion } from "./receipt-draft";
 
 /** Reading the file and writing the draft, on top of the AI call itself. */
 const EXTRACTION_MARGIN_MS = 5 * 60 * 1000;
@@ -67,6 +70,8 @@ const selectReceipts = (executor: Executor) =>
       totalCents: receipts.totalCents,
       discountCents: receipts.discountCents,
       expenseId: receipts.expenseId,
+      suggestedCategoryId: receipts.suggestedCategoryId,
+      suggestedCategoryConfidence: receipts.suggestedCategoryConfidence,
       createdBy: createdBy.summary,
       createdAt: receipts.createdAt,
       updatedAt: receipts.updatedAt,
@@ -99,6 +104,21 @@ function stateOf(row: {
   };
 }
 
+/** The scan's category, gone once the category is deleted. */
+function suggestionOf({
+  suggestedCategoryId,
+  suggestedCategoryConfidence,
+}: ReceiptRow): ReceiptCategorySuggestion | null {
+  return suggestedCategoryId === null || suggestedCategoryConfidence === null
+    ? null
+    : {
+        categoryId: suggestedCategoryId,
+        confidence: CategorySuggestionConfidence.parse(
+          suggestedCategoryConfidence
+        ),
+      };
+}
+
 function toSummary(row: ReceiptRow): ReceiptSummary {
   return {
     id: row.id,
@@ -111,6 +131,7 @@ function toSummary(row: ReceiptRow): ReceiptSummary {
     totalCents: row.totalCents === null ? null : toSafeInteger(row.totalCents),
     discountCents: toSafeInteger(row.discountCents),
     expenseId: row.expenseId,
+    suggestedCategory: suggestionOf(row),
     createdBy: row.createdBy,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -271,6 +292,8 @@ export async function startProcessing(
       status: "processing",
       failureCode: null,
       extractionId,
+      suggestedCategoryId: null,
+      suggestedCategoryConfidence: null,
       updatedAt: sql`now()`,
     })
     .where(inHousehold(householdId, receiptId));
@@ -392,12 +415,17 @@ async function writeDraft(
   tx: Transaction,
   receiptId: string,
   where: SQL | undefined,
-  { items, ...header }: UpdateReceiptRequest
+  { items, ...header }: UpdateReceiptRequest,
+  suggestion?: {
+    suggestedCategoryConfidence: string | null;
+    suggestedCategoryId: string | null;
+  }
 ): Promise<boolean> {
   const updated = await tx
     .update(receipts)
     .set({
       ...headerColumns(header),
+      ...suggestion,
       status: "ready",
       failureCode: null,
       extractionId: null,
@@ -424,15 +452,32 @@ export async function updateDraft(
   await writeDraft(tx, receiptId, inHousehold(householdId, receiptId), patch);
 }
 
-/** A finished run's draft, written only while the run still owns the receipt. */
+/**
+ * A finished run's draft and category, written only while the run still
+ * owns the receipt. The category is locked against deletion until the write
+ * commits; one deleted since the run read the list is no suggestion.
+ */
 export function saveExtractedDraft(
   receiptId: string,
   extractionId: string,
-  draft: UpdateReceiptRequest
+  draft: UpdateReceiptRequest,
+  suggestion: ReceiptCategorySuggestion | null
 ): Promise<boolean> {
-  return db.transaction((tx) =>
-    writeDraft(tx, receiptId, ownedBy(receiptId, extractionId), draft)
-  );
+  return db.transaction(async (tx) => {
+    const [category] = suggestion
+      ? await tx
+          .select({ id: expenseCategories.id })
+          .from(expenseCategories)
+          .where(eq(expenseCategories.id, suggestion.categoryId))
+          .for("key share")
+      : [];
+    return writeDraft(tx, receiptId, ownedBy(receiptId, extractionId), draft, {
+      suggestedCategoryId: category ? category.id : null,
+      suggestedCategoryConfidence: category
+        ? (suggestion?.confidence ?? null)
+        : null,
+    });
+  });
 }
 
 /** A failed run's code, written only while the run still owns the receipt. */

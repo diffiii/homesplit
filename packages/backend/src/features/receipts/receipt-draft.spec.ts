@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   fractionDigits,
   type ModelReceipt,
+  toCategorySuggestion,
   toMinorUnits,
   toReceiptDraft,
 } from "./receipt-draft";
@@ -14,6 +15,7 @@ const reply = (overrides: Partial<ModelReceipt> = {}): ModelReceipt => ({
   currency: "PLN",
   total: 12.99,
   receiptDiscount: null,
+  packagingRefunds: [],
   items: [
     {
       name: "Milk",
@@ -23,6 +25,8 @@ const reply = (overrides: Partial<ModelReceipt> = {}): ModelReceipt => ({
       total: 12.99,
     },
   ],
+  category: null,
+  categoryConfidence: null,
   ...overrides,
 });
 
@@ -139,6 +143,59 @@ describe("toReceiptDraft", () => {
     });
   });
 
+  it("adds returned deposits to the receipt's discount", () => {
+    const draft = toReceiptDraft(
+      reply({
+        total: 4.99,
+        receiptDiscount: 1,
+        packagingRefunds: [7, -1],
+        items: [
+          {
+            name: "Beer",
+            quantity: 6,
+            unitPrice: 2.5,
+            discount: null,
+            total: 15,
+          },
+        ],
+      })
+    );
+    expect(draft.discountCents).toBe(900);
+    expect(draft.items).toHaveLength(1);
+  });
+
+  it("counts a negative line listed as an item as a returned deposit", () => {
+    const draft = toReceiptDraft(
+      reply({
+        items: [
+          {
+            name: "Milk",
+            quantity: 1,
+            unitPrice: 12.99,
+            discount: null,
+            total: 12.99,
+          },
+          {
+            name: "Zwrot kaucji",
+            quantity: 1,
+            unitPrice: -0.5,
+            discount: null,
+            total: -0.5,
+          },
+        ],
+      })
+    );
+    expect(draft.items.map(({ name }) => name)).toEqual(["Milk"]);
+    expect(draft.discountCents).toBe(50);
+  });
+
+  it("caps the discount at the items' total", () => {
+    expect(
+      toReceiptDraft(reply({ receiptDiscount: 10, packagingRefunds: [7] }))
+        .discountCents
+    ).toBe(1299);
+  });
+
   it("fails a file the model says isn't a receipt", () => {
     expect(() => toReceiptDraft(reply({ isReceipt: false }))).toThrow(
       "The attachment isn't a receipt"
@@ -180,5 +237,27 @@ describe("toReceiptDraft", () => {
     expect(() => toReceiptDraft(reply(overrides))).toThrow(
       "AI provider returned invalid output"
     );
+  });
+});
+
+describe("toCategorySuggestion", () => {
+  const categories = [{ id: "groceries" }, { id: "alcohol" }];
+
+  it("maps the category's number to the household's category", () => {
+    expect(
+      toCategorySuggestion(
+        reply({ category: 2, categoryConfidence: "high" }),
+        categories
+      )
+    ).toEqual({ categoryId: "alcohol", confidence: "high" });
+  });
+
+  it.each([
+    ["no category", { category: null, categoryConfidence: null }],
+    ["a number off the list", { category: 3, categoryConfidence: "high" }],
+    ["a fraction", { category: 1.5, categoryConfidence: "high" }],
+    ["no confidence", { category: 1, categoryConfidence: null }],
+  ] as const)("suggests nothing for %s", (_case, overrides) => {
+    expect(toCategorySuggestion(reply(overrides), categories)).toBeNull();
   });
 });

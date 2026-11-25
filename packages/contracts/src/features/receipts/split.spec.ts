@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ReceiptSplitError, splitReceipt } from "./split";
+import { splitReceipt } from "./split";
 
 const A = "00000000-0000-4000-8000-00000000000a";
 const B = "00000000-0000-4000-8000-00000000000b";
@@ -133,23 +133,5 @@ describe("splitReceipt", () => {
       unassignedCents: 0,
       unassignedItemIds: [],
     });
-  });
-
-  it("rejects a user who'd get a negative amount", () => {
-    expect(() =>
-      splitReceipt(
-        [item("beer", 499, [[A, 1]]), item("deposit return", -100, [[B, 1]])],
-        0
-      )
-    ).toThrow(ReceiptSplitError);
-  });
-
-  it("allows a negative line that its assignees' other items cover", () => {
-    const result = splitReceipt(
-      [item("beer", 499, [[A, 1]]), item("deposit return", -100, [[A, 1]])],
-      0
-    );
-
-    expect(amountsOf(result)).toEqual({ [A]: 399 });
   });
 });

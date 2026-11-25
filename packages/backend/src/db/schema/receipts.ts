@@ -16,7 +16,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { attachments } from "./attachments";
 import { organization, user } from "./auth";
-import { expenses } from "./expenses";
+import { expenseCategories, expenses } from "./expenses";
 import { householdMembershipHistory } from "./households";
 
 /**
@@ -26,6 +26,8 @@ import { householdMembershipHistory } from "./households";
  * the result, so a run that a retry or a discard overtook writes nothing.
  * `expense_id` is the expense a confirmed receipt became; editing that
  * expense's amounts unlinks it, and the receipt stays `confirmed`.
+ * `suggested_category_id` is the category the scan picked, with how sure the
+ * model was; confirming uses it when that's `high`.
  */
 export const receipts = pgTable(
   "receipts",
@@ -50,6 +52,13 @@ export const receipts = pgTable(
     expenseId: uuid("expense_id").references(() => expenses.id, {
       onDelete: "set null",
     }),
+    // Picked by the scan from the household's own categories; deleting the
+    // category only drops the suggestion.
+    suggestedCategoryId: uuid("suggested_category_id").references(
+      () => expenseCategories.id,
+      { onDelete: "set null" }
+    ),
+    suggestedCategoryConfidence: text("suggested_category_confidence"),
     createdById: uuid("created_by_id")
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
@@ -96,12 +105,23 @@ export const receipts = pgTable(
       "receipts_expense",
       sql`${table.expenseId} IS NULL OR ${table.status} = 'confirmed'`
     ),
+    check(
+      "receipts_suggested_category_confidence",
+      sql`${table.suggestedCategoryConfidence} IN ('low', 'medium', 'high')`
+    ),
+    // The confidence may outlive a deleted category, never the reverse.
+    check(
+      "receipts_suggested_category",
+      sql`${table.suggestedCategoryId} IS NULL OR ${table.suggestedCategoryConfidence} IS NOT NULL`
+    ),
     // One receipt per expense; also serves the lookup from the expense.
     unique("receipts_expense_id_key").on(table.expenseId),
     // Read backward for the list order: `created_at` desc, `id` desc.
     index("receipts_list_idx").on(table.householdId, table.createdAt, table.id),
     // Serves cleanup's check for receipts of a file, and the cascade above.
     index("receipts_attachment_idx").on(table.attachmentId),
+    // Serves the `SET NULL` when a category is deleted.
+    index("receipts_suggested_category_idx").on(table.suggestedCategoryId),
   ]
 );
 
@@ -130,9 +150,15 @@ export const receiptItems = pgTable(
     check("receipt_items_position_nonnegative", sql`${table.position} >= 0`),
     check("receipt_items_quantity_positive", sql`${table.quantity} > 0`),
     check(
+      "receipt_items_unit_price_nonnegative",
+      sql`${table.unitPriceCents} >= 0`
+    ),
+    check(
       "receipt_items_discount_nonnegative",
       sql`${table.discountCents} >= 0`
     ),
+    // A returned deposit is part of the receipt's discount, never a line.
+    check("receipt_items_total_nonnegative", sql`${table.totalCents} >= 0`),
     index("receipt_items_receipt_idx").on(table.receiptId, table.position),
   ]
 );

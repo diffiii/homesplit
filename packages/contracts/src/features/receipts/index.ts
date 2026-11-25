@@ -3,14 +3,9 @@ import { z } from "zod";
 import { AI_ERROR_CODES } from "../../common/ai-errors";
 import { IsoDate, IsoDateTime } from "../../common/datetime";
 import { Id } from "../../common/id";
-import {
-  BoundedCents,
-  CurrencyCode,
-  MAX_AMOUNT_CENTS,
-  MAX_SHARES,
-} from "../../common/money";
+import { CurrencyCode, MAX_AMOUNT_CENTS, MAX_SHARES } from "../../common/money";
 import { Pagination, paginatedResponse } from "../../common/pagination";
-import { Expense } from "../expenses";
+import { CategorySuggestionConfidence, Expense } from "../expenses";
 import { UserSummary } from "../users";
 
 /**
@@ -84,17 +79,18 @@ export type ReceiptItemAssignment = z.infer<typeof ReceiptItemAssignment>;
 /**
  * One line of a receipt, amounts in the receipt's minor units. A discount
  * printed as its own line, such as "Rabat", is folded into the item it
- * reduces, so `totalCents` is the line after its discount. Unit prices and
- * totals may be negative, for a returned deposit for example.
+ * reduces, so `totalCents` is the line after its discount. Amounts are never
+ * negative: a returned deposit, such as "Zwrot kaucji", isn't an item but
+ * part of the receipt's `discountCents`.
  */
 export const ReceiptItem = z.object({
   id: Id,
   position: z.int().nonnegative(),
   name: z.string().min(1),
   quantity: z.number().positive(),
-  unitPriceCents: z.int(),
+  unitPriceCents: z.int().nonnegative(),
   discountCents: z.int().nonnegative(),
-  totalCents: z.int(),
+  totalCents: z.int().nonnegative(),
   /** Who has the item, ordered by user ID. Empty while it's unassigned. */
   assignments: z.array(ReceiptItemAssignment),
 });
@@ -111,8 +107,19 @@ const ReceiptFields = z.object({
   purchasedOn: IsoDate.nullable(),
   currency: CurrencyCode.nullable(),
   totalCents: z.int().nonnegative().nullable(),
-  /** Discounts on the whole receipt, apart from the line discounts. */
+  /**
+   * Discounts on the whole receipt, apart from the line discounts, including
+   * returned deposits.
+   */
   discountCents: z.int().nonnegative(),
+  /**
+   * The household category the scan picked for the receipt, or `null`: when
+   * none fit, AI is off, or the category was deleted. Clients preselect it
+   * only when `confidence` is `"high"`; confirming uses it the same way.
+   */
+  suggestedCategory: z
+    .object({ categoryId: Id, confidence: CategorySuggestionConfidence })
+    .nullable(),
   /**
    * The expense a confirmed receipt became, or `null`: before confirming, and
    * after the expense's amounts were edited, which unlinks the receipt.
@@ -154,9 +161,9 @@ export const ReceiptItemInput = z.object({
   id: Id.optional(),
   name: ReceiptText,
   quantity: ReceiptQuantity,
-  unitPriceCents: BoundedCents,
+  unitPriceCents: NonNegativeBoundedCents,
   discountCents: NonNegativeBoundedCents.default(0),
-  totalCents: BoundedCents,
+  totalCents: NonNegativeBoundedCents,
 });
 export type ReceiptItemInput = z.infer<typeof ReceiptItemInput>;
 
@@ -288,8 +295,8 @@ export type ReceiptSplit = z.infer<typeof ReceiptSplit>;
 /**
  * Turns a receipt into an expense. Every field is optional: the payer
  * defaults to who scanned the receipt, the name and date to its merchant and
- * purchase date, and the category to a suggestion when AI is on (`null`
- * means none). The total and the currency are the receipt's, and the splits
+ * purchase date, and the category to the scan's `suggestedCategory` when
+ * its confidence is `"high"` (`null` means none). Confirming never calls AI. The total and the currency are the receipt's, and the splits
  * are `exact`, from its assignments.
  */
 export const ConfirmReceiptRequest = z.strictObject({

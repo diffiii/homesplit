@@ -2,19 +2,6 @@ import { distributeProportionally } from "../../common/distribute";
 import type { Id } from "../../common/id";
 import { toSafeInteger } from "../../common/safe-integer";
 
-/** Why a receipt can't be split. */
-export type ReceiptSplitErrorCode = "NEGATIVE_SHARE";
-
-export class ReceiptSplitError extends Error {
-  readonly code: ReceiptSplitErrorCode;
-
-  constructor(code: ReceiptSplitErrorCode, message: string) {
-    super(message);
-    this.name = "ReceiptSplitError";
-    this.code = code;
-  }
-}
-
 /** An item as the split needs it: its cost after the line discount, and who has how many shares. */
 export interface ReceiptSplitItem {
   assignments: readonly { shares: number; userId: Id }[];
@@ -89,16 +76,6 @@ export function splitReceipt(
   const userIds = [...weights.keys()]
     .filter((key) => key !== UNASSIGNED)
     .sort();
-  for (const [key, weight] of weights) {
-    if (weight < 0n) {
-      throw new ReceiptSplitError(
-        "NEGATIVE_SHARE",
-        key === UNASSIGNED
-          ? "The unassigned items cost less than nothing"
-          : `User ${key} would get a negative amount`
-      );
-    }
-  }
 
   const amounts = new Map<string, bigint>();
   if (itemsTotal === 0n) {

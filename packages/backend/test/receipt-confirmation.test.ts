@@ -14,7 +14,6 @@ import { AiClient } from "@/ai/ai-client";
 import { FakeAiClient } from "@/ai/fake-ai-client";
 import { db } from "@/db";
 import { expenseAttachments, expenses, receipts } from "@/db/schema";
-import { SUGGEST_CATEGORY_TASK } from "@/features/expense-categories/category-suggestions.service";
 import {
   type ModelReceipt,
   SCAN_RECEIPT_TASK,
@@ -40,6 +39,7 @@ const BEER_AND_PIZZA: ModelReceipt = {
   currency: "PLN",
   total: 44.97,
   receiptDiscount: null,
+  packagingRefunds: [],
   items: [
     {
       name: "Beer",
@@ -50,6 +50,8 @@ const BEER_AND_PIZZA: ModelReceipt = {
     },
     { name: "Pizza", quantity: 1, unitPrice: 30, discount: null, total: 30 },
   ],
+  category: null,
+  categoryConfidence: null,
 };
 
 const modelItem = (name: string, total: number, quantity = 1) => ({
@@ -553,20 +555,35 @@ describe("receipt assignments and confirming", () => {
       });
     });
 
-    it("defaults the category to a confident suggestion", async () => {
+    /** The number the scan sees for the household's "Groceries" category, and its ID. */
+    async function groceries(member: Flat) {
+      const response = await member.client
+        .get(`/api/households/${member.household.id}/expense-categories`)
+        .expect(200);
+      const { items } = ExpenseCategoryListResponse.parse(response.body);
+      const index = items.findIndex(({ name }) => name === "Groceries");
+      return { number: index + 1, id: items[index]?.id ?? "" };
+    }
+
+    it("defaults the category to the scan's confident suggestion, without AI", async () => {
       const members = await flat();
       const { alice } = members;
-      const receipt = await scan(alice);
-      await assignExample(members, receipt);
-      const categories = await alice.client
-        .get(`/api/households/${alice.household.id}/expense-categories`)
-        .expect(200);
-      const { items } = ExpenseCategoryListResponse.parse(categories.body);
-      const position = items.findIndex(({ name }) => name === "Groceries") + 1;
-      fake.on(SUGGEST_CATEGORY_TASK, () => ({
-        category: position,
+      const category = await groceries(alice);
+      const receipt = await scan(alice, {
+        ...BEER_AND_PIZZA,
+        category: category.number,
+        categoryConfidence: "high",
+      });
+      expect(receipt.suggestedCategory).toEqual({
+        categoryId: category.id,
         confidence: "high",
-      }));
+      });
+      await assignExample(members, receipt);
+      const scanRequest = fake.requests.find(
+        ({ task }) => task === SCAN_RECEIPT_TASK
+      );
+      expect(JSON.stringify(scanRequest?.input)).toContain("Groceries");
+      const calls = fake.requests.length;
 
       const response = await alice.client
         .post(`${receiptPath(alice, receipt.id)}/confirm`)
@@ -574,22 +591,20 @@ describe("receipt assignments and confirming", () => {
         .expect(200);
 
       const { expense } = ConfirmReceiptResponse.parse(response.body);
-      expect(expense.category?.id).toBe(items[position - 1]?.id);
-      const suggestion = fake.requests.find(
-        ({ task }) => task === SUGGEST_CATEGORY_TASK
-      );
-      expect(JSON.stringify(suggestion?.input)).toContain("Beer, Pizza");
+      expect(expense.category?.id).toBe(category.id);
+      expect(fake.requests).toHaveLength(calls);
     });
 
     it("leaves the category empty when the suggestion isn't confident", async () => {
       const members = await flat();
       const { alice } = members;
-      const receipt = await scan(alice);
+      const category = await groceries(alice);
+      const receipt = await scan(alice, {
+        ...BEER_AND_PIZZA,
+        category: category.number,
+        categoryConfidence: "medium",
+      });
       await assignExample(members, receipt);
-      fake.on(SUGGEST_CATEGORY_TASK, () => ({
-        category: 1,
-        confidence: "low",
-      }));
 
       const response = await alice.client
         .post(`${receiptPath(alice, receipt.id)}/confirm`)
@@ -599,6 +614,68 @@ describe("receipt assignments and confirming", () => {
       expect(
         ConfirmReceiptResponse.parse(response.body).expense.category
       ).toBeNull();
+    });
+
+    it("takes the request's category over the suggestion, null included", async () => {
+      const members = await flat();
+      const { alice } = members;
+      const category = await groceries(alice);
+      const receipt = await scan(alice, {
+        ...BEER_AND_PIZZA,
+        category: category.number,
+        categoryConfidence: "high",
+      });
+      await assignExample(members, receipt);
+
+      const { expense } = await confirmed(alice, receipt.id, {
+        categoryId: null,
+      });
+
+      expect(expense.category).toBeNull();
+    });
+
+    it("drops the suggestion when its category is deleted", async () => {
+      const members = await flat();
+      const { alice } = members;
+      const category = await groceries(alice);
+      const receipt = await scan(alice, {
+        ...BEER_AND_PIZZA,
+        category: category.number,
+        categoryConfidence: "high",
+      });
+      await alice.client
+        .delete(
+          `/api/households/${alice.household.id}/expense-categories/${category.id}`
+        )
+        .expect(204);
+
+      expect((await get(alice, receipt.id)).suggestedCategory).toBeNull();
+    });
+
+    it("splits a receipt with a returned deposit", async () => {
+      const members = await flat();
+      const { alice, bob } = members;
+      // Beer 4 × 2.50 with 2.00 back for bottles, then pizza 30.00.
+      const receipt = await scan(alice, {
+        ...BEER_AND_PIZZA,
+        total: 38,
+        packagingRefunds: [2],
+        items: [modelItem("Beer", 10, 4), modelItem("Pizza", 30)],
+      });
+      expect(receipt.discountCents).toBe(200);
+      const [beer, pizza] = receipt.items;
+      await assign(alice, receipt.id, [
+        { itemId: beer?.id ?? "", assignees: equally(bob) },
+        { itemId: pizza?.id ?? "", assignees: equally(alice) },
+      ]).expect(200);
+
+      const { expense } = await confirmed(alice, receipt.id);
+
+      // The 2.00 is spread by cost: a quarter on the beer, the rest on the pizza.
+      expect(amountsBy(expense.splits)).toEqual({
+        [alice.id]: 2850,
+        [bob.id]: 950,
+      });
     });
 
     it("validates like a manual expense", async () => {

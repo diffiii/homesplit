@@ -5,13 +5,12 @@ import {
   CreateExpenseRequest,
   type Receipt,
   type ReceiptSplit,
-  ReceiptSplitError,
   type ReceiptSplitResult,
   type ReceiptStatus,
   splitReceipt,
   type UserSummary,
 } from "@homesplit/contracts";
-import { Inject, Injectable } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, type Transaction } from "@/db";
 import {
@@ -22,7 +21,6 @@ import {
   receipts,
 } from "@/db/schema";
 import { assertCategoryInHousehold } from "@/features/expense-categories/category-reference";
-import { CategorySuggestionsService } from "@/features/expense-categories/category-suggestions.service";
 import {
   createExpense,
   findExpense,
@@ -33,9 +31,6 @@ import { assertUsersEligible } from "@/features/households/access/household-acce
 import { AppError, invalidReference } from "@/http/app-error";
 import { findReceipt, inHousehold, lockReceipt } from "./receipts.repository";
 import { receiptConfirmed, receiptProcessing } from "./receipts.service";
-
-/** Longest item list sent for a category suggestion. */
-const MAX_SUGGESTION_TEXT = 2000;
 
 const conflict = (code: string, message: string, details?: unknown) =>
   new AppError(409, code, message, details);
@@ -61,29 +56,35 @@ function assertConfirmable(status: ReceiptStatus): void {
   }
 }
 
-/** `splitReceipt` over the receipt's items; a negative share answers 409. */
+/** `splitReceipt` over the receipt's items, none of them negative. */
 function calculateSplit(receipt: Receipt): ReceiptSplitResult {
-  try {
-    return splitReceipt(
-      receipt.items.map(({ id, totalCents, assignments }) => ({
-        id,
-        totalCents,
-        assignments: assignments.map(({ user, shares }) => ({
-          userId: user.id,
-          shares,
-        })),
+  return splitReceipt(
+    receipt.items.map(({ id, totalCents, assignments }) => ({
+      id,
+      totalCents,
+      assignments: assignments.map(({ user, shares }) => ({
+        userId: user.id,
+        shares,
       })),
-      receipt.discountCents
-    );
-  } catch (error) {
-    if (error instanceof ReceiptSplitError) {
-      throw conflict(
-        "RECEIPT_NEGATIVE_SHARE",
-        "Someone would get a negative amount"
-      );
-    }
-    throw error;
+    })),
+    receipt.discountCents
+  );
+}
+
+/**
+ * The request's category when it sends one, `null` included; otherwise the
+ * scan's, but only a confident one, as clients preselect it.
+ */
+function categoryOf(
+  { suggestedCategory }: Receipt,
+  { categoryId }: ConfirmReceiptRequest
+): string | null {
+  if (categoryId !== undefined) {
+    return categoryId;
   }
+  return suggestedCategory?.confidence === "high"
+    ? suggestedCategory.categoryId
+    : null;
 }
 
 function toSplit(receipt: Receipt): ReceiptSplit {
@@ -213,14 +214,6 @@ function toExpenseRequest(
 
 @Injectable()
 export class ReceiptConfirmationService {
-  private readonly suggestions: CategorySuggestionsService;
-
-  constructor(
-    @Inject(CategorySuggestionsService) suggestions: CategorySuggestionsService
-  ) {
-    this.suggestions = suggestions;
-  }
-
   /**
    * Replaces the assignments of the listed items. Items must be this
    * receipt's, and assignees current members of the household.
@@ -296,23 +289,15 @@ export class ReceiptConfirmationService {
    * Creates the expense, links the receipt's file to it, and confirms the
    * receipt, all in one transaction, so a failure at any step leaves
    * nothing behind. The expense goes through the same checks as
-   * `POST /expenses`, with the author being the caller.
+   * `POST /expenses`, with the author being the caller. It never calls AI:
+   * the category defaults to what the scan suggested.
    */
-  async confirm(
+  confirm(
     household: HouseholdContext,
     receiptId: string,
     body: ConfirmReceiptRequest
   ): Promise<ConfirmReceiptResponse> {
     const { householdId } = household;
-    // Checked before the suggestion, so a receipt that can't be confirmed
-    // never uses the AI quota.
-    const draft = await findReceipt(db, householdId, receiptId);
-    assertConfirmable(draft.status);
-    const categoryId =
-      body.categoryId === undefined
-        ? await this.suggestCategory(householdId, draft, body.name)
-        : body.categoryId;
-
     return db.transaction(async (tx) => {
       await lockHouseholdForLedgerWrite(tx, householdId);
       const { status } = await lockReceipt(tx, householdId, receiptId);
@@ -337,10 +322,12 @@ export class ReceiptConfirmationService {
         householdId,
         ready.split.amounts.map(({ userId }) => userId)
       );
+      // A suggestion is never another household's category: the scan only
+      // sends this household's, and a deleted one is already null.
       const request = toExpenseRequest(receipt, ready, {
         ...body,
         payerId,
-        categoryId,
+        categoryId: categoryOf(receipt, body),
       });
 
       const expenseId = await createExpense(tx, household, request);
@@ -359,38 +346,5 @@ export class ReceiptConfirmationService {
         expense: await findExpense(tx, householdId, expenseId),
       };
     });
-  }
-
-  /**
-   * The category `POST /expense-categories/suggestion` suggests from the
-   * expense name and the item names, used only when it's confident, as
-   * clients do. Without AI, or when it fails, the expense has no category.
-   */
-  private async suggestCategory(
-    householdId: string,
-    receipt: Receipt,
-    name: string | undefined
-  ): Promise<string | null> {
-    const expenseName = name ?? receipt.merchant;
-    const description =
-      receipt.items
-        .map((item) => item.name)
-        .join(", ")
-        .slice(0, MAX_SUGGESTION_TEXT) || null;
-    if (expenseName === null && description === null) {
-      return null;
-    }
-    try {
-      const { suggestion } = await this.suggestions.suggest(householdId, {
-        name: expenseName,
-        description,
-      });
-      return suggestion?.confidence === "high" ? suggestion.categoryId : null;
-    } catch (error) {
-      if (error instanceof AppError) {
-        return null;
-      }
-      throw error;
-    }
   }
 }

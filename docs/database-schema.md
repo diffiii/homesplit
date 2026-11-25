@@ -409,7 +409,9 @@ erDiagram
         date purchased_on "nullable"
         text currency "nullable until extracted; ISO 4217"
         bigint total_cents "nullable until extracted"
-        bigint discount_cents "Receipt-level; default 0"
+        bigint discount_cents "Receipt-level, with returned deposits; default 0"
+        uuid suggested_category_id FK "nullable; the scan's pick, SET NULL on category delete"
+        text suggested_category_confidence "nullable; low, medium, high"
         uuid expense_id FK "nullable; set on confirm, cleared when the expense's amounts change"
         uuid created_by_id FK
         timestamptz created_at
@@ -422,9 +424,9 @@ erDiagram
         integer position
         text name
         numeric quantity "numeric(12, 3), for weighed products"
-        bigint unit_price_cents
+        bigint unit_price_cents "Nonnegative"
         bigint discount_cents "Line discount; default 0"
-        bigint total_cents "After line discount"
+        bigint total_cents "After line discount; nonnegative"
     }
 
     RECEIPT_ITEM_ASSIGNMENTS {
@@ -445,6 +447,7 @@ erDiagram
 ```
 
 - Confirming a receipt creates an ordinary expense with the `exact` allocation method. Item assignments are kept on the receipt as the history of who had what, and the expense's splits remain the only source for balances.
+- Returned deposits aren't items but part of the receipt-level discount, so no item amount is negative.
 - Item costs are split by shares, receipt-level discounts are spread over items in proportion to their cost, and per-person totals are rounded once with the allocation engine's remainder rule.
 - Shopping matches from task 7.5 are request-time suggestions, not stored relations. Confirming them reuses the shopping purchase columns.
 
