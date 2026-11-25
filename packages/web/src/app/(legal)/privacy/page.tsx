@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/page-header";
 import { PRIVACY_PATH } from "@/lib/api/session";
-import { DraftNotice, LegalSection } from "../legal-section";
+import { LegalSection } from "../legal-section";
 
 export const metadata: Metadata = {
   title: "Privacy policy · HomeSplit",
@@ -22,7 +22,6 @@ export default function PrivacyPage() {
         description="What HomeSplit keeps about you, why, and who it's shared with."
         title="Privacy policy"
       />
-      <DraftNotice />
       <LegalSection
         covers="your account (name, email, password, photo, and signed-in devices), the households you're in, and what members add to them: expenses, payments, chores, shopping items, and files; who in a household can see what; and why HomeSplit keeps each."
         id="data-heading"

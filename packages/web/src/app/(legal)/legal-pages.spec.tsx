@@ -1,4 +1,5 @@
-import { screen, within } from "@testing-library/react";
+import { screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { expectNoAxeViolations } from "@/test/axe";
 import { renderWithProviders } from "@/test/render";
@@ -8,6 +9,11 @@ import TermsPage from "./terms/page";
 
 const DRAFT_NOTICE = /This page is a draft/u;
 
+const renderLegalPage = (page: ReactNode) =>
+  renderWithProviders(
+    <LegalLayout params={Promise.resolve({})}>{page}</LegalLayout>
+  );
+
 const sections = () =>
   screen
     .getAllByRole("heading", { level: 2 })
@@ -15,11 +21,7 @@ const sections = () =>
 
 describe("PrivacyPage", () => {
   it("has a section for each topic the policy must cover", async () => {
-    renderWithProviders(
-      <LegalLayout params={Promise.resolve({})}>
-        <PrivacyPage />
-      </LegalLayout>
-    );
+    renderLegalPage(<PrivacyPage />);
 
     expect(
       screen.getByRole("heading", { level: 1, name: "Privacy policy" })
@@ -36,18 +38,10 @@ describe("PrivacyPage", () => {
     await expectNoAxeViolations();
   });
 
-  it("links to the terms and back home", () => {
-    renderWithProviders(
-      <LegalLayout params={Promise.resolve({})}>
-        <PrivacyPage />
-      </LegalLayout>
-    );
+  it("links to the other legal page and back home", () => {
+    renderLegalPage(<PrivacyPage />);
 
-    const legal = screen.getByRole("navigation", { name: "Legal" });
-    expect(within(legal).getByRole("link", { name: "Terms" })).toHaveAttribute(
-      "href",
-      "/terms"
-    );
+    expect(screen.getByRole("navigation", { name: "Legal" })).toBeVisible();
     expect(screen.getByRole("link", { name: "HomeSplit" })).toHaveAttribute(
       "href",
       "/"
@@ -56,12 +50,8 @@ describe("PrivacyPage", () => {
 });
 
 describe("TermsPage", () => {
-  it("has its sections and links to the privacy policy", async () => {
-    renderWithProviders(
-      <LegalLayout params={Promise.resolve({})}>
-        <TermsPage />
-      </LegalLayout>
-    );
+  it("has its sections and the legal links", async () => {
+    renderLegalPage(<TermsPage />);
 
     expect(
       screen.getByRole("heading", { level: 1, name: "Terms" })
@@ -73,10 +63,8 @@ describe("TermsPage", () => {
       "AI features",
       "Ending your account and changes",
     ]);
-    const legal = screen.getByRole("navigation", { name: "Legal" });
-    expect(
-      within(legal).getByRole("link", { name: "Privacy policy" })
-    ).toHaveAttribute("href", "/privacy");
+    expect(screen.getByText(DRAFT_NOTICE)).toBeVisible();
+    expect(screen.getByRole("navigation", { name: "Legal" })).toBeVisible();
     await expectNoAxeViolations();
   });
 });

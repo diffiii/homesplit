@@ -1,4 +1,3 @@
-import { cn } from "cn";
 import Link from "next/link";
 import { PRIVACY_PATH, TERMS_PATH } from "@/lib/api/session";
 
@@ -9,14 +8,11 @@ const LINK =
  * The privacy policy and terms, linked from the landing page, sign-up, the
  * account page, and the legal pages themselves.
  */
-export function LegalLinks({ className }: { className?: string }) {
+export function LegalLinks() {
   return (
     <nav
       aria-label="Legal"
-      className={cn(
-        "text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-sm",
-        className
-      )}
+      className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-sm"
     >
       <Link className={LINK} href={PRIVACY_PATH}>
         Privacy policy
