@@ -11,7 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLinkIcon, Trash2Icon } from "lucide-react";
 import { useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { FilePreview } from "@/components/file-upload";
+import { FilePreview } from "@/components/file-preview";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -143,7 +143,7 @@ export function ExpenseFiles({ expense }: { expense: Expense }) {
               : null;
             return (
               <li
-                className="relative flex items-center gap-3 py-2 pr-2 pl-4"
+                className="flex items-center gap-3 py-2 pr-2 pl-4"
                 key={attachment.id}
               >
                 <FilePreview
@@ -157,11 +157,8 @@ export function ExpenseFiles({ expense }: { expense: Expense }) {
                     {describeFile(attachment)}
                   </p>
                 </div>
-                {/* Its hit area covers the row, under Remove. Not nudged
-                    when pressed: a transform would shrink the hit area. */}
                 <Button
                   aria-label={`Open ${file.label}`}
-                  className="after:absolute after:inset-0 active:not-aria-[haspopup]:translate-none"
                   disabled={opening === attachment.id}
                   onClick={() => open(file)}
                   size="sm"
@@ -185,7 +182,6 @@ export function ExpenseFiles({ expense }: { expense: Expense }) {
                     trigger={
                       <Button
                         aria-label={`Remove ${file.label}`}
-                        className="relative"
                         size="icon"
                         variant="ghost"
                       >

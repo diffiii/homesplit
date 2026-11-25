@@ -96,20 +96,6 @@ test("shows a thumbnail of an expense's photo and an icon for its PDF", async ({
   // Showing thumbnails asks for no download links.
   expect(downloads).toBe(0);
   await expectNoAxeViolations(page);
-
-  // The Open button's hit area covers the preview, so tapping it opens the
-  // photo. A mouse click at its position, since the button is what's hit.
-  // Centered first: on a phone it starts below the fold, and at the bottom
-  // edge the tab bar would cover it.
-  await thumbnail.evaluate((image) =>
-    image.scrollIntoView({ block: "center" })
-  );
-  const box = await thumbnail.boundingBox();
-  if (!box) {
-    throw new Error("The thumbnail isn't shown");
-  }
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  await expect(page.getByRole("dialog", { name: "File 1" })).toBeVisible();
 });
 
 test("filters by a date range from the calendar", async ({ page }) => {
