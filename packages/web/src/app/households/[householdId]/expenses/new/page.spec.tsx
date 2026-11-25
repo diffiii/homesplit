@@ -488,8 +488,16 @@ describe("NewExpensePage", () => {
     await pickMethod(user, "Equally, with adjustments");
 
     await user.type(
+      screen.getByRole("textbox", { name: "Bartek Kowalski's adjustment" }),
+      "-31"
+    );
+    await user.type(
+      screen.getByRole("textbox", { name: "Celina Wiśniewska's adjustment" }),
+      "-31"
+    );
+    await user.type(
       screen.getByRole("textbox", { name: "Your adjustment" }),
-      "100"
+      "60"
     );
     expect(checkOf("Split between")).toBe(
       "Bartek Kowalski and Celina Wiśniewska would get a negative share."
@@ -512,7 +520,7 @@ describe("NewExpensePage", () => {
       screen.queryByText("This would leave them a negative share.")
     ).not.toBeInTheDocument();
     expect(checkOf("Split between")).toBe(
-      "PLN 96.00 is split equally before adjustments."
+      "PLN 158.00 is split equally before adjustments."
     );
   });
 

@@ -1,6 +1,8 @@
 import {
+  type AdjustmentProblemReason,
   type AllocatedSplit,
   AllocationError,
+  adjustmentProblems,
   allocate,
   CreateExpenseRequest,
   type Expense,
@@ -449,9 +451,8 @@ const nameList = new Intl.ListFormat("en", { type: "conjunction" });
 
 /**
  * How the inputs for the chosen method add up: percentages left to 100%,
- * exact amounts left to the total, shares in all, or who an adjustment
- * leaves with a negative share. `null` for an equal split or while there's
- * nothing to check.
+ * exact amounts left to the total, shares in all, or what's wrong with the
+ * adjustments. `null` for an equal split or while there's nothing to check.
  */
 export function splitCheck(
   values: ExpenseFormValues,
@@ -490,10 +491,26 @@ export function splitCheck(
   if (method === "exact") {
     return remainderCheck(total, sumOf(numbers), money, "the amount");
   }
-  // As `CreateExpenseRequest` checks it, before rounding:
-  // (total − adjustments) / people + adjustment ≥ 0.
-  const rest = total - sumOf(numbers);
-  const negative = ids.filter((_, i) => rest + numbers[i] * ids.length < 0);
+  const problems = adjustmentProblems(total, numbers);
+  const whose = (reason: "below_total" | "negative_share") =>
+    problems.flatMap((p) =>
+      "index" in p && p.reason === reason ? [ids[p.index]] : []
+    );
+  const below = whose("below_total");
+  if (below.length > 0) {
+    const owners = nameList.format(below.map((id) => `${nameOf(id)}'s`));
+    return {
+      ok: false,
+      text: `${owners} ${below.length === 1 ? "adjustment takes" : "adjustments take"} away more than the amount.`,
+    };
+  }
+  if (problems.some((p) => p.reason === "sum_over_total")) {
+    return {
+      ok: false,
+      text: "The adjustments add up to more than the amount.",
+    };
+  }
+  const negative = whose("negative_share");
   if (negative.length > 0) {
     return {
       ok: false,
@@ -502,7 +519,7 @@ export function splitCheck(
   }
   return {
     ok: true,
-    text: `${money(rest)} is split equally before adjustments.`,
+    text: `${money(total - sumOf(numbers))} is split equally before adjustments.`,
   };
 }
 
@@ -550,7 +567,13 @@ export function fieldForPath(
 
 /** What to tell the user about an input `CreateExpenseRequest` rejected. */
 function clientMessage(
-  { path, code }: { code: string; path: readonly PropertyKey[] },
+  {
+    path,
+    params,
+  }: {
+    path: readonly PropertyKey[];
+    params?: { reason?: AdjustmentProblemReason };
+  },
   values: ExpenseFormValues,
   request: CreateExpenseRequest
 ): string {
@@ -586,6 +609,8 @@ function clientMessage(
         return "Percentages must add up to 100%.";
       case "exact":
         return "Amounts must add up to the amount.";
+      case "adjustment":
+        return "The adjustments add up to more than the amount.";
       default:
         return "Pick at least one person to split it with.";
     }
@@ -598,10 +623,15 @@ function clientMessage(
     case "amountCents":
       return "That amount is too large.";
     default:
-      // The negative-share check is the one custom issue on an adjustment.
-      return code === "custom"
-        ? "This would leave them a negative share."
-        : "That adjustment is too large.";
+      break;
+  }
+  switch (params?.reason) {
+    case "below_total":
+      return "An adjustment can't take away more than the amount.";
+    case "negative_share":
+      return "This would leave them a negative share.";
+    default:
+      return "That adjustment is too large.";
   }
 }
 
