@@ -23,7 +23,8 @@ Write every amount as a decimal number in the currency, such as 12.99, never in 
 List every purchased product in items, in the order printed, with its name as printed, its quantity (a decimal for weighed products, such as 0.452), its unit price, and its total.
 A discount line, such as "Rabat", "Promocja", or "Upust", isn't an item: add its amount, as a positive number, to the discount of the item above it that it reduces, and make that item's total the amount after the discount.
 A discount on the whole receipt goes in receiptDiscount as a positive number, not in items.
-A returned deposit or packaging refund, such as "Zwrot kaucji" or "Zwrot opakowania", isn't an item either: copy each one's amount, as a positive number, into packagingRefunds, and use an empty list when there are none.
+A deposit charged for a bottle or a can, such as "Kaucja PET", is an item of its own, even when it's printed below the total.
+A returned deposit or packaging refund, such as "Zwrot kaucji" or "Zwrot opakowania", or a voucher for returned packaging used to pay, such as "Bon - zwrot opak", isn't an item either: copy each one's amount, as a positive number, into packagingRefunds, and use an empty list when there are none. total is then what was left to pay after them, such as the card or cash payment.
 Leave out subtotals, taxes, payment lines, change, and loyalty points.
 Set category to the number of the one category that best fits the whole receipt, or null when none fits or there are no categories. Only use numbers from the list.
 Set categoryConfidence to "high" when the receipt clearly belongs in that category, "medium" when it's a likely fit, "low" when it's a guess, and null when category is null.`;
