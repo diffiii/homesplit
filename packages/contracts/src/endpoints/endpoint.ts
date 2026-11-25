@@ -2,9 +2,13 @@ import type { z } from "zod";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
+/**
+ * A 302 is for paths a browser loads directly, such as an `<img src>`, so
+ * `ApiEndpointName` leaves it out.
+ */
 type EndpointResult =
   | { readonly status: 200 | 201; readonly response: z.ZodType }
-  | { readonly status: 204; readonly response: null };
+  | { readonly status: 204 | 302; readonly response: null };
 
 /** One application route: its path template, request schemas, and success response. */
 export type Endpoint = {
@@ -40,7 +44,7 @@ export type RequestBody<E extends Endpoint> = E extends {
   ? z.input<B>
   : never;
 
-/** Parsed success response; `undefined` for 204 routes. */
+/** Parsed success response; `undefined` for 204 and 302 routes. */
 export type ResponseBody<E extends Endpoint> = E extends {
   response: infer R extends z.ZodType;
 }

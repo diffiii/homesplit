@@ -28,3 +28,11 @@ export const endpoints = {
 
 export type Endpoints = typeof endpoints;
 export type EndpointName = keyof Endpoints;
+
+/**
+ * Endpoints whose answer a client reads, for `api()` and the web mocks. A
+ * 302 route leads a browser to content elsewhere, so it isn't one.
+ */
+export type ApiEndpointName = {
+  [N in EndpointName]: Endpoints[N] extends { status: 302 } ? never : N;
+}[EndpointName];

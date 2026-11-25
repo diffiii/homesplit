@@ -1,6 +1,10 @@
 "use client";
 
-import type { Attachment, AttachmentMimeType } from "@homesplit/contracts";
+import {
+  type Attachment,
+  type AttachmentMimeType,
+  isImageType,
+} from "@homesplit/contracts";
 import { cn } from "cn";
 import {
   CameraIcon,
@@ -24,7 +28,6 @@ import {
   attachmentFileError,
   attachmentTypeOf,
   formatFileSize,
-  isImageType,
   uploadErrorMessage,
 } from "@/lib/attachments";
 

@@ -726,11 +726,19 @@ describe("application routes", () => {
       id: added.id,
       mimeType: "image/png",
       sizeBytes: 10,
+      hasThumbnail: false,
     });
     await expect(
       api("listExpenseAttachments", expense("Pizza night"))
     ).resolves.toEqual({
-      items: [{ id: added.id, mimeType: "image/png", sizeBytes: 10 }],
+      items: [
+        {
+          id: added.id,
+          mimeType: "image/png",
+          sizeBytes: 10,
+          hasThumbnail: false,
+        },
+      ],
     });
     await expect(failure(link("Pizza night", added.id))).resolves.toMatchObject(
       { status: 409, code: "ATTACHMENT_ALREADY_LINKED" }

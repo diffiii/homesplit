@@ -229,6 +229,7 @@ Household paths in this table are relative to `/api/households/:householdId`. Ta
 
 - `GET` returns 200, and a creating `POST` returns 201 with the created resource. `PATCH` returns 200 with the full resource, which for `PATCH /api/me` is the user's `UserSummary`, and `DELETE` returns 204 with no body.
 - An action returns 200 with the resulting resource. `clear-purchased` returns `{ deletedCount }`, accepting a friend request returns the new `Friendship`, and declining returns 204.
+- A route that a browser loads directly, as an `<img src>`, answers 302 with the target in `Location` and no JSON body. The [attachment thumbnail](api/attachments.md#thumbnails) is the only one.
 - In a `PATCH`, an omitted field stays unchanged, `null` clears a nullable field, and `financial` replaces the whole financial spec.
 - Chore, shopping-item, and payment actions are idempotent. Repeating one whose target state already holds returns 200 with the resource unchanged, keeping the original actor and time, and repeating `clear-purchased` returns `{ deletedCount: 0 }`. Friend-request actions aren't: accepting or declining deletes the request, so a repeat answers 404.
 

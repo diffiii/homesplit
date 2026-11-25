@@ -238,7 +238,14 @@ const userColumns = { columns: { id: true, name: true, image: true } } as const;
 export const linkedAttachments = {
   columns: {},
   with: {
-    attachment: { columns: { id: true, mimeType: true, sizeBytes: true } },
+    attachment: {
+      columns: {
+        id: true,
+        mimeType: true,
+        sizeBytes: true,
+        thumbnailStorageKey: true,
+      },
+    },
   },
   // Typed as mutable, which `orderBy` takes, unlike the rest of the object.
   orderBy: [
@@ -251,11 +258,13 @@ export const toAttachmentSummary = (row: {
   id: string;
   mimeType: string;
   sizeBytes: number;
+  thumbnailStorageKey: string | null;
 }): AttachmentSummary => ({
   id: row.id,
   // Parsed, so a stored type the contract can't describe fails loudly.
   mimeType: AttachmentMimeType.parse(row.mimeType),
   sizeBytes: row.sizeBytes,
+  hasThumbnail: row.thumbnailStorageKey !== null,
 });
 
 export const toAttachmentSummaries = (

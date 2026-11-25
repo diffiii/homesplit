@@ -10,6 +10,7 @@ import {
   Inject,
   Param,
   ParseFilePipe,
+  Res,
   UploadedFile,
   UseInterceptors,
 } from "@nestjs/common";
@@ -22,6 +23,12 @@ import {
 import type { HouseholdContext } from "../households/access/household.guard";
 import { attachmentsConfig } from "./attachments.config";
 import { AttachmentsService, type FileUpload } from "./attachments.service";
+
+/** The part of Express's response a redirect uses. */
+interface RedirectResponse {
+  redirect: (status: number, url: string) => void;
+  setHeader: (name: string, value: string) => void;
+}
 
 @Controller()
 export class AttachmentsController {
@@ -56,5 +63,20 @@ export class AttachmentsController {
     @Param("attachmentId", new ZodPipe(Id)) attachmentId: string
   ): Promise<AttachmentDownload> {
     return this.attachments.getDownload(household.householdId, attachmentId);
+  }
+
+  /** `@Res()` rather than `@Header()`, so errors don't get the cache header. */
+  @HouseholdRoute(endpoints.getAttachmentThumbnail)
+  async getThumbnail(
+    @CurrentHousehold() household: HouseholdContext,
+    @Param("attachmentId", new ZodPipe(Id)) attachmentId: string,
+    @Res() response: RedirectResponse
+  ): Promise<void> {
+    const { url, maxAgeSeconds } = await this.attachments.getThumbnail(
+      household.householdId,
+      attachmentId
+    );
+    response.setHeader("Cache-Control", `private, max-age=${maxAgeSeconds}`);
+    response.redirect(endpoints.getAttachmentThumbnail.status, url);
   }
 }

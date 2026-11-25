@@ -29,7 +29,10 @@ if (!env.success) {
 export const attachmentsConfig = {
   /** Largest file an upload accepts. */
   maxBytes: env.data.ATTACHMENT_MAX_BYTES,
-  /** How long a download URL stays valid. */
+  /**
+   * How long a download URL, or the signed URL a thumbnail redirect points
+   * to, stays valid. It also caps the redirect's `Cache-Control: max-age`.
+   */
   downloadUrlTtlSeconds: env.data.ATTACHMENT_DOWNLOAD_URL_TTL_SECONDS,
   /** How old an attachment that nothing references gets before cleanup deletes it. */
   unreferencedTtlHours: env.data.ATTACHMENT_UNREFERENCED_TTL_HOURS,

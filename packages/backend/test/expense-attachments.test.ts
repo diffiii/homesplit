@@ -160,6 +160,8 @@ describe("expense attachments", () => {
       // `upload` parses the response as a summary, which is what links show.
       const image = await upload(alice, household);
       const pdf = await upload(carol, household, PDF, "application/pdf");
+      expect(image.hasThumbnail).toBe(true);
+      expect(pdf.hasThumbnail).toBe(false);
 
       const linked = await link(alice, household, expenseId, image.id);
       expect(linked.status).toBe(201);
@@ -287,10 +289,11 @@ describe("expense attachments", () => {
     const links = await db.select().from(expenseAttachments);
     expect(links.map(({ attachmentId }) => attachmentId)).toEqual([shared.id]);
     expect(await attachmentRows()).toHaveLength(2);
-    // Past the TTL, cleanup deletes the unlinked file and keeps the linked one.
+    // Past the TTL, cleanup deletes the unlinked file, with its thumbnail, and
+    // keeps the linked one.
     expect(await cleanup.run(new Date(Date.now() + AFTER_TTL_MS))).toEqual({
       deletedAttachments: 1,
-      deletedObjects: 1,
+      deletedObjects: 2,
       failedObjects: 0,
     });
     expect(await attachmentRows()).toEqual([shared.id]);

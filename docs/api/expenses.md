@@ -88,7 +88,7 @@ The defaults live in `DEFAULT_CATEGORIES` in `default-categories.ts`, so changin
 
 #### Attachments
 
-Files are uploaded through the [attachments API](attachments.md) and then linked to an expense. Every expense response, from `GET`, the list, `POST`, and `PATCH`, has `attachments`: one `AttachmentSummary` (`id`, `mimeType`, `sizeBytes`) per linked file, in the order they were linked. Summaries have no download URL, because signed URLs expire; a client gets one from `GET /attachments/:attachmentId/download` when it shows the file.
+Files are uploaded through the [attachments API](attachments.md) and then linked to an expense. Every expense response, from `GET`, the list, `POST`, and `PATCH`, has `attachments`: one `AttachmentSummary` (`id`, `mimeType`, `sizeBytes`, `hasThumbnail`) per linked file, in the order they were linked. Summaries have no download URL, because signed URLs expire; a client gets one from `GET /attachments/:attachmentId/download` when it shows the file, and uses `GET /attachments/:attachmentId/thumbnail` as an image's preview when `hasThumbnail` is true.
 
 - References: `attachmentId` must be one of this household's files. A missing file and another household's both answer 400 `INVALID_REFERENCE` with the path `["attachmentId"]`. `expense_attachments_attachment_fk` enforces the same at the database.
 - Duplicates: a file is linked to an expense at most once; linking it again answers 409 `ATTACHMENT_ALREADY_LINKED`. The same file may be linked to several expenses of its household.

@@ -1,0 +1,2 @@
+ALTER TABLE "attachments" ADD COLUMN "thumbnail_storage_key" text;--> statement-breakpoint
+ALTER TABLE "attachments" ADD CONSTRAINT "attachments_thumbnail_storage_key_unique" UNIQUE("thumbnail_storage_key");

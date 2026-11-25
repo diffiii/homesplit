@@ -1,7 +1,13 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { z } from "zod";
 import type { Expense } from "../features/expenses";
-import { type Endpoint, endpoints, type ResponseBody } from ".";
+import {
+  type ApiEndpointName,
+  type Endpoint,
+  type EndpointName,
+  endpoints,
+  type ResponseBody,
+} from ".";
 import { buildPath, encodeQuery } from "./url";
 
 const HOUSEHOLD_ID = "0b6f1f4e-3c1a-4b8e-9a59-1d2f3e4a5b6c";
@@ -99,12 +105,15 @@ describe("encodeQuery", () => {
 });
 
 describe("ResponseBody", () => {
-  it("is the parsed response, or undefined for 204 routes", () => {
+  it("is the parsed response, or undefined for 204 and 302 routes", () => {
     expectTypeOf<
       ResponseBody<typeof endpoints.getExpense>
     >().toEqualTypeOf<Expense>();
     expectTypeOf<
       ResponseBody<typeof endpoints.deleteExpense>
+    >().toEqualTypeOf<undefined>();
+    expectTypeOf<
+      ResponseBody<typeof endpoints.getAttachmentThumbnail>
     >().toEqualTypeOf<undefined>();
   });
 
@@ -112,5 +121,13 @@ describe("ResponseBody", () => {
     expectTypeOf<
       ResponseBody<typeof endpoints.getExpense | typeof endpoints.deleteExpense>
     >().toEqualTypeOf<Expense | undefined>();
+  });
+});
+
+describe("ApiEndpointName", () => {
+  it("is every endpoint but the 302 routes", () => {
+    expectTypeOf<
+      Exclude<EndpointName, ApiEndpointName>
+    >().toEqualTypeOf<"getAttachmentThumbnail">();
   });
 });

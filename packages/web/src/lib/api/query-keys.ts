@@ -1,10 +1,10 @@
-import type { EndpointName, Endpoints } from "@homesplit/contracts";
+import type { ApiEndpointName, Endpoints } from "@homesplit/contracts";
 import type { ApiInput } from "./client";
 
 /** Endpoints that read data, the only ones that get query keys. */
 export type QueryEndpointName = {
-  [N in EndpointName]: Endpoints[N]["method"] extends "GET" ? N : never;
-}[EndpointName];
+  [N in ApiEndpointName]: Endpoints[N]["method"] extends "GET" ? N : never;
+}[ApiEndpointName];
 
 /** Better Auth reads scoped to one household. */
 export type HouseholdAuthQuery = "get" | "listMembers" | "listInvitations";

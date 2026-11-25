@@ -1,6 +1,6 @@
 "use client";
 
-import type { AttachmentSummary } from "@homesplit/contracts";
+import { type AttachmentSummary, isImageType } from "@homesplit/contracts";
 import { useQuery } from "@tanstack/react-query";
 import { DownloadIcon } from "lucide-react";
 import { useState } from "react";
@@ -17,11 +17,7 @@ import { useHouseholdId } from "@/components/shell/household-context";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { endpointQuery } from "@/lib/api/queries";
-import {
-  ATTACHMENT_TYPE_LABELS,
-  formatFileSize,
-  isImageType,
-} from "@/lib/attachments";
+import { ATTACHMENT_TYPE_LABELS, formatFileSize } from "@/lib/attachments";
 
 /** A file as the page lists it: numbered, since files keep no name. */
 export interface ListedFile {

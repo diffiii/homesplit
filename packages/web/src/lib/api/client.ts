@@ -1,7 +1,7 @@
 import {
+  type ApiEndpointName,
   buildPath,
   type Endpoint,
-  type EndpointName,
   type Endpoints,
   encodeQuery,
   endpoints,
@@ -25,11 +25,11 @@ export type EndpointInput<E extends Endpoint> = (E extends {
     : { query?: never }) &
   (E extends { body: z.ZodType } ? { body: RequestBody<E> } : { body?: never });
 
-export type ApiInput<N extends EndpointName> = EndpointInput<Endpoints[N]>;
-export type ApiResponse<N extends EndpointName> = ResponseBody<Endpoints[N]>;
+export type ApiInput<N extends ApiEndpointName> = EndpointInput<Endpoints[N]>;
+export type ApiResponse<N extends ApiEndpointName> = ResponseBody<Endpoints[N]>;
 
 /** The input argument may be left out when the endpoint needs neither params nor a body. */
-export type ApiArgs<N extends EndpointName> =
+export type ApiArgs<N extends ApiEndpointName> =
   object extends ApiInput<N>
     ? [input?: ApiInput<N> & RequestOptions]
     : [input: ApiInput<N> & RequestOptions];
@@ -44,7 +44,7 @@ export interface ApiClientOptions {
   onUnauthenticated?: () => void;
 }
 
-export type ApiClient = <N extends EndpointName>(
+export type ApiClient = <N extends ApiEndpointName>(
   name: N,
   ...args: ApiArgs<N>
 ) => Promise<ApiResponse<N>>;

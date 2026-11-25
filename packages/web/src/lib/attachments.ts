@@ -116,11 +116,6 @@ export function attachErrorMessage(error: unknown): string {
   return errorMessage(error);
 }
 
-/** Whether a browser may be able to show `type` in an `<img>`. HEIC only works in some. */
-export function isImageType(type: AttachmentMimeType | null): boolean {
-  return type?.startsWith("image/") ?? false;
-}
-
 const KIB = 1024;
 const MIB = KIB * KIB;
 

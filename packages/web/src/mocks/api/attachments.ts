@@ -74,7 +74,13 @@ export const attachmentRoutes: MockRoutes = {
         contents.set(attachment.id, URL.createObjectURL(file));
       }
       const { uploadedById, ...rest } = attachment;
-      return { ...rest, uploadedBy: db.summary(uploadedById) };
+      return {
+        ...rest,
+        // The mocks make no thumbnails, and `getAttachmentThumbnail` has no
+        // mock route, so its path answers 501.
+        hasThumbnail: false,
+        uploadedBy: db.summary(uploadedById),
+      };
     },
   },
 

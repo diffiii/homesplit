@@ -8,7 +8,6 @@ import {
   attachmentFileError,
   attachmentTypeOf,
   formatFileSize,
-  isImageType,
   uploadErrorMessage,
 } from "./attachments";
 
@@ -128,14 +127,6 @@ describe("attachErrorMessage", () => {
     ).toBe(
       "This module is turned off for the household. An admin can turn it back on in settings."
     );
-  });
-});
-
-describe("isImageType", () => {
-  it("is true for images only", () => {
-    expect(isImageType("image/heic")).toBe(true);
-    expect(isImageType("application/pdf")).toBe(false);
-    expect(isImageType(null)).toBe(false);
   });
 });
 

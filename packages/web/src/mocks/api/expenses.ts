@@ -53,6 +53,7 @@ function linkedAttachments(db: MockDb, expenseId: string): AttachmentSummary[] {
             id: attachment.id,
             mimeType: attachment.mimeType,
             sizeBytes: attachment.sizeBytes,
+            hasThumbnail: false,
           },
         ]
       : [];
@@ -453,6 +454,7 @@ export const expenseRoutes: MockRoutes = {
         id: attachment.id,
         mimeType: attachment.mimeType,
         sizeBytes: attachment.sizeBytes,
+        hasThumbnail: false,
       };
     },
   },
