@@ -35,6 +35,7 @@ function expense(overrides: Partial<Expense> = {}): Expense {
       { user: user(B, "Bartek"), amountCents: 4500 },
     ],
     attachments: [],
+    receiptId: null,
     createdAt: "2026-03-01T10:00:00.000Z",
     updatedAt: "2026-03-01T10:00:00.000Z",
     ...overrides,

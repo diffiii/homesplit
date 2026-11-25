@@ -20,6 +20,7 @@ import {
   eq,
   exists,
   gte,
+  inArray,
   isNull,
   lte,
   or,
@@ -33,6 +34,7 @@ import {
   expensePayers,
   expenseSplits,
   expenses,
+  receipts,
 } from "@/db/schema";
 
 /** The participant field that `value` stores, by method; `equal` has none. */
@@ -280,7 +282,7 @@ const toShare = (row: {
  * Reads the expenses matching `where` in the list order: `expense_date`,
  * `created_at`, and `id`, all descending. Child rows are sorted by `user_id`,
  * and linked files by when they were linked. Everything comes back in one
- * query.
+ * query, and the linked receipts' IDs in a second.
  */
 export async function findExpenses(
   executor: Executor,
@@ -316,6 +318,24 @@ export async function findExpenses(
     },
   });
 
+  // A second query: the relational API can't select another table's column.
+  // `receipts_expense_id_key` serves it, and keeps it to one receipt each.
+  const linked =
+    rows.length === 0
+      ? []
+      : await executor
+          .select({ id: receipts.id, expenseId: receipts.expenseId })
+          .from(receipts)
+          .where(
+            inArray(
+              receipts.expenseId,
+              rows.map(({ id }) => id)
+            )
+          );
+  const receiptIds = new Map(
+    linked.map(({ id, expenseId }) => [expenseId, id])
+  );
+
   return rows.map((row) => {
     const field = valueFields[row.allocationMethod as SplitMethod];
     return {
@@ -342,6 +362,7 @@ export async function findExpenses(
       }),
       splits: row.splits.map(toShare),
       attachments: toAttachmentSummaries(row.attachments),
+      receiptId: receiptIds.get(row.id) ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };

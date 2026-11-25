@@ -385,7 +385,7 @@ erDiagram
 
 ## Attachments and receipts
 
-These tables support backlog tasks [4.3](backlog/tasks/4-expenses/4.3-attachments/4.3.0-epic.md) and [7](backlog/tasks/7-ai-receipts/7.0-epic.md). `HOUSEHOLDS`, `USERS`, `EXPENSES`, and `SHOPPING_ITEMS` are the entities from the household diagram. `ATTACHMENTS` and `EXPENSE_ATTACHMENTS` are the implemented `attachments` (#44) and `expense_attachments` (#45) tables, and `RECEIPTS` and `RECEIPT_ITEMS` the implemented `receipts` and `receipt_items` (#55; see [Receipts API](api/receipts.md#storage)), except `expense_id`. `expense_id` and `RECEIPT_ITEM_ASSIGNMENTS` are still proposed, for the tasks that confirm and split receipts.
+These tables support backlog tasks [4.3](backlog/tasks/4-expenses/4.3-attachments/4.3.0-epic.md) and [7](backlog/tasks/7-ai-receipts/7.0-epic.md). `HOUSEHOLDS`, `USERS`, `EXPENSES`, and `SHOPPING_ITEMS` are the entities from the household diagram. `ATTACHMENTS` and `EXPENSE_ATTACHMENTS` are the implemented `attachments` (#44) and `expense_attachments` (#45) tables, and `RECEIPTS`, `RECEIPT_ITEMS`, and `RECEIPT_ITEM_ASSIGNMENTS` the implemented `receipts`, `receipt_items`, and `receipt_item_assignments` (#55, #56; see [Receipts API](api/receipts.md#storage)).
 
 ```mermaid
 erDiagram
@@ -409,8 +409,10 @@ erDiagram
         date purchased_on "nullable"
         text currency "nullable until extracted; ISO 4217"
         bigint total_cents "nullable until extracted"
-        bigint discount_cents "Receipt-level; default 0"
-        uuid expense_id FK "Proposed; nullable; set on confirm"
+        bigint discount_cents "Receipt-level, with returned deposits; default 0"
+        uuid suggested_category_id FK "nullable; the scan's pick, SET NULL on category delete"
+        text suggested_category_confidence "nullable; low, medium, high"
+        uuid expense_id FK "nullable; set on confirm, cleared when the expense's amounts change"
         uuid created_by_id FK
         timestamptz created_at
         timestamptz updated_at
@@ -422,15 +424,15 @@ erDiagram
         integer position
         text name
         numeric quantity "numeric(12, 3), for weighed products"
-        bigint unit_price_cents
+        bigint unit_price_cents "Nonnegative"
         bigint discount_cents "Line discount; default 0"
-        bigint total_cents "After line discount"
+        bigint total_cents "After line discount; nonnegative"
     }
 
     RECEIPT_ITEM_ASSIGNMENTS {
         uuid receipt_item_id PK,FK
         uuid user_id PK,FK
-        numeric shares "Strictly positive; units or equal shares"
+        integer shares "Strictly positive; units or equal shares"
     }
 
     HOUSEHOLDS ||..o{ RECEIPTS : contains
@@ -445,6 +447,7 @@ erDiagram
 ```
 
 - Confirming a receipt creates an ordinary expense with the `exact` allocation method. Item assignments are kept on the receipt as the history of who had what, and the expense's splits remain the only source for balances.
+- Returned deposits aren't items but part of the receipt-level discount, so no item amount is negative.
 - Item costs are split by shares, receipt-level discounts are spread over items in proportion to their cost, and per-person totals are rounded once with the allocation engine's remainder rule.
 - Shopping matches from task 7.5 are request-time suggestions, not stored relations. Confirming them reuses the shopping purchase columns.
 

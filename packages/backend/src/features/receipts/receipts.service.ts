@@ -24,10 +24,10 @@ import {
   updateDraft,
 } from "./receipts.repository";
 
-const receiptConfirmed = (): AppError =>
+export const receiptConfirmed = (): AppError =>
   new AppError(409, "RECEIPT_CONFIRMED", "The receipt is confirmed");
 
-const receiptProcessing = (): AppError =>
+export const receiptProcessing = (): AppError =>
   new AppError(409, "RECEIPT_PROCESSING", "The receipt is still being read");
 
 const receiptNotFailed = (): AppError =>

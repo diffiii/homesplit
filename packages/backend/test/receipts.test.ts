@@ -64,6 +64,7 @@ const GROCERIES: ModelReceipt = {
   currency: "PLN",
   total: 13.6,
   receiptDiscount: 0.5,
+  packagingRefunds: [],
   items: [
     { name: "Milk", quantity: 1, unitPrice: 4.99, discount: null, total: 4.99 },
     { name: "Bread", quantity: 2, unitPrice: 3.5, discount: 1, total: 6 },
@@ -75,6 +76,8 @@ const GROCERIES: ModelReceipt = {
       total: 3.11,
     },
   ],
+  category: null,
+  categoryConfidence: null,
 };
 
 describe("receipts", () => {
@@ -231,6 +234,7 @@ describe("receipts", () => {
         discountCents: 50,
         itemsTotalCents: 1410,
         differenceCents: 0,
+        suggestedCategory: null,
       });
       expect(receipt.items.map(({ id: _id, ...item }) => item)).toEqual([
         {
@@ -240,6 +244,7 @@ describe("receipts", () => {
           unitPriceCents: 499,
           discountCents: 0,
           totalCents: 499,
+          assignments: [],
         },
         {
           position: 1,
@@ -248,6 +253,7 @@ describe("receipts", () => {
           unitPriceCents: 350,
           discountCents: 100,
           totalCents: 600,
+          assignments: [],
         },
         {
           position: 2,
@@ -256,6 +262,7 @@ describe("receipts", () => {
           unitPriceCents: 689,
           discountCents: 0,
           totalCents: 311,
+          assignments: [],
         },
       ]);
       expect(await usage(alice)).toBe(1);
@@ -490,6 +497,7 @@ describe("receipts", () => {
           unitPriceCents: 1000,
           discountCents: 0,
           totalCents: 1000,
+          assignments: [],
         },
         { ...bread, position: 2 },
       ]);
@@ -536,6 +544,20 @@ describe("receipts", () => {
       ["a blank merchant", { merchant: " " }, "VALIDATION_ERROR"],
       ["an unknown currency", { currency: "XAU" }, "VALIDATION_ERROR"],
       ["a negative total", { totalCents: -1 }, "VALIDATION_ERROR"],
+      [
+        "a negative item, such as a returned deposit",
+        {
+          items: [
+            {
+              name: "Zwrot kaucji",
+              quantity: 1,
+              unitPriceCents: -50,
+              totalCents: -50,
+            },
+          ],
+        },
+        "VALIDATION_ERROR",
+      ],
       [
         "a quantity with four decimals",
         {

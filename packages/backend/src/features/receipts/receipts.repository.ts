@@ -1,5 +1,6 @@
 import {
   AttachmentMimeType,
+  CategorySuggestionConfidence,
   type ListReceiptsQuery,
   type Receipt,
   ReceiptFailureCode,
@@ -11,12 +12,28 @@ import {
   toSafeInteger,
   type UpdateReceiptRequest,
 } from "@homesplit/contracts";
-import { and, asc, desc, eq, inArray, type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  notInArray,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { longestRequestMs } from "@/ai/ai.config";
 import { db, type Executor, readSnapshot, type Transaction } from "@/db";
-import { attachments, receiptItems, receipts } from "@/db/schema";
+import {
+  attachments,
+  expenseCategories,
+  receiptItemAssignments,
+  receiptItems,
+  receipts,
+} from "@/db/schema";
 import { userRole } from "@/features/users/user-projections";
 import { invalidReference, notFound } from "@/http/app-error";
+import type { ReceiptCategorySuggestion } from "./receipt-draft";
 
 /** Reading the file and writing the draft, on top of the AI call itself. */
 const EXTRACTION_MARGIN_MS = 5 * 60 * 1000;
@@ -36,6 +53,7 @@ const STALE_INTERVAL = sql.raw(`interval '${STALE_AFTER_MS} milliseconds'`);
 const isStale = sql<boolean>`(${receipts.status} = 'processing' AND ${receipts.updatedAt} < now() - ${STALE_INTERVAL})`;
 
 const createdBy = userRole("created_by");
+const assignee = userRole("assignee");
 
 const selectReceipts = (executor: Executor) =>
   executor
@@ -51,6 +69,9 @@ const selectReceipts = (executor: Executor) =>
       currency: receipts.currency,
       totalCents: receipts.totalCents,
       discountCents: receipts.discountCents,
+      expenseId: receipts.expenseId,
+      suggestedCategoryId: receipts.suggestedCategoryId,
+      suggestedCategoryConfidence: receipts.suggestedCategoryConfidence,
       createdBy: createdBy.summary,
       createdAt: receipts.createdAt,
       updatedAt: receipts.updatedAt,
@@ -83,6 +104,21 @@ function stateOf(row: {
   };
 }
 
+/** The scan's category, gone once the category is deleted. */
+function suggestionOf({
+  suggestedCategoryId,
+  suggestedCategoryConfidence,
+}: ReceiptRow): ReceiptCategorySuggestion | null {
+  return suggestedCategoryId === null || suggestedCategoryConfidence === null
+    ? null
+    : {
+        categoryId: suggestedCategoryId,
+        confidence: CategorySuggestionConfidence.parse(
+          suggestedCategoryConfidence
+        ),
+      };
+}
+
 function toSummary(row: ReceiptRow): ReceiptSummary {
   return {
     id: row.id,
@@ -94,6 +130,8 @@ function toSummary(row: ReceiptRow): ReceiptSummary {
     currency: row.currency,
     totalCents: row.totalCents === null ? null : toSafeInteger(row.totalCents),
     discountCents: toSafeInteger(row.discountCents),
+    expenseId: row.expenseId,
+    suggestedCategory: suggestionOf(row),
     createdBy: row.createdBy,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -142,6 +180,23 @@ async function findItems(
     .from(receiptItems)
     .where(eq(receiptItems.receiptId, receiptId))
     .orderBy(asc(receiptItems.position), asc(receiptItems.id));
+  const assignments = await executor
+    .select({
+      itemId: receiptItemAssignments.receiptItemId,
+      user: assignee.summary,
+      shares: receiptItemAssignments.shares,
+    })
+    .from(receiptItemAssignments)
+    .innerJoin(
+      receiptItems,
+      eq(receiptItems.id, receiptItemAssignments.receiptItemId)
+    )
+    .innerJoin(
+      assignee.table,
+      eq(assignee.table.id, receiptItemAssignments.userId)
+    )
+    .where(eq(receiptItems.receiptId, receiptId))
+    .orderBy(asc(receiptItemAssignments.userId));
   return rows.map((row) => ({
     id: row.id,
     position: row.position,
@@ -151,6 +206,9 @@ async function findItems(
     unitPriceCents: toSafeInteger(row.unitPriceCents),
     discountCents: toSafeInteger(row.discountCents),
     totalCents: toSafeInteger(row.totalCents),
+    assignments: assignments
+      .filter(({ itemId }) => itemId === row.id)
+      .map(({ user, shares }) => ({ user, shares })),
   }));
 }
 
@@ -234,6 +292,8 @@ export async function startProcessing(
       status: "processing",
       failureCode: null,
       extractionId,
+      suggestedCategoryId: null,
+      suggestedCategoryConfidence: null,
       updatedAt: sql`now()`,
     })
     .where(inHousehold(householdId, receiptId));
@@ -295,30 +355,54 @@ function headerColumns({
 }
 
 /**
- * Replaces the items in the given order. Items with an ID keep it, new items
- * get new IDs, and positions are renumbered from 0.
+ * Replaces the items in the given order. Items with an ID keep it and their
+ * assignments, items left out are deleted with theirs, new items get new IDs,
+ * and positions are renumbered from 0. Callers checked the IDs with
+ * `assertOwnItems`, or have none, so the upsert only updates this receipt's
+ * items.
  */
 async function replaceItems(
   tx: Transaction,
   receiptId: string,
   items: ReceiptItemInput[]
 ): Promise<void> {
-  await tx.delete(receiptItems).where(eq(receiptItems.receiptId, receiptId));
+  const keptIds = items.flatMap(({ id }) => (id === undefined ? [] : [id]));
+  await tx
+    .delete(receiptItems)
+    .where(
+      and(
+        eq(receiptItems.receiptId, receiptId),
+        keptIds.length === 0 ? undefined : notInArray(receiptItems.id, keptIds)
+      )
+    );
   if (items.length === 0) {
     return;
   }
-  await tx.insert(receiptItems).values(
-    items.map(({ id, ...item }, position) => ({
-      ...(id === undefined ? {} : { id }),
-      receiptId,
-      position,
-      name: item.name,
-      quantity: String(item.quantity),
-      unitPriceCents: BigInt(item.unitPriceCents),
-      discountCents: BigInt(item.discountCents),
-      totalCents: BigInt(item.totalCents),
-    }))
-  );
+  await tx
+    .insert(receiptItems)
+    .values(
+      items.map(({ id, ...item }, position) => ({
+        ...(id === undefined ? {} : { id }),
+        receiptId,
+        position,
+        name: item.name,
+        quantity: String(item.quantity),
+        unitPriceCents: BigInt(item.unitPriceCents),
+        discountCents: BigInt(item.discountCents),
+        totalCents: BigInt(item.totalCents),
+      }))
+    )
+    .onConflictDoUpdate({
+      target: receiptItems.id,
+      set: {
+        position: sql`excluded.position`,
+        name: sql`excluded.name`,
+        quantity: sql`excluded.quantity`,
+        unitPriceCents: sql`excluded.unit_price_cents`,
+        discountCents: sql`excluded.discount_cents`,
+        totalCents: sql`excluded.total_cents`,
+      },
+    });
 }
 
 /**
@@ -331,12 +415,17 @@ async function writeDraft(
   tx: Transaction,
   receiptId: string,
   where: SQL | undefined,
-  { items, ...header }: UpdateReceiptRequest
+  { items, ...header }: UpdateReceiptRequest,
+  suggestion?: {
+    suggestedCategoryConfidence: string | null;
+    suggestedCategoryId: string | null;
+  }
 ): Promise<boolean> {
   const updated = await tx
     .update(receipts)
     .set({
       ...headerColumns(header),
+      ...suggestion,
       status: "ready",
       failureCode: null,
       extractionId: null,
@@ -363,15 +452,32 @@ export async function updateDraft(
   await writeDraft(tx, receiptId, inHousehold(householdId, receiptId), patch);
 }
 
-/** A finished run's draft, written only while the run still owns the receipt. */
+/**
+ * A finished run's draft and category, written only while the run still
+ * owns the receipt. The category is locked against deletion until the write
+ * commits; one deleted since the run read the list is no suggestion.
+ */
 export function saveExtractedDraft(
   receiptId: string,
   extractionId: string,
-  draft: UpdateReceiptRequest
+  draft: UpdateReceiptRequest,
+  suggestion: ReceiptCategorySuggestion | null
 ): Promise<boolean> {
-  return db.transaction((tx) =>
-    writeDraft(tx, receiptId, ownedBy(receiptId, extractionId), draft)
-  );
+  return db.transaction(async (tx) => {
+    const [category] = suggestion
+      ? await tx
+          .select({ id: expenseCategories.id })
+          .from(expenseCategories)
+          .where(eq(expenseCategories.id, suggestion.categoryId))
+          .for("key share")
+      : [];
+    return writeDraft(tx, receiptId, ownedBy(receiptId, extractionId), draft, {
+      suggestedCategoryId: category ? category.id : null,
+      suggestedCategoryConfidence: category
+        ? (suggestion?.confidence ?? null)
+        : null,
+    });
+  });
 }
 
 /** A failed run's code, written only while the run still owns the receipt. */

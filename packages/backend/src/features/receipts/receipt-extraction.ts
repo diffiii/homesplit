@@ -7,12 +7,14 @@ import {
 } from "@nestjs/common";
 import { AiService } from "@/ai/ai.service";
 import { attachmentInput } from "@/ai/ai-attachment";
+import { ExpenseCategoriesService } from "@/features/expense-categories/expense-categories.service";
 import { AppError } from "@/http/app-error";
 import { ObjectStorage } from "@/storage/object-storage";
 import {
   ModelReceipt,
   SCAN_RECEIPT_INSTRUCTIONS,
   SCAN_RECEIPT_TASK,
+  toCategorySuggestion,
   toReceiptDraft,
 } from "./receipt-draft";
 import {
@@ -40,15 +42,18 @@ const failureCodeOf = (error: unknown): ReceiptFailureCode | null =>
 export class ReceiptExtraction implements OnModuleDestroy {
   private readonly logger = new Logger(ReceiptExtraction.name);
   private readonly ai: AiService;
+  private readonly categories: ExpenseCategoriesService;
   private readonly storage: ObjectStorage;
   /** Runs still going, which shutdown waits for. */
   private readonly running = new Set<Promise<void>>();
 
   constructor(
     @Inject(AiService) ai: AiService,
+    @Inject(ExpenseCategoriesService) categories: ExpenseCategoriesService,
     @Inject(ObjectStorage) storage: ObjectStorage
   ) {
     this.ai = ai;
+    this.categories = categories;
     this.storage = storage;
   }
 
@@ -84,13 +89,33 @@ export class ReceiptExtraction implements OnModuleDestroy {
       }
       const content = await this.storage.get(source.storageKey);
       const file = await attachmentInput(content, source.mimeType);
+      // The model sees list positions rather than IDs.
+      const { items: categories } = await this.categories.list(
+        source.householdId
+      );
       const reply = await this.ai.generate(source.householdId, {
         task: SCAN_RECEIPT_TASK,
         instructions: SCAN_RECEIPT_INSTRUCTIONS,
-        input: [{ type: "text", text: "Read this receipt." }, file],
+        input: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              categories: categories.map((category, index) => ({
+                number: index + 1,
+                name: category.name,
+              })),
+            }),
+          },
+          file,
+        ],
         output: ModelReceipt,
       });
-      await saveExtractedDraft(receiptId, extractionId, toReceiptDraft(reply));
+      await saveExtractedDraft(
+        receiptId,
+        extractionId,
+        toReceiptDraft(reply),
+        toCategorySuggestion(reply, categories)
+      );
     } catch (error) {
       const code = failureCodeOf(error);
       if (code === null) {

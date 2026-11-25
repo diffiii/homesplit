@@ -1,10 +1,14 @@
 import {
+  AssignReceiptItemsRequest,
+  ConfirmReceiptRequest,
+  type ConfirmReceiptResponse,
   CreateReceiptRequest,
   endpoints,
   Id,
   ListReceiptsQuery,
   type Receipt,
   type ReceiptListResponse,
+  type ReceiptSplit,
   UpdateReceiptRequest,
 } from "@homesplit/contracts";
 import { Body, Controller, Inject, Param, Query } from "@nestjs/common";
@@ -15,15 +19,21 @@ import {
 import type { HouseholdContext } from "@/features/households/access/household.guard";
 import { PatchPipe } from "@/http/patch.pipe";
 import { ZodPipe } from "@/http/zod.pipe";
+import { ReceiptConfirmationService } from "./receipt-confirmation.service";
 import { ReceiptsService } from "./receipts.service";
 
 /** Writes need `expenses`; `AiService` also checks `ai` before reading a receipt. */
 @Controller()
 export class ReceiptsController {
   private readonly receipts: ReceiptsService;
+  private readonly confirmation: ReceiptConfirmationService;
 
-  constructor(@Inject(ReceiptsService) receipts: ReceiptsService) {
+  constructor(
+    @Inject(ReceiptsService) receipts: ReceiptsService,
+    @Inject(ReceiptConfirmationService) confirmation: ReceiptConfirmationService
+  ) {
     this.receipts = receipts;
+    this.confirmation = confirmation;
   }
 
   @HouseholdRoute(endpoints.listReceipts)
@@ -73,5 +83,33 @@ export class ReceiptsController {
     @Param("receiptId", new ZodPipe(Id)) receiptId: Id
   ): Promise<Receipt> {
     return this.receipts.retry(household.householdId, receiptId);
+  }
+
+  @HouseholdRoute(endpoints.assignReceiptItems, { module: "expenses" })
+  assignReceiptItems(
+    @CurrentHousehold() household: HouseholdContext,
+    @Param("receiptId", new ZodPipe(Id)) receiptId: Id,
+    @Body(new ZodPipe(AssignReceiptItemsRequest))
+    body: AssignReceiptItemsRequest
+  ): Promise<Receipt> {
+    return this.confirmation.assign(household.householdId, receiptId, body);
+  }
+
+  @HouseholdRoute(endpoints.getReceiptSplit)
+  getReceiptSplit(
+    @CurrentHousehold() household: HouseholdContext,
+    @Param("receiptId", new ZodPipe(Id)) receiptId: Id
+  ): Promise<ReceiptSplit> {
+    return this.confirmation.split(household.householdId, receiptId);
+  }
+
+  /** Any member may confirm, as any member may record an expense. */
+  @HouseholdRoute(endpoints.confirmReceipt, { module: "expenses" })
+  confirmReceipt(
+    @CurrentHousehold() household: HouseholdContext,
+    @Param("receiptId", new ZodPipe(Id)) receiptId: Id,
+    @Body(new ZodPipe(ConfirmReceiptRequest)) body: ConfirmReceiptRequest
+  ): Promise<ConfirmReceiptResponse> {
+    return this.confirmation.confirm(household, receiptId, body);
   }
 }

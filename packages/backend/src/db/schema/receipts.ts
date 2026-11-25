@@ -8,12 +8,15 @@ import {
   integer,
   numeric,
   pgTable,
+  primaryKey,
   text,
   timestamp,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 import { attachments } from "./attachments";
 import { organization, user } from "./auth";
+import { expenseCategories, expenses } from "./expenses";
 import { householdMembershipHistory } from "./households";
 
 /**
@@ -21,6 +24,10 @@ import { householdMembershipHistory } from "./households";
  * fields stay null until extraction or a member fills them in. While
  * `status` is `processing`, `extraction_id` names the run allowed to write
  * the result, so a run that a retry or a discard overtook writes nothing.
+ * `expense_id` is the expense a confirmed receipt became; editing that
+ * expense's amounts unlinks it, and the receipt stays `confirmed`.
+ * `suggested_category_id` is the category the scan picked, with how sure the
+ * model was; confirming uses it when that's `high`.
  */
 export const receipts = pgTable(
   "receipts",
@@ -40,6 +47,18 @@ export const receipts = pgTable(
     discountCents: bigint("discount_cents", { mode: "bigint" })
       .notNull()
       .default(sql`0`),
+    // Deleting the expense puts the receipt back to `ready` first; `SET NULL`
+    // only covers a household's deletion, which cascades to both.
+    expenseId: uuid("expense_id").references(() => expenses.id, {
+      onDelete: "set null",
+    }),
+    // Picked by the scan from the household's own categories; deleting the
+    // category only drops the suggestion.
+    suggestedCategoryId: uuid("suggested_category_id").references(
+      () => expenseCategories.id,
+      { onDelete: "set null" }
+    ),
+    suggestedCategoryConfidence: text("suggested_category_confidence"),
     createdById: uuid("created_by_id")
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
@@ -82,10 +101,27 @@ export const receipts = pgTable(
     check("receipts_currency_code", sql`${table.currency} ~ '^[A-Z]{3}$'`),
     check("receipts_total_nonnegative", sql`${table.totalCents} >= 0`),
     check("receipts_discount_nonnegative", sql`${table.discountCents} >= 0`),
+    check(
+      "receipts_expense",
+      sql`${table.expenseId} IS NULL OR ${table.status} = 'confirmed'`
+    ),
+    check(
+      "receipts_suggested_category_confidence",
+      sql`${table.suggestedCategoryConfidence} IN ('low', 'medium', 'high')`
+    ),
+    // The confidence may outlive a deleted category, never the reverse.
+    check(
+      "receipts_suggested_category",
+      sql`${table.suggestedCategoryId} IS NULL OR ${table.suggestedCategoryConfidence} IS NOT NULL`
+    ),
+    // One receipt per expense; also serves the lookup from the expense.
+    unique("receipts_expense_id_key").on(table.expenseId),
     // Read backward for the list order: `created_at` desc, `id` desc.
     index("receipts_list_idx").on(table.householdId, table.createdAt, table.id),
     // Serves cleanup's check for receipts of a file, and the cascade above.
     index("receipts_attachment_idx").on(table.attachmentId),
+    // Serves the `SET NULL` when a category is deleted.
+    index("receipts_suggested_category_idx").on(table.suggestedCategoryId),
   ]
 );
 
@@ -114,9 +150,52 @@ export const receiptItems = pgTable(
     check("receipt_items_position_nonnegative", sql`${table.position} >= 0`),
     check("receipt_items_quantity_positive", sql`${table.quantity} > 0`),
     check(
+      "receipt_items_unit_price_nonnegative",
+      sql`${table.unitPriceCents} >= 0`
+    ),
+    check(
       "receipt_items_discount_nonnegative",
       sql`${table.discountCents} >= 0`
     ),
+    // A returned deposit is part of the receipt's discount, never a line.
+    check("receipt_items_total_nonnegative", sql`${table.totalCents} >= 0`),
     index("receipt_items_receipt_idx").on(table.receiptId, table.position),
+  ]
+);
+
+/**
+ * Who has which receipt item, as shares of it. The household's membership
+ * history key keeps every assignee a party of the household, as for expense
+ * participants; the service checks they're current members. Rows go with
+ * their item.
+ */
+export const receiptItemAssignments = pgTable(
+  "receipt_item_assignments",
+  {
+    receiptItemId: uuid("receipt_item_id")
+      .notNull()
+      .references(() => receiptItems.id, { onDelete: "cascade" }),
+    householdId: uuid("household_id").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    shares: integer("shares").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.receiptItemId, table.userId] }),
+    foreignKey({
+      name: "receipt_item_assignments_party_fk",
+      columns: [table.householdId, table.userId],
+      foreignColumns: [
+        householdMembershipHistory.organizationId,
+        householdMembershipHistory.userId,
+      ],
+    }),
+    check("receipt_item_assignments_shares_positive", sql`${table.shares} > 0`),
+    // Serves the party key above.
+    index("receipt_item_assignments_party_idx").on(
+      table.householdId,
+      table.userId
+    ),
   ]
 );
