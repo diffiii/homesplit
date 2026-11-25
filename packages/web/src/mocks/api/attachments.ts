@@ -2,31 +2,35 @@ import {
   ATTACHMENT_MIME_TYPES,
   ATTACHMENT_UPLOAD_FIELD,
   type AttachmentMimeType,
+  endpoints,
+  isImageType,
 } from "@homesplit/contracts";
+import { type HttpHandler, HttpResponse, http } from "msw";
 import { ATTACHMENT_MAX_BYTES, attachmentTypeOf } from "@/lib/attachments";
-import { now } from "../db";
-import type { MockRoutes } from "../routes";
+import { type MockDb, now } from "../db";
+import { notFound, unauthenticated } from "../errors";
+import { type MockNetwork, type MockRoutes, simulateLatency } from "../routes";
 import { findInHousehold, uploadedFile } from "./shared";
 
 /** How long a download link works, as the backend's default TTL. */
 const DOWNLOAD_TTL_MS = 5 * 60 * 1000;
 
 /**
- * Object URLs of the files uploaded since the page loaded, by attachment ID.
- * They can't be saved with the state, so after a reload, and for seeded
- * files, a download gets a sample of the file's type instead.
+ * The files uploaded since the page loaded, by attachment ID, with images
+ * served as their own thumbnails. They can't be saved with the state, so
+ * after a reload, and for seeded files, a sample of the file's type stands in.
  */
-const contents = new Map<string, string>();
+const files = new Map<string, Blob>();
 
-const SAMPLE_IMAGE = `data:image/svg+xml,${encodeURIComponent(
-  [
-    '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800">',
-    '<rect width="600" height="800" fill="#fafaf9"/>',
-    '<rect x="60" y="60" width="480" height="680" rx="12" fill="#fff" stroke="#d6d3d1" stroke-width="4"/>',
-    '<text x="300" y="400" fill="#57534e" font-family="sans-serif" font-size="36" text-anchor="middle">Sample receipt</text>',
-    "</svg>",
-  ].join("")
-)}`;
+const SAMPLE_SVG = [
+  '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800">',
+  '<rect width="600" height="800" fill="#fafaf9"/>',
+  '<rect x="60" y="60" width="480" height="680" rx="12" fill="#fff" stroke="#d6d3d1" stroke-width="4"/>',
+  '<text x="300" y="400" fill="#57534e" font-family="sans-serif" font-size="36" text-anchor="middle">Sample receipt</text>',
+  "</svg>",
+].join("");
+
+const SAMPLE_IMAGE = `data:image/svg+xml,${encodeURIComponent(SAMPLE_SVG)}`;
 
 const SAMPLE_PDF = [
   "%PDF-1.4",
@@ -64,23 +68,16 @@ export const attachmentRoutes: MockRoutes = {
       const attachment = {
         id: crypto.randomUUID(),
         householdId: household.id,
+        hasThumbnail: isImageType(type),
         mimeType: type,
         sizeBytes: file.size,
         uploadedById: userId,
         createdAt: now(),
       };
       db.state.attachments.push(attachment);
-      if (typeof URL.createObjectURL === "function") {
-        contents.set(attachment.id, URL.createObjectURL(file));
-      }
+      files.set(attachment.id, file);
       const { uploadedById, ...rest } = attachment;
-      return {
-        ...rest,
-        // The mocks make no thumbnails, and `getAttachmentThumbnail` has no
-        // mock route, so its path answers 501.
-        hasThumbnail: false,
-        uploadedBy: db.summary(uploadedById),
-      };
+      return { ...rest, uploadedBy: db.summary(uploadedById) };
     },
   },
 
@@ -91,10 +88,51 @@ export const attachmentRoutes: MockRoutes = {
         household.id,
         params.attachmentId
       );
+      const file = files.get(attachment.id);
       return {
-        url: contents.get(attachment.id) ?? sampleUrl(attachment.mimeType),
+        // jsdom has no object URLs, so it gets the sample.
+        url:
+          file && typeof URL.createObjectURL === "function"
+            ? URL.createObjectURL(file)
+            : sampleUrl(attachment.mimeType),
         expiresAt: new Date(Date.now() + DOWNLOAD_TTL_MS).toISOString(),
       };
     },
   },
 };
+
+/**
+ * `getAttachmentThumbnail`, a 302 route, so not among the `MockRoutes`. It
+ * answers 200 with the content the redirect leads to, since browsers don't
+ * follow redirects to the `blob:` URLs the mocks serve files from: the uploaded
+ * image itself rather than a resized copy, or the sample for seeded ones.
+ */
+export function createThumbnailHandler(
+  db: MockDb,
+  network: () => MockNetwork
+): HttpHandler {
+  return http.get(
+    `*${endpoints.getAttachmentThumbnail.path}`,
+    async ({ params }) => {
+      await simulateLatency(network());
+      const userId = db.state.sessionUserId;
+      if (!userId) {
+        return unauthenticated().toResponse();
+      }
+      const householdId = String(params.householdId);
+      const attachment = db.state.attachments.find(
+        ({ id, householdId: owner }) =>
+          id === params.attachmentId && owner === householdId
+      );
+      if (!(attachment?.hasThumbnail && db.member(householdId, userId))) {
+        return notFound().toResponse();
+      }
+      const image =
+        files.get(attachment.id) ??
+        new Blob([SAMPLE_SVG], { type: "image/svg+xml" });
+      return new HttpResponse(image, {
+        headers: { "Content-Type": image.type },
+      });
+    }
+  );
+}

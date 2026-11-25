@@ -76,8 +76,9 @@ export interface MockRoute<E extends Endpoint> {
 }
 
 /**
- * Mock implementations by endpoint name. A route left out, or a 302 route
- * (`ApiEndpointName` leaves those out), answers 501 and logs an error.
+ * Mock implementations by endpoint name. A route left out answers 501 and
+ * logs an error. A 302 route isn't one (`ApiEndpointName` leaves those out):
+ * `handlers.ts` serves it with its own handler.
  */
 export type MockRoutes = {
   [N in ApiEndpointName]?: MockRoute<Endpoints[N]>;

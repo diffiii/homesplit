@@ -11,7 +11,13 @@ import {
   UNCATEGORIZED,
   WRITE_OFF_NOTE,
 } from "@homesplit/contracts";
-import { type MockDb, type MockExpense, type MockSettlement, now } from "../db";
+import {
+  type MockAttachment,
+  type MockDb,
+  type MockExpense,
+  type MockSettlement,
+  now,
+} from "../db";
 import {
   conflict,
   forbidden,
@@ -47,17 +53,17 @@ function linkedAttachments(db: MockDb, expenseId: string): AttachmentSummary[] {
     const attachment = db.state.attachments.find(
       ({ id }) => id === attachmentId
     );
-    return attachment
-      ? [
-          {
-            id: attachment.id,
-            mimeType: attachment.mimeType,
-            sizeBytes: attachment.sizeBytes,
-            hasThumbnail: false,
-          },
-        ]
-      : [];
+    return attachment ? [toSummary(attachment)] : [];
   });
+}
+
+function toSummary({
+  id,
+  mimeType,
+  sizeBytes,
+  hasThumbnail,
+}: MockAttachment): AttachmentSummary {
+  return { id, mimeType, sizeBytes, hasThumbnail };
 }
 
 /** Child rows come back sorted by user ID, and splits are calculated on read. */
@@ -450,12 +456,7 @@ export const expenseRoutes: MockRoutes = {
         attachmentId: attachment.id,
         createdAt: now(),
       });
-      return {
-        id: attachment.id,
-        mimeType: attachment.mimeType,
-        sizeBytes: attachment.sizeBytes,
-        hasThumbnail: false,
-      };
+      return toSummary(attachment);
     },
   },
 

@@ -2,14 +2,16 @@
 
 import {
   type AttachmentSummary,
+  buildPath,
   type Expense,
+  endpoints,
   isImageType,
 } from "@homesplit/contracts";
 import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLinkIcon, Trash2Icon } from "lucide-react";
 import { useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { fileIcon } from "@/components/file-upload";
+import { FilePreview } from "@/components/file-preview";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -29,10 +31,10 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { describeFile, FileViewer, type ListedFile } from "./file-viewer";
 
 /**
- * The files attached to an expense. Opening one asks for a fresh download
- * link: images open in a viewer, and other files in a new tab, where the
- * browser shows or saves them. The author or an admin+ can detach files
- * while expenses are turned on.
+ * The files attached to an expense, each with its thumbnail or type icon.
+ * Opening one asks for a fresh download link: images open in a viewer, and
+ * other files in a new tab, where the browser shows or saves them. The
+ * author or an admin+ can detach files while expenses are turned on.
  */
 export function ExpenseFiles({ expense }: { expense: Expense }) {
   const householdId = useHouseholdId();
@@ -133,15 +135,22 @@ export function ExpenseFiles({ expense }: { expense: Expense }) {
         <ul className="flex flex-col divide-y rounded-xl border">
           {expense.attachments.map((attachment, index) => {
             const file = { attachment, label: `File ${index + 1}` };
-            const Icon = fileIcon(attachment.mimeType);
+            const thumbnail = attachment.hasThumbnail
+              ? buildPath(endpoints.getAttachmentThumbnail, {
+                  householdId,
+                  attachmentId: attachment.id,
+                })
+              : null;
             return (
               <li
                 className="flex items-center gap-3 py-2 pr-2 pl-4"
                 key={attachment.id}
               >
-                <div className="bg-muted flex size-10 shrink-0 items-center justify-center rounded-md">
-                  <Icon aria-hidden className="text-muted-foreground size-5" />
-                </div>
+                <FilePreview
+                  size={40}
+                  src={thumbnail}
+                  type={attachment.mimeType}
+                />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <p className="text-sm font-medium">{file.label}</p>
                   <p className="text-muted-foreground text-xs">

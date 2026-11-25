@@ -5,12 +5,8 @@ import {
   type AttachmentMimeType,
   isImageType,
 } from "@homesplit/contracts";
-import { cn } from "cn";
 import {
   CameraIcon,
-  FileIcon,
-  FileImageIcon,
-  FileTextIcon,
   type LucideIcon,
   PaperclipIcon,
   RotateCwIcon,
@@ -18,6 +14,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { type ChangeEvent, useEffect, useRef, useState } from "react";
+import { FilePreview } from "@/components/file-preview";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { uploadAttachment } from "@/lib/api/upload";
@@ -297,7 +294,7 @@ function UploadRow({ item, actions }: UploadRowProps) {
   const percent = Math.round(item.progress * 100);
   return (
     <li className="flex items-center gap-3 rounded-lg border p-2">
-      <Preview item={item} />
+      <FilePreview size={48} src={item.previewUrl} type={item.type} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <p className="truncate text-sm font-medium">{file.name}</p>
         {status === "rejected" || status === "failed" ? (
@@ -343,44 +340,6 @@ const STATUS_LABELS: Record<
   uploaded: () => "Uploaded",
   canceled: () => "Canceled",
 };
-
-/** The image itself, or an icon for files the browser can't show, such as PDFs and HEIC outside Safari. */
-function Preview({ item }: { item: UploadItem }) {
-  const [broken, setBroken] = useState(false);
-  const box = "size-12 shrink-0 rounded-md";
-  if (item.previewUrl && !broken) {
-    return (
-      // biome-ignore lint/performance/noImgElement: next/image can't optimize a local object URL.
-      // biome-ignore lint/a11y/noNoninteractiveElementInteractions: `onError` is a load failure, not user input.
-      <img
-        alt=""
-        className={cn(box, "object-cover")}
-        data-testid="file-preview"
-        height={48}
-        onError={() => setBroken(true)}
-        src={item.previewUrl}
-        width={48}
-      />
-    );
-  }
-  const Icon = fileIcon(item.type);
-  return (
-    <div
-      className={cn(box, "bg-muted flex items-center justify-center")}
-      data-testid="file-icon"
-    >
-      <Icon aria-hidden className="text-muted-foreground size-5" />
-    </div>
-  );
-}
-
-/** The icon for a file of `type`: a document for PDFs, a picture for images. */
-export function fileIcon(type: AttachmentMimeType | null): LucideIcon {
-  if (type === "application/pdf") {
-    return FileTextIcon;
-  }
-  return isImageType(type) ? FileImageIcon : FileIcon;
-}
 
 function revokePreview(item: UploadItem) {
   if (item.previewUrl) {

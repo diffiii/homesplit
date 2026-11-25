@@ -8,6 +8,8 @@ const CATEGORY_IN_URL = /[?&]category=[0-9a-f-]+/u;
 const EXPENSE_URL = /\/expenses\/[0-9a-f-]+\?category=/u;
 const LIST_URL = /\/expenses$/u;
 const INTERNET = /^Internet/u;
+const ELECTRICITY = /^Electricity/u;
+const DOWNLOAD = /\/download$/u;
 const DATES_IN_URL = /from=\d{4}-\d{2}-\d{2}&to=\d{4}-\d{2}-\d{2}/u;
 const PREVIOUS = /previous/iu;
 const NEXT = /next/iu;
@@ -62,6 +64,38 @@ test("scrolls, filters, and opens an expense", async ({ page }) => {
   await page.getByRole("button", { name: "Clear filters" }).click();
   await expect(page).toHaveURL(LIST_URL);
   await expect(page.getByText("Showing 20 of 26 expenses")).toBeVisible();
+});
+
+test("shows a thumbnail of an expense's photo and an icon for its PDF", async ({
+  page,
+}) => {
+  let downloads = 0;
+  page.on("request", (request) => {
+    if (DOWNLOAD.test(new URL(request.url()).pathname)) {
+      downloads += 1;
+    }
+  });
+  await page.goto("/households");
+  await page.getByRole("link", { name: "Flat on Piękna" }).click();
+  await expect(page).toHaveURL(HOUSEHOLD_URL);
+  await page.goto(`${new URL(page.url()).pathname}/expenses`);
+  await page.getByRole("link", { name: ELECTRICITY }).click();
+
+  const files = page.getByRole("region", { name: "Files" });
+  const thumbnail = files.getByTestId("file-preview");
+  // Loaded through the mocks, not broken and replaced by the icon.
+  await expect
+    .poll(() =>
+      thumbnail.evaluate((image: HTMLImageElement) => image.naturalWidth)
+    )
+    .toBeGreaterThan(0);
+  await expect(files.getByTestId("file-icon")).toHaveCount(1);
+  await expect(
+    files.getByRole("button", { name: "Open File 1" })
+  ).toBeVisible();
+  // Showing thumbnails asks for no download links.
+  expect(downloads).toBe(0);
+  await expectNoAxeViolations(page);
 });
 
 test("filters by a date range from the calendar", async ({ page }) => {

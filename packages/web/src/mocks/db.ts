@@ -76,6 +76,8 @@ export interface MockExpense {
 /** A stored file. Its content isn't kept in the state; see `mocks/api/attachments.ts`. */
 export interface MockAttachment {
   createdAt: string;
+  /** Whether `getAttachmentThumbnail` serves a preview, as the backend has for images. */
+  hasThumbnail: boolean;
   householdId: string;
   id: string;
   mimeType: AttachmentMimeType;
