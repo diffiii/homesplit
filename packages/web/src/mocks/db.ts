@@ -5,6 +5,8 @@ import type {
   ExpensePayerInput,
   HouseholdFeatures,
   PositiveMoney,
+  ReceiptFailureCode,
+  ReceiptStatus,
   UserSummary,
 } from "@homesplit/contracts";
 import type { HouseholdRole } from "@/lib/api/auth-client";
@@ -93,6 +95,34 @@ export interface MockExpenseAttachment {
   householdId: string;
 }
 
+export interface MockReceiptItem {
+  discountCents: number;
+  id: string;
+  name: string;
+  position: number;
+  quantity: number;
+  totalCents: number;
+  unitPriceCents: number;
+}
+
+/** A scanned receipt; the mocks "read" it on its first fetch instead of calling a model. */
+export interface MockReceipt {
+  attachmentId: string;
+  createdAt: string;
+  createdById: string;
+  currency: string | null;
+  discountCents: number;
+  failureCode: ReceiptFailureCode | null;
+  householdId: string;
+  id: string;
+  items: MockReceiptItem[];
+  merchant: string | null;
+  purchasedOn: string | null;
+  status: ReceiptStatus;
+  totalCents: number | null;
+  updatedAt: string;
+}
+
 export interface MockSettlement {
   amount: PositiveMoney;
   confirmedAt: string | null;
@@ -171,6 +201,7 @@ export interface MockState {
   members: MockMember[];
   /** Sessions on the users' other devices. */
   otherSessions: MockSession[];
+  receipts: MockReceipt[];
   /** The signed-in user, standing in for the session cookie. */
   sessionUserId: string | null;
   settlements: MockSettlement[];

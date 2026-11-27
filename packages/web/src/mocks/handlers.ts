@@ -5,6 +5,7 @@ import { expenseRoutes } from "./api/expenses";
 import { householdRoutes } from "./api/households";
 import { invitationRoutes } from "./api/invitations";
 import { meRoutes } from "./api/me";
+import { receiptRoutes } from "./api/receipts";
 import { shoppingRoutes } from "./api/shopping";
 import { createAuthHandlers } from "./auth";
 import type { MockDb } from "./db";
@@ -21,6 +22,7 @@ export const mockRoutes: MockRoutes = {
   ...invitationRoutes,
   ...expenseRoutes,
   ...attachmentRoutes,
+  ...receiptRoutes,
   ...choreRoutes,
   ...shoppingRoutes,
   ...meRoutes,

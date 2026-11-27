@@ -15,7 +15,8 @@ export interface Scenario {
  *   over a page of them, with every split method, and a photo and a PDF
  *   on the electricity bill; pending and confirmed payments; open, overdue,
  *   unassigned, and completed chores; bought and unbought shopping; a
- *   pending invitation.
+ *   pending invitation; a receipt draft whose items don't add up yet and a
+ *   receipt that couldn't be read.
  * - Lake cabin: Ewa is the owner and Alice a member, with chores turned off
  *   but still holding chores, and expenses in EUR and PLN.
  * - Book club: Filip's household, where Alice has a pending invitation.
@@ -293,6 +294,41 @@ function households(): MockState {
     },
     { signedIn: { daysAgo: 6 }, lastActive: { daysAgo: 4 } }
   );
+
+  f.receipt(flat, {
+    scannedBy: bartek,
+    merchant: "Lidl",
+    totalCents: 2847,
+    items: [
+      {
+        name: "Pasta 500 g",
+        quantity: 2,
+        unitPriceCents: 499,
+        discountCents: 0,
+        totalCents: 998,
+      },
+      {
+        name: "Tomatoes",
+        quantity: 0.734,
+        unitPriceCents: 1299,
+        discountCents: 0,
+        totalCents: 953,
+      },
+      {
+        name: "Parmesan",
+        quantity: 1,
+        unitPriceCents: 1199,
+        discountCents: 200,
+        totalCents: 999,
+      },
+    ],
+    hoursAgo: 20,
+  });
+  f.receipt(flat, {
+    scannedBy: alice,
+    failureCode: "AI_LIMIT_EXCEEDED",
+    hoursAgo: 2,
+  });
 
   f.signIn(alice);
   return f.state;
