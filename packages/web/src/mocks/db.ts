@@ -5,6 +5,7 @@ import type {
   ExpensePayerInput,
   HouseholdFeatures,
   PositiveMoney,
+  Receipt,
   ReceiptFailureCode,
   ReceiptStatus,
   UserSummary,
@@ -96,6 +97,8 @@ export interface MockExpenseAttachment {
 }
 
 export interface MockReceiptItem {
+  /** Who has the item, as `receipt_item_assignments` keeps it. */
+  assignments: { shares: number; userId: string }[];
   discountCents: number;
   id: string;
   name: string;
@@ -112,6 +115,8 @@ export interface MockReceipt {
   createdById: string;
   currency: string | null;
   discountCents: number;
+  /** The expense a confirmed receipt became, until its amounts are edited. */
+  expenseId: string | null;
   failureCode: ReceiptFailureCode | null;
   householdId: string;
   id: string;
@@ -119,6 +124,7 @@ export interface MockReceipt {
   merchant: string | null;
   purchasedOn: string | null;
   status: ReceiptStatus;
+  suggestedCategory: Receipt["suggestedCategory"];
   totalCents: number | null;
   updatedAt: string;
 }

@@ -43,6 +43,7 @@ import {
   receiptTitle,
 } from "@/lib/receipts";
 import { ReceiptDraftForm } from "./receipt-draft-form";
+import { ReceiptWorkspace } from "./receipt-workspace";
 
 /**
  * One scanned receipt: the wait while it's read, what went wrong when it
@@ -122,7 +123,7 @@ function ReceiptBody({
       return <ConfirmedState receipt={receipt} />;
     default:
       return editable ? (
-        <ReceiptDraftForm key={receipt.id} receipt={receipt} />
+        <ReceiptWorkspace key={receipt.id} receipt={receipt} />
       ) : (
         <ReadOnlyItems receipt={receipt} />
       );

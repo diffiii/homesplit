@@ -91,7 +91,9 @@ export function renderExpense(db: MockDb, expense: MockExpense): Expense {
       ({ userId, amountCents }) => ({ user: db.summary(userId), amountCents })
     ),
     attachments: linkedAttachments(db, expense.id),
-    receiptId: null,
+    receiptId:
+      db.state.receipts.find((receipt) => receipt.expenseId === expense.id)
+        ?.id ?? null,
     createdAt: expense.createdAt,
     updatedAt: expense.updatedAt,
   };
@@ -122,7 +124,7 @@ export function renderSettlement(
   return { ...base, status: "pending", confirmedBy: null, confirmedAt: null };
 }
 
-function assertCategory(
+export function assertCategory(
   db: MockDb,
   householdId: string,
   categoryId: string | null | undefined
@@ -385,6 +387,14 @@ export const expenseRoutes: MockRoutes = {
         }),
         updatedAt: now(),
       });
+      if (financial) {
+        // The receipt stays confirmed, as the record of the scan, but unlinked.
+        for (const receipt of db.state.receipts) {
+          if (receipt.expenseId === expense.id) {
+            Object.assign(receipt, { expenseId: null, updatedAt: now() });
+          }
+        }
+      }
       return renderExpense(db, expense);
     },
   },
@@ -399,6 +409,16 @@ export const expenseRoutes: MockRoutes = {
       );
       assertAuthorOrAdmin(expense, userId, member.role);
       removeRow(db.state.expenses, expense);
+      // A receipt still linked to it can be confirmed again.
+      for (const receipt of db.state.receipts) {
+        if (receipt.expenseId === expense.id) {
+          Object.assign(receipt, {
+            status: "ready",
+            expenseId: null,
+            updatedAt: now(),
+          });
+        }
+      }
       // The files stay, unlinked, for the backend's cleanup to delete.
       db.state.expenseAttachments = db.state.expenseAttachments.filter(
         (link) => link.expenseId !== expense.id

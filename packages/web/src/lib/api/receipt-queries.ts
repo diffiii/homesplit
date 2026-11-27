@@ -41,3 +41,15 @@ export function receiptListQuery(householdId: string) {
 export function receiptListKey(householdId: string) {
   return queryKeys.endpoint("listReceipts", { params: { householdId } });
 }
+
+/** How the receipt would split now: each person's amount and what's unassigned. */
+export function receiptSplitQuery(householdId: string, receiptId: string) {
+  return endpointQuery("getReceiptSplit", {
+    params: { householdId, receiptId },
+  });
+}
+
+/** The key assignment taps share, so they go out one at a time, in order. */
+export function receiptAssignKey(householdId: string, receiptId: string) {
+  return ["assignReceiptItems", householdId, receiptId] as const;
+}

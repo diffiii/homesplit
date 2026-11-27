@@ -1,1 +1,1 @@
-export { ReceiptScreen as default } from "../../receipt-screen";
+export { ReceiptScreen as default } from "./receipt-screen";
