@@ -109,6 +109,8 @@ function renderSummary(db: MockDb, receipt: MockReceipt): ReceiptSummary {
     currency: receipt.currency,
     totalCents: receipt.totalCents,
     discountCents: receipt.discountCents,
+    suggestedCategory: null,
+    expenseId: null,
     createdBy: db.summary(receipt.createdById),
     createdAt: receipt.createdAt,
     updatedAt: receipt.updatedAt,
@@ -124,7 +126,8 @@ function renderReceipt(db: MockDb, receipt: MockReceipt): Receipt {
   const itemsTotalCents = items.reduce((sum, item) => sum + item.totalCents, 0);
   return {
     ...renderSummary(db, receipt),
-    items,
+    // The mocks don't assign items yet.
+    items: items.map((item) => ({ ...item, assignments: [] })),
     itemsTotalCents,
     differenceCents:
       receipt.totalCents === null

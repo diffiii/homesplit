@@ -296,6 +296,7 @@ export class MockFactory {
     const attachment = {
       id: this.id(),
       householdId: household.id,
+      hasThumbnail: true,
       mimeType: "image/jpeg" as const,
       sizeBytes: 1_258_291,
       uploadedById: input.scannedBy.id,

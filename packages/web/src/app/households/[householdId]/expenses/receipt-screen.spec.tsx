@@ -150,6 +150,8 @@ describe("ReceiptScreen", () => {
           return HttpResponse.json({
             ...receipt,
             createdBy: db.summary(receipt.createdById),
+            suggestedCategory: null,
+            expenseId: null,
             items: [],
             itemsTotalCents: 0,
             differenceCents: null,
