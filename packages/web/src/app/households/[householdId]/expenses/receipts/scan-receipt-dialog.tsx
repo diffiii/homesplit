@@ -34,14 +34,16 @@ import { receiptListKey, receiptQuery } from "@/lib/api/receipt-queries";
  */
 export function ScanReceiptDialog({
   disabled = false,
+  variant = "default",
 }: {
   disabled?: boolean;
+  variant?: "default" | "outline";
 }) {
   const [open, setOpen] = useState(false);
   return (
     <ResponsiveDialog onOpenChange={setOpen} open={open}>
       <ResponsiveDialogTrigger
-        render={<Button disabled={disabled} type="button" />}
+        render={<Button disabled={disabled} type="button" variant={variant} />}
       >
         <ScanLineIcon aria-hidden data-icon="inline-start" />
         Scan receipt

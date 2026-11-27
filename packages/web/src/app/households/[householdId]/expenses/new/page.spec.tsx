@@ -820,6 +820,26 @@ describe("NewExpensePage", () => {
     });
   });
 
+  it("offers to scan a receipt only while AI is on", async () => {
+    const { unmount } = renderForm();
+    await screen.findByLabelText("Date");
+    expect(
+      screen.queryByRole("button", { name: "Scan receipt" })
+    ).not.toBeInTheDocument();
+    unmount();
+
+    flat().features.ai = true;
+    const { user } = renderForm();
+    await user.click(
+      await screen.findByRole("button", { name: "Scan receipt" })
+    );
+
+    expect(
+      await screen.findByRole("dialog", { name: "Scan a receipt" })
+    ).toBeVisible();
+    await expectNoAxeViolations(document.body, AXE_OPTIONS);
+  });
+
   it("shows the module as off instead of the form", async () => {
     const household = flat();
     household.features = { ...household.features, expenses: false };

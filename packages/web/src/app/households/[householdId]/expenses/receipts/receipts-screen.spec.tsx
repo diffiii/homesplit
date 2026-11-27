@@ -35,6 +35,7 @@ const pdf = () =>
 
 const LIDL = /^Lidl/u;
 const UNNAMED = /^Unnamed receipt/u;
+const CARREFOUR = /^Carrefour Express/u;
 
 // jsdom sees both navs labelled "Household"; a browser shows one per screen size.
 const AXE_OPTIONS = { rules: { "landmark-unique": { enabled: false } } };
@@ -56,13 +57,14 @@ describe("ReceiptsScreen", () => {
     const list = await screen.findByRole("list", { name: "Receipt drafts" });
     const links = within(list).getAllByRole("link");
     expect(links.map((link) => link.textContent)).toEqual([
+      expect.stringMatching(CARREFOUR),
       expect.stringMatching(UNNAMED),
       expect.stringMatching(LIDL),
     ]);
-    expect(links[0]).toHaveTextContent("Couldn't read");
-    expect(links[1]).toHaveTextContent("Draft");
-    expect(links[1]).toHaveTextContent("Scanned by Bartek Kowalski");
-    expect(links[1]).toHaveAttribute(
+    expect(links[1]).toHaveTextContent("Couldn't read");
+    expect(links[2]).toHaveTextContent("Draft");
+    expect(links[2]).toHaveTextContent("Scanned by Bartek Kowalski");
+    expect(links[2]).toHaveAttribute(
       "href",
       `/households/${flat().id}/expenses/receipts/${lidl.id}`
     );

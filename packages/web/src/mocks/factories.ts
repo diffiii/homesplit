@@ -286,9 +286,10 @@ export class MockFactory {
       currency?: CurrencyCode;
       discountCents?: number;
       failureCode?: MockReceipt["failureCode"];
-      items?: Omit<MockReceiptItem, "id" | "position">[];
+      items?: Omit<MockReceiptItem, "assignments" | "id" | "position">[];
       merchant?: string;
       scannedBy: MockUser;
+      suggestedCategory?: MockReceipt["suggestedCategory"];
       totalCents?: number;
     }
   ): MockReceipt {
@@ -319,7 +320,10 @@ export class MockFactory {
         ...item,
         id: this.id(),
         position,
+        assignments: [],
       })),
+      suggestedCategory: failed ? null : (input.suggestedCategory ?? null),
+      expenseId: null,
       createdById: input.scannedBy.id,
       createdAt,
       updatedAt: createdAt,

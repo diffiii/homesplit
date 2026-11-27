@@ -12,6 +12,7 @@ import {
   PlusIcon,
   Trash2Icon,
 } from "lucide-react";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import { useAppForm } from "@/components/form";
 import { useHouseholdId } from "@/components/shell/household-context";
@@ -19,7 +20,11 @@ import { Button } from "@/components/ui/button";
 import { isApiRequestError } from "@/lib/api/api-error";
 import { api } from "@/lib/api/client";
 import { invalidate } from "@/lib/api/queries";
-import { receiptListKey, receiptQuery } from "@/lib/api/receipt-queries";
+import {
+  receiptListKey,
+  receiptQuery,
+  receiptSplitQuery,
+} from "@/lib/api/receipt-queries";
 import { applyServerErrors, showServerErrors } from "@/lib/form";
 import {
   type DraftTotals,
@@ -49,7 +54,11 @@ function useReceiptForm(receipt: Receipt) {
         params: { householdId, receiptId: receipt.id },
         body: toUpdateReceiptRequest(values),
       }),
-    onSettled: () => invalidate(queryClient, [receiptListKey(householdId)]),
+    onSettled: () =>
+      invalidate(queryClient, [
+        receiptListKey(householdId),
+        receiptSplitQuery(householdId, receipt.id).queryKey,
+      ]),
   });
   const form = useAppForm({
     defaultValues: receiptDraftValues(receipt),
@@ -90,8 +99,19 @@ type ReceiptForm = ReturnType<typeof useReceiptForm>;
  * follows the quantity, unit price, and discount, and the summary below
  * always says whether the items add up to the receipt's total.
  */
-export function ReceiptDraftForm({ receipt }: { receipt: Receipt }) {
+export function ReceiptDraftForm({
+  receipt,
+  onDirtyChange,
+}: {
+  /** Told whether there are changes that aren't saved yet. */
+  onDirtyChange?: (dirty: boolean) => void;
+  receipt: Receipt;
+}) {
   const form = useReceiptForm(receipt);
+  const dirty = useStore(form.store, (state) => state.isDirty);
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
   return (
     <form.AppForm>
       <form.Form className="flex flex-col gap-6">
@@ -305,7 +325,7 @@ function DraftSummary({ form }: { form: ReceiptForm }) {
   return (
     <section
       aria-label="Summary"
-      className="bg-background sticky bottom-0 -mx-4 flex flex-col gap-3 border-t px-4 py-3 sm:mx-0 sm:rounded-xl sm:border"
+      className="bg-background sticky bottom-[calc(4rem+1px+env(safe-area-inset-bottom))] -mx-4 flex flex-col gap-3 border-t px-4 py-3 sm:mx-0 sm:rounded-xl sm:border md:bottom-0"
     >
       <SummaryLines currency={currency} totals={totals} />
       <form.FormError />

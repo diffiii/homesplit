@@ -34,6 +34,7 @@ import {
   useAttachFiles,
   useMemberSummaries,
 } from "../expense-form";
+import { ScanReceiptDialog } from "../receipts/scan-receipt-dialog";
 
 /**
  * Add an expense: by default the user paid it all and it's split equally, and
@@ -42,6 +43,9 @@ import {
 export default function NewExpensePage() {
   const householdId = useHouseholdId();
   const enabled = useFeatureEnabled("expenses");
+  // Like every AI feature, scanning isn't shown while AI is off.
+  const ai = useFeatureEnabled("ai");
+  const scanning = enabled && ai;
   return (
     <>
       <Link
@@ -55,7 +59,15 @@ export default function NewExpensePage() {
         <ArrowLeftIcon aria-hidden data-icon="inline-start" />
         All expenses
       </Link>
-      <PageHeader title="New expense" />
+      <PageHeader
+        actions={scanning ? <ScanReceiptDialog variant="outline" /> : null}
+        description={
+          scanning
+            ? "Have a receipt? Scan it to split it item by item."
+            : undefined
+        }
+        title="New expense"
+      />
       {enabled ? <NewExpenseForm /> : <ModuleDisabledAlert module="Expenses" />}
     </>
   );

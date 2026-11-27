@@ -86,6 +86,7 @@ function finishReading(db: MockDb, receipt: MockReceipt): void {
         ...item,
         id: crypto.randomUUID(),
         position,
+        assignments: [],
       })),
     });
   } else {
@@ -109,15 +110,15 @@ function renderSummary(db: MockDb, receipt: MockReceipt): ReceiptSummary {
     currency: receipt.currency,
     totalCents: receipt.totalCents,
     discountCents: receipt.discountCents,
-    suggestedCategory: null,
-    expenseId: null,
+    suggestedCategory: receipt.suggestedCategory,
+    expenseId: receipt.expenseId,
     createdBy: db.summary(receipt.createdById),
     createdAt: receipt.createdAt,
     updatedAt: receipt.updatedAt,
   };
 }
 
-function renderReceipt(db: MockDb, receipt: MockReceipt): Receipt {
+export function renderReceipt(db: MockDb, receipt: MockReceipt): Receipt {
   const items = sortBy(
     receipt.items,
     asc((item) => item.position),
@@ -126,8 +127,13 @@ function renderReceipt(db: MockDb, receipt: MockReceipt): Receipt {
   const itemsTotalCents = items.reduce((sum, item) => sum + item.totalCents, 0);
   return {
     ...renderSummary(db, receipt),
-    // The mocks don't assign items yet.
-    items: items.map((item) => ({ ...item, assignments: [] })),
+    items: items.map(({ assignments, ...item }) => ({
+      ...item,
+      assignments: sortBy(
+        assignments,
+        asc((assignment) => assignment.userId)
+      ).map(({ userId, shares }) => ({ user: db.summary(userId), shares })),
+    })),
     itemsTotalCents,
     differenceCents:
       receipt.totalCents === null
@@ -151,7 +157,7 @@ function replaceItems(
   receipt: MockReceipt,
   items: ReceiptItemInput[]
 ): MockReceiptItem[] {
-  const known = new Set(receipt.items.map(({ id }) => id));
+  const known = new Map(receipt.items.map((item) => [item.id, item]));
   const unknown = items.flatMap(({ id }, index) =>
     id === undefined || known.has(id)
       ? []
@@ -160,10 +166,12 @@ function replaceItems(
   if (unknown.length > 0) {
     throw invalidReference(unknown);
   }
+  // Items that stay keep who has them.
   return items.map(({ id, ...item }, position) => ({
     ...item,
     id: id ?? crypto.randomUUID(),
     position,
+    assignments: (id && known.get(id)?.assignments) || [],
   }));
 }
 
@@ -213,6 +221,8 @@ export const receiptRoutes: MockRoutes = {
         totalCents: null,
         discountCents: 0,
         items: [],
+        suggestedCategory: null,
+        expenseId: null,
         createdById: userId,
         createdAt,
         updatedAt: createdAt,
