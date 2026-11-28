@@ -205,6 +205,7 @@ function parseSplitInput(
   currency: string
 ): ParsedInput {
   switch (method) {
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: false positive, Biome 2.6.9 misreads `Exclude<SplitMethod, "equal">`.
     case "percentage": {
       const parsed = parseDecimal(input, PERCENT_EXPONENT);
       if (parsed.ok) {
@@ -221,6 +222,7 @@ function parseSplitInput(
           return { ok: false, message: "Enter a number, like 25." };
       }
     }
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: false positive, Biome 2.6.9 misreads `Exclude<SplitMethod, "equal">`.
     case "shares": {
       const text = input.trim();
       if (!text) {
@@ -230,6 +232,7 @@ function parseSplitInput(
         ? { ok: true, value: Number(text) }
         : { ok: false, message: "Enter a whole number, like 2." };
     }
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: false positive, Biome 2.6.9 misreads `Exclude<SplitMethod, "equal">`.
     case "exact": {
       const parsed = parseAmount(input, currency);
       return parsed.ok
