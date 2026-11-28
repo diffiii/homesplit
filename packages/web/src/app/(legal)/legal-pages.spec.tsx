@@ -7,8 +7,6 @@ import LegalLayout from "./layout";
 import PrivacyPage from "./privacy/page";
 import TermsPage from "./terms/page";
 
-const DRAFT_NOTICE = /This page is a draft/u;
-
 const renderLegalPage = (page: ReactNode) =>
   renderWithProviders(
     <LegalLayout params={Promise.resolve({})}>{page}</LegalLayout>
@@ -34,8 +32,21 @@ describe("PrivacyPage", () => {
       "Deleting your account",
       "Your rights and contact",
     ]);
-    expect(screen.getByText(DRAFT_NOTICE)).toBeVisible();
+    expect(screen.getByText("28 November 2026")).toHaveAttribute(
+      "dateTime",
+      "2026-11-28"
+    );
     await expectNoAxeViolations();
+  });
+
+  it("gives the contact email for privacy requests", () => {
+    renderLegalPage(<PrivacyPage />);
+
+    for (const link of screen.getAllByRole("link", {
+      name: "280633@student.pwr.edu.pl",
+    })) {
+      expect(link).toHaveAttribute("href", "mailto:280633@student.pwr.edu.pl");
+    }
   });
 
   it("links to the other legal page and back home", () => {
@@ -63,7 +74,10 @@ describe("TermsPage", () => {
       "AI features",
       "Ending your account and changes",
     ]);
-    expect(screen.getByText(DRAFT_NOTICE)).toBeVisible();
+    expect(screen.getByText("28 November 2026")).toHaveAttribute(
+      "dateTime",
+      "2026-11-28"
+    );
     expect(screen.getByRole("navigation", { name: "Legal" })).toBeVisible();
     await expectNoAxeViolations();
   });

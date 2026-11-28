@@ -1,46 +1,30 @@
-import { InfoIcon } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import type { ReactNode } from "react";
 
-/**
- * Says the page is a draft; the legal layout shows it above every page.
- * Remove it once the text is written; writing it is outside #134, which only
- * adds the pages and their sections.
- */
-export function DraftNotice() {
-  return (
-    // A note rather than the default `alert`: it's there from the start, so
-    // screen readers shouldn't announce it as news.
-    <Alert role="note">
-      <InfoIcon aria-hidden />
-      <AlertDescription>
-        This page is a draft. Its full text will be added soon.
-      </AlertDescription>
-    </Alert>
-  );
-}
+/** Where privacy requests and questions about the legal pages go. */
+export const CONTACT_EMAIL = "280633@student.pwr.edu.pl";
 
-/**
- * A placeholder for one section of a legal page: its title, and what its
- * text must cover. The PR that writes the text decides how a real section
- * looks.
- */
+/** When the privacy policy and terms last changed, shown on both. */
+export const LAST_UPDATED = new Date("2026-11-28");
+
+/** One section of a legal page: an `h2` and its text. */
 export function LegalSection({
   id,
   title,
-  covers,
+  children,
 }: {
-  covers: string;
+  children: ReactNode;
   id: string;
   title: string;
 }) {
   return (
-    <section aria-labelledby={id} className="flex flex-col gap-2">
+    <section
+      aria-labelledby={id}
+      className="flex flex-col gap-3 leading-relaxed [&_ul]:flex [&_ul]:list-disc [&_ul]:flex-col [&_ul]:gap-1 [&_ul]:pl-5"
+    >
       <h2 className="text-lg font-medium" id={id}>
         {title}
       </h2>
-      <p className="text-muted-foreground leading-relaxed">
-        To be written: {covers}
-      </p>
+      {children}
     </section>
   );
 }

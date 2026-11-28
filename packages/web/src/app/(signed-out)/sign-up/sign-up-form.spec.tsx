@@ -9,10 +9,16 @@ import { SignUpForm } from "./sign-up-form";
 describe("SignUpForm", () => {
   beforeEach(() => loadScenario("signed-out"));
 
-  it("links to the privacy policy and the terms", () => {
+  it("says creating an account accepts the terms, linking them and the privacy policy", () => {
     renderWithProviders(<SignUpForm />, { url: "/sign-up" });
 
-    expect(screen.getByRole("navigation", { name: "Legal" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Terms" })).toHaveAttribute(
+      "href",
+      "/terms"
+    );
+    expect(
+      screen.getByRole("link", { name: "Privacy policy" })
+    ).toHaveAttribute("href", "/privacy");
   });
 
   it("asks the user to open the emailed link when sign-up gives no session", async () => {
