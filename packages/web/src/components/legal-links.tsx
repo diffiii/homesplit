@@ -5,8 +5,9 @@ const LINK =
   "focus-visible:ring-ring/50 rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-3";
 
 /**
- * The privacy policy and terms, linked from the landing page, sign-up, the
- * account page, and the legal pages themselves.
+ * The privacy policy and terms, linked from the landing page, the account
+ * page, and the legal pages themselves. Sign-up links them in its consent
+ * sentence instead.
  */
 export function LegalLinks() {
   return (
