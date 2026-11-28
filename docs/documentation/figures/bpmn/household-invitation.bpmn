@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_household-invitation" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_main" name="Zaproszenie do gospodarstwa" processRef="Process_household-invitation" />
+    <bpmn:participant id="Participant_Mail" name="Usługa poczty e-mail" />
+    <bpmn:messageFlow id="Message_1" name="zaproszenie" sourceRef="Send" targetRef="Participant_Mail" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_household-invitation" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Lane_A" name="Administrator">
+        <bpmn:flowNodeRef>Start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Invite</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_S" name="System HomeSplit">
+        <bpmn:flowNodeRef>Create</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Send</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AddMember</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndMember</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Z" name="Zaproszona osoba">
+        <bpmn:flowNodeRef>Open</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>HasAccount</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>SignIn</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>SignUp</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Join</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Accept</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndRejected</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start" name="Potrzeba dodania członka">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="Invite" name="Zaproś osobę lub znajomego">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Create" name="Utwórz zaproszenie">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Send" name="Wyślij wiadomość z linkiem">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="Open" name="Otwórz link z zaproszenia">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="HasAccount" name="Ma konto?">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="SignIn" name="Zaloguj się">
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="SignUp" name="Załóż konto i potwierdź e-mail">
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Join">
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Accept" name="Przyjąć zaproszenie?">
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+      <bpmn:outgoing>Flow_11</bpmn:outgoing>
+      <bpmn:outgoing>Flow_12</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="AddMember" name="Dodaj członka do gospodarstwa">
+      <bpmn:incoming>Flow_11</bpmn:incoming>
+      <bpmn:outgoing>Flow_13</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="EndMember" name="Nowy członek gospodarstwa">
+      <bpmn:incoming>Flow_13</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="EndRejected" name="Zaproszenie odrzucone">
+      <bpmn:incoming>Flow_12</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start" targetRef="Invite" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Invite" targetRef="Create" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Create" targetRef="Send" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Send" targetRef="Open" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Open" targetRef="HasAccount" />
+    <bpmn:sequenceFlow id="Flow_6" name="tak" sourceRef="HasAccount" targetRef="SignIn" />
+    <bpmn:sequenceFlow id="Flow_7" name="nie" sourceRef="HasAccount" targetRef="SignUp" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="SignIn" targetRef="Join" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="SignUp" targetRef="Join" />
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="Join" targetRef="Accept" />
+    <bpmn:sequenceFlow id="Flow_11" name="tak" sourceRef="Accept" targetRef="AddMember" />
+    <bpmn:sequenceFlow id="Flow_12" name="nie" sourceRef="Accept" targetRef="EndRejected" />
+    <bpmn:sequenceFlow id="Flow_13" sourceRef="AddMember" targetRef="EndMember" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_1">
+      <bpmndi:BPMNShape id="Participant_main_di" bpmnElement="Participant_main" isHorizontal="true"><dc:Bounds x="0" y="0" width="1364" height="460" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_A_di" bpmnElement="Lane_A" isHorizontal="true"><dc:Bounds x="30" y="0" width="1334" height="120" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_S_di" bpmnElement="Lane_S" isHorizontal="true"><dc:Bounds x="30" y="120" width="1334" height="120" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Z_di" bpmnElement="Lane_Z" isHorizontal="true"><dc:Bounds x="30" y="240" width="1334" height="220" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_di" bpmnElement="Start"><dc:Bounds x="97" y="42" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="65" y="82" width="100" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Invite_di" bpmnElement="Invite"><dc:Bounds x="172" y="20" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Create_di" bpmnElement="Create"><dc:Bounds x="306" y="140" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Send_di" bpmnElement="Send"><dc:Bounds x="440" y="140" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Open_di" bpmnElement="Open"><dc:Bounds x="574" y="260" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="HasAccount_di" bpmnElement="HasAccount" isMarkerVisible="true"><dc:Bounds x="721" y="275" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="696" y="243" width="100" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SignIn_di" bpmnElement="SignIn"><dc:Bounds x="808" y="260" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SignUp_di" bpmnElement="SignUp"><dc:Bounds x="808" y="360" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Join_di" bpmnElement="Join" isMarkerVisible="true"><dc:Bounds x="955" y="275" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Accept_di" bpmnElement="Accept" isMarkerVisible="true"><dc:Bounds x="1055" y="275" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="1030" y="243" width="100" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AddMember_di" bpmnElement="AddMember"><dc:Bounds x="1142" y="140" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndMember_di" bpmnElement="EndMember"><dc:Bounds x="1291" y="162" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1259" y="202" width="100" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndRejected_di" bpmnElement="EndRejected"><dc:Bounds x="1179" y="382" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1147" y="422" width="100" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Participant_Mail_di" bpmnElement="Participant_Mail" isHorizontal="true"><dc:Bounds x="0" y="510" width="1364" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1"><di:waypoint x="133" y="60" /><di:waypoint x="172" y="60" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2"><di:waypoint x="282" y="60" /><di:waypoint x="361" y="60" /><di:waypoint x="361" y="140" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3"><di:waypoint x="416" y="180" /><di:waypoint x="440" y="180" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4"><di:waypoint x="550" y="180" /><di:waypoint x="629" y="180" /><di:waypoint x="629" y="260" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5"><di:waypoint x="684" y="300" /><di:waypoint x="721" y="300" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6"><di:waypoint x="771" y="300" /><di:waypoint x="808" y="300" /><bpmndi:BPMNLabel><dc:Bounds x="777" y="280" width="27" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7"><di:waypoint x="746" y="325" /><di:waypoint x="746" y="400" /><di:waypoint x="808" y="400" /><bpmndi:BPMNLabel><dc:Bounds x="751" y="329" width="27" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8"><di:waypoint x="918" y="300" /><di:waypoint x="955" y="300" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9"><di:waypoint x="918" y="400" /><di:waypoint x="980" y="400" /><di:waypoint x="980" y="325" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10"><di:waypoint x="1005" y="300" /><di:waypoint x="1055" y="300" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11"><di:waypoint x="1105" y="300" /><di:waypoint x="1197" y="300" /><di:waypoint x="1197" y="220" /><bpmndi:BPMNLabel><dc:Bounds x="1111" y="280" width="27" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_12_di" bpmnElement="Flow_12"><di:waypoint x="1080" y="325" /><di:waypoint x="1080" y="400" /><di:waypoint x="1179" y="400" /><bpmndi:BPMNLabel><dc:Bounds x="1085" y="329" width="27" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_13_di" bpmnElement="Flow_13"><di:waypoint x="1252" y="180" /><di:waypoint x="1291" y="180" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_1_di" bpmnElement="Message_1"><di:waypoint x="495" y="220" /><di:waypoint x="495" y="510" /><bpmndi:BPMNLabel><dc:Bounds x="500" y="358" width="83" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

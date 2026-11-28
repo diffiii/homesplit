@@ -11,5 +11,17 @@
     "*.css": "tailwindcss"
   },
   "js/ts.tsdk.path": "node_modules/typescript/lib",
-  "js/ts.tsdk.promptToUseWorkspaceVersion": true
+  "js/ts.tsdk.promptToUseWorkspaceVersion": true,
+  "[latex]": {
+    "editor.defaultFormatter": "James-Yu.latex-workshop",
+    "editor.formatOnPaste": false,
+    "editor.formatOnSave": false,
+    "editor.wordWrap": "on"
+  },
+  "[bibtex]": {
+    "editor.defaultFormatter": "James-Yu.latex-workshop",
+    "editor.formatOnPaste": false,
+    "editor.formatOnSave": false
+  },
+  "latex-workshop.latex.recipe.default": "latexmk (latexmkrc)"
 }

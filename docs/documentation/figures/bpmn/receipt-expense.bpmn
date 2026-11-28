@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_receipt-expense" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_main" name="Dodanie wydatku z paragonu" processRef="Process_receipt-expense" />
+    <bpmn:participant id="Participant_AI" name="Dostawca modeli AI" />
+    <bpmn:messageFlow id="Message_1" name="zdjęcie" sourceRef="Extract" targetRef="Participant_AI" />
+    <bpmn:messageFlow id="Message_2" name="dane paragonu" sourceRef="Participant_AI" targetRef="Extract" />
+    <bpmn:messageFlow id="Message_3" name="pozycje" sourceRef="CreateExpense" targetRef="Participant_AI" />
+    <bpmn:messageFlow id="Message_4" name="dopasowania" sourceRef="Participant_AI" targetRef="CreateExpense" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_receipt-expense" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Lane_C" name="Członek">
+        <bpmn:flowNodeRef>Start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Photo</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Manual</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Review</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Assign</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Matches</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Confirm</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Bought</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_S" name="System HomeSplit">
+        <bpmn:flowNodeRef>Extract</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Extracted</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CreateExpense</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start" name="Zakupy zakończone">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="Photo" name="Sfotografuj paragon">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Extract" name="Odczytaj paragon">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Extracted" name="Odczyt udany?">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Manual" name="Uzupełnij dane ręcznie">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Review" name="Sprawdź i popraw szkic">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Assign" name="Przypisz pozycje do osób">
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Matches" name="Suma zgodna?">
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Confirm" name="Zatwierdź paragon">
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_11</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="CreateExpense" name="Utwórz wydatek i dopasuj zakupy">
+      <bpmn:incoming>Flow_11</bpmn:incoming>
+      <bpmn:outgoing>Flow_12</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="Bought" name="Zatwierdź kupione pozycje">
+      <bpmn:incoming>Flow_12</bpmn:incoming>
+      <bpmn:outgoing>Flow_13</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="End" name="Wydatek zapisany">
+      <bpmn:incoming>Flow_13</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start" targetRef="Photo" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Photo" targetRef="Extract" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Extract" targetRef="Extracted" />
+    <bpmn:sequenceFlow id="Flow_4" name="tak" sourceRef="Extracted" targetRef="Review" />
+    <bpmn:sequenceFlow id="Flow_5" name="nie" sourceRef="Extracted" targetRef="Manual" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Manual" targetRef="Review" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Review" targetRef="Assign" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="Assign" targetRef="Matches" />
+    <bpmn:sequenceFlow id="Flow_9" name="tak" sourceRef="Matches" targetRef="Confirm" />
+    <bpmn:sequenceFlow id="Flow_10" name="nie" sourceRef="Matches" targetRef="Assign" />
+    <bpmn:sequenceFlow id="Flow_11" sourceRef="Confirm" targetRef="CreateExpense" />
+    <bpmn:sequenceFlow id="Flow_12" sourceRef="CreateExpense" targetRef="Bought" />
+    <bpmn:sequenceFlow id="Flow_13" sourceRef="Bought" targetRef="End" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_1">
+      <bpmndi:BPMNShape id="Participant_main_di" bpmnElement="Participant_main" isHorizontal="true"><dc:Bounds x="0" y="0" width="1432" height="340" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_C_di" bpmnElement="Lane_C" isHorizontal="true"><dc:Bounds x="30" y="0" width="1402" height="220" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_S_di" bpmnElement="Lane_S" isHorizontal="true"><dc:Bounds x="30" y="220" width="1402" height="120" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_di" bpmnElement="Start"><dc:Bounds x="97" y="42" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="65" y="82" width="100" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Photo_di" bpmnElement="Photo"><dc:Bounds x="172" y="20" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Extract_di" bpmnElement="Extract"><dc:Bounds x="306" y="240" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Extracted_di" bpmnElement="Extracted" isMarkerVisible="true"><dc:Bounds x="470" y="255" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="445" y="309" width="100" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Manual_di" bpmnElement="Manual"><dc:Bounds x="440" y="120" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Review_di" bpmnElement="Review"><dc:Bounds x="574" y="20" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Assign_di" bpmnElement="Assign"><dc:Bounds x="708" y="20" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Matches_di" bpmnElement="Matches" isMarkerVisible="true"><dc:Bounds x="855" y="35" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="830" y="3" width="100" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Confirm_di" bpmnElement="Confirm"><dc:Bounds x="942" y="20" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CreateExpense_di" bpmnElement="CreateExpense"><dc:Bounds x="1076" y="240" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Bought_di" bpmnElement="Bought"><dc:Bounds x="1210" y="20" width="110" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_di" bpmnElement="End"><dc:Bounds x="1359" y="262" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1327" y="302" width="100" height="28" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Participant_AI_di" bpmnElement="Participant_AI" isHorizontal="true"><dc:Bounds x="0" y="390" width="1432" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1"><di:waypoint x="133" y="60" /><di:waypoint x="172" y="60" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2"><di:waypoint x="282" y="60" /><di:waypoint x="361" y="60" /><di:waypoint x="361" y="240" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3"><di:waypoint x="416" y="280" /><di:waypoint x="470" y="280" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4"><di:waypoint x="520" y="280" /><di:waypoint x="629" y="280" /><di:waypoint x="629" y="100" /><bpmndi:BPMNLabel><dc:Bounds x="526" y="260" width="27" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5"><di:waypoint x="495" y="255" /><di:waypoint x="495" y="200" /><bpmndi:BPMNLabel><dc:Bounds x="500" y="235" width="27" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6"><di:waypoint x="495" y="120" /><di:waypoint x="495" y="60" /><di:waypoint x="574" y="60" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7"><di:waypoint x="684" y="60" /><di:waypoint x="708" y="60" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8"><di:waypoint x="818" y="60" /><di:waypoint x="855" y="60" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9"><di:waypoint x="905" y="60" /><di:waypoint x="942" y="60" /><bpmndi:BPMNLabel><dc:Bounds x="911" y="40" width="27" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10"><di:waypoint x="880" y="85" /><di:waypoint x="880" y="160" /><di:waypoint x="763" y="160" /><di:waypoint x="763" y="100" /><bpmndi:BPMNLabel><dc:Bounds x="885" y="89" width="27" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11"><di:waypoint x="1052" y="60" /><di:waypoint x="1131" y="60" /><di:waypoint x="1131" y="240" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_12_di" bpmnElement="Flow_12"><di:waypoint x="1186" y="280" /><di:waypoint x="1265" y="280" /><di:waypoint x="1265" y="100" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_13_di" bpmnElement="Flow_13"><di:waypoint x="1320" y="60" /><di:waypoint x="1377" y="60" /><di:waypoint x="1377" y="262" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_1_di" bpmnElement="Message_1"><di:waypoint x="347" y="320" /><di:waypoint x="347" y="390" /><bpmndi:BPMNLabel><dc:Bounds x="287" y="348" width="55" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_2_di" bpmnElement="Message_2"><di:waypoint x="375" y="390" /><di:waypoint x="375" y="320" /><bpmndi:BPMNLabel><dc:Bounds x="380" y="348" width="97" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_3_di" bpmnElement="Message_3"><di:waypoint x="1117" y="320" /><di:waypoint x="1117" y="390" /><bpmndi:BPMNLabel><dc:Bounds x="1057" y="348" width="55" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Message_4_di" bpmnElement="Message_4"><di:waypoint x="1145" y="390" /><di:waypoint x="1145" y="320" /><bpmndi:BPMNLabel><dc:Bounds x="1150" y="348" width="83" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
