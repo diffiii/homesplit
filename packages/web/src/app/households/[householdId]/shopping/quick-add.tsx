@@ -95,7 +95,7 @@ export function QuickAdd({
             {(field) => <field.UnitField label="Unit" />}
           </form.AppField>
         </div>
-        <form.SubmitButton className="col-start-3 row-start-1 mt-[calc(var(--text-sm)*1.375+--spacing(2))] sm:col-start-4">
+        <form.SubmitButton className="mt-[calc(var(--text-sm)*1.375+--spacing(2))] col-start-3 row-start-1 sm:col-start-4">
           <PlusIcon aria-hidden data-icon="inline-start" />
           Add
         </form.SubmitButton>

@@ -76,7 +76,24 @@
       "**",
       "!packages/web/src/components/ui/**",
       "!packages/web/src/hooks/use-mobile.ts"
-    ]
+    ],
+    "rules": {
+      "style": {
+        // ultracite 8.3 switched to `separatedType`. The codebase uses
+        // `import { type A, b }`, so keep Biome's default until it's migrated.
+        "useImportType": {
+          "level": "error",
+          "options": { "style": "auto" }
+        }
+      }
+    }
+  },
+  "markdown": {
+    // ultracite 8.3 turned the Markdown formatter on, which realigns every
+    // table in docs/. Keep it off, as before, until the docs are migrated.
+    "formatter": {
+      "enabled": false
+    }
   },
   "files": {
     "includes": ["!**/src/db/migrations"]
