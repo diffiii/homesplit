@@ -12,6 +12,25 @@ export const ACCOUNT_PATH = "/account";
 /** The user's friends and friend requests. */
 export const FRIENDS_PATH = "/friends";
 
+/** What HomeSplit keeps, why, and who it's shared with. */
+export const PRIVACY_PATH = "/privacy";
+
+/** The terms of using HomeSplit. */
+export const TERMS_PATH = "/terms";
+
+/**
+ * Pages anyone may open, signed in or not, such as the privacy policy that
+ * sign-up links to. The proxy lets them through either way.
+ */
+export const PUBLIC_PATHS: ReadonlySet<string> = new Set([
+  PRIVACY_PATH,
+  TERMS_PATH,
+]);
+
+export function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.has(pathname);
+}
+
 /**
  * The page `/` shows with a session cookie, sending the user on to a
  * household. Without one, `/` is the landing page.

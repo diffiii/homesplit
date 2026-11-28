@@ -32,6 +32,16 @@ describe("LandingPage", () => {
     await expectNoAxeViolations();
   });
 
+  it("links to the privacy policy and terms from the footer", () => {
+    renderWithProviders(<LandingPage />);
+
+    expect(
+      within(screen.getByRole("contentinfo")).getByRole("navigation", {
+        name: "Legal",
+      })
+    ).toBeVisible();
+  });
+
   it("leads to sign-up and sign-in", () => {
     renderWithProviders(<LandingPage />);
 

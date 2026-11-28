@@ -2,6 +2,7 @@ import { getSessionCookie } from "better-auth/cookies";
 import { type NextRequest, NextResponse } from "next/server";
 import {
   HOME_PATH,
+  isPublicPath,
   isSignedOutPath,
   SIGNED_IN_HOME_PATH,
   signInUrl,
@@ -16,6 +17,7 @@ import {
  *
  * `/` is the landing page without a cookie and the signed-in home with one,
  * so the installed app, which starts at `/`, opens straight into a household.
+ * Public pages, such as the privacy policy, open either way.
  */
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
@@ -27,7 +29,7 @@ export function proxy(request: NextRequest) {
         )
       : NextResponse.next();
   }
-  if (isSignedOutPath(pathname) || hasSession) {
+  if (isSignedOutPath(pathname) || isPublicPath(pathname) || hasSession) {
     return NextResponse.next();
   }
   return NextResponse.redirect(

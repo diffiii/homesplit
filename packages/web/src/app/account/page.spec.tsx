@@ -489,6 +489,12 @@ describe("AccountPage", () => {
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
   });
 
+  it("links to the privacy policy and terms", () => {
+    renderPage();
+
+    expect(screen.getByRole("navigation", { name: "Legal" })).toBeVisible();
+  });
+
   it("lists this device first, then the others by last activity", async () => {
     renderPage();
 

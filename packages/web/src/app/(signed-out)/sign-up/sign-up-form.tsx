@@ -10,13 +10,20 @@ import { ResendVerification } from "@/components/resend-verification";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useRedirectIfSignedIn } from "@/hooks/use-redirect-if-signed-in";
 import { account } from "@/lib/api/auth-client";
-import { safeRedirectPath, signInUrl } from "@/lib/api/session";
+import {
+  PRIVACY_PATH,
+  safeRedirectPath,
+  signInUrl,
+  TERMS_PATH,
+} from "@/lib/api/session";
 import {
   applyAuthErrors,
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
 } from "@/lib/auth-errors";
 import { VERIFICATION_LINK_HOURS } from "@/lib/verification";
+
+const TEXT_LINK = "text-foreground font-medium underline underline-offset-4";
 
 const SignUpValues = z.object({
   // The limits of `DisplayName`, which the backend checks on sign-up.
@@ -128,11 +135,19 @@ export function SignUpForm() {
         </form.Form>
       </form.AppForm>
       <p className="text-muted-foreground text-center text-sm">
+        By creating an account, you agree to the{" "}
+        <Link className={TEXT_LINK} href={TERMS_PATH}>
+          Terms
+        </Link>{" "}
+        and confirm you&apos;ve read the{" "}
+        <Link className={TEXT_LINK} href={PRIVACY_PATH}>
+          Privacy policy
+        </Link>
+        .
+      </p>
+      <p className="text-muted-foreground text-center text-sm">
         Already have an account?{" "}
-        <Link
-          className="text-foreground font-medium underline underline-offset-4"
-          href={signInUrl(redirectTo)}
-        >
+        <Link className={TEXT_LINK} href={signInUrl(redirectTo)}>
           Sign in
         </Link>
       </p>
