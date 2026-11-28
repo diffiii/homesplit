@@ -32,6 +32,8 @@ const receipt = (overrides: Partial<Receipt> = {}): Receipt => ({
   totalCents: 1360,
   discountCents: 50,
   suggestedCategory: null,
+  payer: null,
+  confirmedAt: null,
   expenseId: null,
   createdBy: USER,
   createdAt: "2026-11-02T10:00:00.000Z",

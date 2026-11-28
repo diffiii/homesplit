@@ -155,6 +155,8 @@ describe("ReceiptScreen", () => {
             items: [],
             itemsTotalCents: 0,
             differenceCents: null,
+            payer: null,
+            confirmedAt: null,
             merchant: null,
             totalCents: null,
           });

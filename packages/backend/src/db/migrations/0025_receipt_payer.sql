@@ -1,0 +1,5 @@
+ALTER TABLE "receipts" ADD COLUMN "payer_id" uuid;--> statement-breakpoint
+ALTER TABLE "receipts" ADD COLUMN "confirmed_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "receipts" ADD CONSTRAINT "receipts_payer_id_user_id_fk" FOREIGN KEY ("payer_id") REFERENCES "public"."user"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "receipts" ADD CONSTRAINT "receipts_payer_party_fk" FOREIGN KEY ("household_id","payer_id") REFERENCES "public"."household_membership_history"("organization_id","user_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "receipts" ADD CONSTRAINT "receipts_confirmation" CHECK (("receipts"."status" = 'confirmed') = ("receipts"."confirmed_at" IS NOT NULL) AND ("receipts"."confirmed_at" IS NULL) = ("receipts"."payer_id" IS NULL));

@@ -1,6 +1,6 @@
 # Receipts API
 
-Module flag: `expenses`, plus `ai` for reading receipts · Tasks: #55, #56 · Contracts: [receipts](../../packages/contracts/src/features/receipts/index.ts), [split](../../packages/contracts/src/features/receipts/split.ts)
+Module flag: `expenses`, plus `ai` for reading receipts and `shopping` for the shopping list · Tasks: #55, #56, #57 · Contracts: [receipts](../../packages/contracts/src/features/receipts/index.ts), [split](../../packages/contracts/src/features/receipts/split.ts)
 
 ## Routes
 
@@ -15,6 +15,8 @@ Module flag: `expenses`, plus `ai` for reading receipts · Tasks: #55, #56 · Co
 | PUT | `/api/households/:householdId/receipts/:receiptId/assignments` | `ReceiptIdParams`, `AssignReceiptItemsRequest` | `Receipt` | 200 | all |
 | GET | `/api/households/:householdId/receipts/:receiptId/split` | `ReceiptIdParams` | `ReceiptSplit` | 200 | all |
 | POST | `/api/households/:householdId/receipts/:receiptId/confirm` | `ReceiptIdParams`, `ConfirmReceiptRequest` | `ConfirmReceiptResponse` | 200 | all |
+| POST | `/api/households/:householdId/receipts/:receiptId/shopping-matches` | `ReceiptIdParams` | `ReceiptShoppingMatchesResponse` | 200 | all |
+| POST | `/api/households/:householdId/receipts/:receiptId/purchase-shopping-items` | `ReceiptIdParams`, `PurchaseReceiptShoppingItemsRequest` | `PurchaseReceiptShoppingItemsResponse` | 200 | all |
 
 ## Rules
 
@@ -98,6 +100,17 @@ Items and discounts are never negative, so nobody's amount is either.
 - Editing the expense's name, description, date, or category keeps the link.
 - Editing its amounts (`financial` in `PATCH /expenses/:expenseId`) unlinks the receipt: `expense.receiptId` and `receipt.expenseId` become `null`, and the receipt stays `confirmed` and read-only, as the record of the scan. It can't be confirmed again, so the edited expense and a second one never count the same costs twice. The receipt's file stays linked to the expense until someone unlinks it.
 - Deleting the expense puts the receipt back to `ready` with its items and assignments, so it can be corrected and confirmed again.
+- Confirming stores the payer as `receipt.payer` and the time as `receipt.confirmedAt`. Unlinking keeps both, and putting the receipt back to `ready` clears them.
+
+### The shopping list
+
+After confirming, the app suggests which of the household's unpurchased [shopping items](shopping.md) the receipt bought, and the member marks the ones they keep as purchased. Partial purchases (2 of 3 units) aren't supported, because an item is either purchased or not.
+
+- `POST /shopping-matches` sends the receipt's item names and quantities and the household's unpurchased items (names, quantities, and units, up to the 200 first in the list's order) to the model, numbered, never with IDs or anyone's name. The model answers list positions, which the server maps back: a position that isn't on either list, which is all an unknown or another household's ID could be, is discarded, and so is a second match for the same shopping item. Each match is `{ shoppingItem, receiptItemId, confidence }`, in the shopping list's order. Nothing is saved. With no unpurchased items or no receipt items, it answers `{ matches: [] }` without calling the model.
+- `POST /purchase-shopping-items` takes `{ itemIds }` (1 to 100, no duplicates) and marks those items purchased with `purchasedBy` the receipt's payer and `purchasedAt` its confirmation time, as `purchase` on one item would. It calls no model, so a member can pick items by hand with AI off.
+- Skipped items: an item purchased in the meantime is reported as `ALREADY_PURCHASED` and keeps its purchase; one that was deleted, or isn't the household's, as `NOT_FOUND` and stays untouched. The answer is `{ purchased, skipped }`, both in the request's order.
+- Concurrency: the bulk purchase locks the items `FOR UPDATE` in ID order, then updates only those still unpurchased, so of two overlapping requests, or a request and a single `purchase`, each item is purchased once and the other one reports it as skipped.
+- Modules and order: both routes need `shopping` (403 `MODULE_DISABLED`), then the receipt in this household (404), then a confirmed receipt (409 `RECEIPT_NOT_CONFIRMED`). Suggestions also need `ai`, checked by `AiService` after that, and use one AI request.
 
 ### Discarding
 
@@ -116,6 +129,7 @@ Shared errors from [the decision record](../decisions.md#errors) apply, as do th
 | 409 | `RECEIPT_ITEMS_UNASSIGNED` | Confirming while an item has no assignee; `details.itemIds` lists them |
 | 409 | `RECEIPT_TOTAL_MISMATCH` | Confirming while the items don't add up to the total; `details.differenceCents` |
 | 409 | `RECEIPT_ASSIGNEE_NOT_MEMBER` | Confirming with an assignee who has left; `details.userIds` |
+| 409 | `RECEIPT_NOT_CONFIRMED` | Suggesting shopping matches for, or purchasing shopping items from, a receipt that isn't confirmed |
 | 409 | `RECEIPT_NOT_FAILED` | Retrying a receipt that isn't `failed` |
 
 ## Storage
@@ -123,6 +137,7 @@ Shared errors from [the decision record](../decisions.md#errors) apply, as do th
 - `receipts`: `household_id` cascades from the household. `(attachment_id, household_id)` references `attachments (id, household_id)`, so the file is in the receipt's household; it cascades, which happens only when the household goes, because cleanup deletes only files nothing references. `(household_id, created_by_id)` references `household_membership_history`. Checks keep `status` to the four values, `failure_code` set exactly while `failed`, `extraction_id` set exactly while `processing`, a non-blank `merchant`, a three-letter `currency`, non-negative `total_cents` and `discount_cents`, `suggested_category_confidence` to `low`, `medium`, or `high`, and a confidence whenever there's a `suggested_category_id`. `receipts_list_idx (household_id, created_at, id)` serves the list, `receipts_attachment_idx (attachment_id)` serves cleanup's check and the cascade, and `receipts_suggested_category_idx (suggested_category_id)` serves the `SET NULL` when a category is deleted. `suggested_category_id` references `expense_categories.id` alone: the scan only picks from the receipt's household, and it's written while the category is locked against deletion.
 - `receipt_items`: `receipt_id` cascades from the receipt. `quantity` is `numeric(12, 3)` and amounts are `bigint`. Checks keep a non-blank `name`, a non-negative `position`, `unit_price_cents`, `discount_cents`, and `total_cents`, and a positive `quantity`. `receipt_items_receipt_idx (receipt_id, position)` serves reads; positions aren't unique, so an edit can renumber them freely.
 - `receipts.expense_id` references `expenses.id` with `ON DELETE SET NULL`, which only a household's deletion reaches, because deleting an expense puts its receipt back to `ready` first. `receipts_expense_id_key` keeps it to one receipt per expense and serves the lookup from the expense, and `receipts_expense` allows it only on a `confirmed` receipt. The confirm route creates the expense in the receipt's own household, so the key needs no `household_id`.
+- `receipts.payer_id` and `receipts.confirmed_at` are set exactly while the receipt is `confirmed` (`receipts_confirmation`), and `(household_id, payer_id)` references `household_membership_history`.
 - `receipt_item_assignments`: the primary key is `(receipt_item_id, user_id)`, and rows cascade from their item. `(household_id, user_id)` references `household_membership_history`, served by `receipt_item_assignments_party_idx`, and `shares` is a positive `integer`.
 
 ## Code

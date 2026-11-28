@@ -187,7 +187,13 @@ export class ExpensesService {
       await lockExpenseForWrite(tx, household, expenseId);
       await tx
         .update(receipts)
-        .set({ status: "ready", expenseId: null, updatedAt: sql`now()` })
+        .set({
+          status: "ready",
+          expenseId: null,
+          payerId: null,
+          confirmedAt: null,
+          updatedAt: sql`now()`,
+        })
         .where(eq(receipts.expenseId, expenseId));
       await tx
         .delete(expenses)

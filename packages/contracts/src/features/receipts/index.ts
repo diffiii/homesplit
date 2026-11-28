@@ -6,6 +6,7 @@ import { Id } from "../../common/id";
 import { CurrencyCode, MAX_AMOUNT_CENTS, MAX_SHARES } from "../../common/money";
 import { Pagination, paginatedResponse } from "../../common/pagination";
 import { CategorySuggestionConfidence, Expense } from "../expenses";
+import { PurchasedShoppingItem, UnpurchasedShoppingItem } from "../shopping";
 import { UserSummary } from "../users";
 
 /**
@@ -125,6 +126,10 @@ const ReceiptFields = z.object({
    * after the expense's amounts were edited, which unlinks the receipt.
    */
   expenseId: Id.nullable(),
+  /** Who paid, set when the receipt is confirmed, and kept after unlinking. */
+  payer: UserSummary.nullable(),
+  /** When the receipt was confirmed, or `null` before. */
+  confirmedAt: IsoDateTime.nullable(),
   createdBy: UserSummary,
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
@@ -314,3 +319,78 @@ export const ConfirmReceiptResponse = z.object({
   expense: Expense,
 });
 export type ConfirmReceiptResponse = z.infer<typeof ConfirmReceiptResponse>;
+
+/** How sure the model is that a shopping item was bought. */
+export const SHOPPING_MATCH_CONFIDENCES = ["high", "medium", "low"] as const;
+
+export const ShoppingMatchConfidence = z.enum(SHOPPING_MATCH_CONFIDENCES);
+export type ShoppingMatchConfidence = z.infer<typeof ShoppingMatchConfidence>;
+
+/** An unpurchased shopping item the receipt shows was bought, and the receipt item that bought it. */
+export const ReceiptShoppingMatch = z.object({
+  shoppingItem: UnpurchasedShoppingItem,
+  receiptItemId: Id,
+  confidence: ShoppingMatchConfidence,
+});
+export type ReceiptShoppingMatch = z.infer<typeof ReceiptShoppingMatch>;
+
+/**
+ * Suggestions only; nothing is saved. Each of the household's unpurchased
+ * items appears at most once, in the shopping list's order.
+ */
+export const ReceiptShoppingMatchesResponse = z.object({
+  matches: z.array(ReceiptShoppingMatch),
+});
+export type ReceiptShoppingMatchesResponse = z.infer<
+  typeof ReceiptShoppingMatchesResponse
+>;
+
+/** Most shopping items one request may mark purchased. */
+export const MAX_RECEIPT_PURCHASES = 100;
+
+/**
+ * Marks the household's shopping items purchased by the receipt's payer, at
+ * the time it was confirmed. They're the suggestions a member kept, or
+ * items picked by hand.
+ */
+export const PurchaseReceiptShoppingItemsRequest = z
+  .object({
+    itemIds: z.array(Id).min(1).max(MAX_RECEIPT_PURCHASES),
+  })
+  .superRefine(({ itemIds }, ctx) => {
+    const seen = new Set<string>();
+    itemIds.forEach((itemId, index) => {
+      if (seen.has(itemId)) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Duplicate item id",
+          path: ["itemIds", index],
+        });
+      }
+      seen.add(itemId);
+    });
+  });
+export type PurchaseReceiptShoppingItemsRequest = z.infer<
+  typeof PurchaseReceiptShoppingItemsRequest
+>;
+
+/**
+ * Why an item wasn't marked: it was purchased in the meantime, or it isn't
+ * one of the household's items any more, such as after being deleted.
+ */
+export const SkippedShoppingItemReason = z.enum([
+  "ALREADY_PURCHASED",
+  "NOT_FOUND",
+]);
+export type SkippedShoppingItemReason = z.infer<
+  typeof SkippedShoppingItemReason
+>;
+
+/** What was marked purchased, and what was skipped, both in request order. */
+export const PurchaseReceiptShoppingItemsResponse = z.object({
+  purchased: z.array(PurchasedShoppingItem),
+  skipped: z.array(z.object({ itemId: Id, reason: SkippedShoppingItemReason })),
+});
+export type PurchaseReceiptShoppingItemsResponse = z.infer<
+  typeof PurchaseReceiptShoppingItemsResponse
+>;
